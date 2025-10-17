@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -8,11 +8,11 @@ import {
   ActivityIndicator,
   Alert,
   TouchableOpacity,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import CurrencyCard from '../components/CurrencyCard';
-import { CURRENCY_PAIRS } from '../utils/helpers';
-import { checkApiStatus, getAllPredictions } from '../services/api';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import CurrencyCard from "../components/CurrencyCard";
+import { CURRENCY_PAIRS } from "../utils/helpers";
+import { checkApiStatus, getAllPredictions } from "../services/api";
 
 /**
  * Үндсэн дэлгэц - Валютын хослолууд
@@ -34,13 +34,13 @@ const HomeScreen = ({ navigation }) => {
 
     if (!statusResult.success) {
       Alert.alert(
-        'Холболтын алдаа',
-        'Backend API-тай холбогдож чадсангүй.\n\n' +
-        'Шалгах:\n' +
-        '1. Backend сервер ажиллаж байгаа эсэх\n' +
-        '2. IP хаяг зөв эсэх (src/services/api.js)\n' +
-        '3. Нэг сүлжээнд байгаа эсэх',
-        [{ text: 'OK' }]
+        "Холболтын алдаа",
+        "Backend API-тай холбогдож чадсангүй.\n\n" +
+          "Шалгах:\n" +
+          "1. Backend сервер ажиллаж байгаа эсэх\n" +
+          "2. IP хаяг зөв эсэх (src/services/api.js)\n" +
+          "3. Нэг сүлжээнд байгаа эсэх",
+        [{ text: "OK" }]
       );
       setLoading(false);
       return;
@@ -48,10 +48,10 @@ const HomeScreen = ({ navigation }) => {
 
     // Бүх таамаглалуудыг авах
     const result = await getAllPredictions();
-    
+
     if (result.success) {
       const predictionsMap = {};
-      result.data.forEach(item => {
+      result.data.forEach((item) => {
         if (item.success) {
           predictionsMap[item.pair] = item.data;
         }
@@ -71,11 +71,11 @@ const HomeScreen = ({ navigation }) => {
   const handlePairPress = (pair) => {
     const prediction = predictions[pair.name];
     if (!prediction) {
-      Alert.alert('Алдаа', 'Таамаглал олдсонгүй');
+      Alert.alert("Алдаа", "Таамаглал олдсонгүй");
       return;
     }
 
-    navigation.navigate('Signal', {
+    navigation.navigate("Signal", {
       pair,
       prediction,
     });
@@ -94,21 +94,23 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={['#1a237e', '#283593', '#3949ab']}
+        colors={["#1a237e", "#283593", "#3949ab"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
         <Text style={styles.headerTitle}>Форекс Сигнал</Text>
         <Text style={styles.headerSubtitle}>AI-аар хөтлөгддөг таамаглал</Text>
-        
+
         <View style={styles.statusContainer}>
-          <View style={[
-            styles.statusDot,
-            { backgroundColor: apiConnected ? '#4CAF50' : '#F44336' }
-          ]} />
+          <View
+            style={[
+              styles.statusDot,
+              { backgroundColor: apiConnected ? "#4CAF50" : "#F44336" },
+            ]}
+          />
           <Text style={styles.statusText}>
-            {apiConnected ? 'Холбогдсон' : 'Холбогдоогүй'}
+            {apiConnected ? "Холбогдсон" : "Холбогдоогүй"}
           </Text>
         </View>
       </LinearGradient>
@@ -141,9 +143,9 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.disclaimer}>
           <Text style={styles.disclaimerTitle}>⚠️ Анхааруулга</Text>
           <Text style={styles.disclaimerText}>
-            Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн.
-            Бодит худалдаанд ашиглахаас өмнө өөрийн судалгаа хийж,
-            эрсдлийн менежментийг сайн тооцоолоорой.
+            Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн. Бодит худалдаанд
+            ашиглахаас өмнө өөрийн судалгаа хийж, эрсдлийн менежментийг сайн
+            тооцоолоорой.
           </Text>
         </View>
 
@@ -156,18 +158,18 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#757575',
+    color: "#757575",
   },
   header: {
     paddingTop: 60,
@@ -176,18 +178,18 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: "bold",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   headerSubtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: "rgba(255, 255, 255, 0.9)",
     marginBottom: 12,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   statusDot: {
     width: 8,
@@ -197,8 +199,8 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 13,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    color: "#FFFFFF",
+    fontWeight: "600",
   },
   scrollView: {
     flex: 1,
@@ -210,18 +212,18 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: "bold",
+    color: "#212121",
     marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 14,
-    color: '#757575',
+    color: "#757575",
   },
   disclaimer: {
-    backgroundColor: '#FFF3E0',
+    backgroundColor: "#FFF3E0",
     borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
+    borderLeftColor: "#FF9800",
     padding: 16,
     marginHorizontal: 16,
     marginTop: 20,
@@ -229,13 +231,13 @@ const styles = StyleSheet.create({
   },
   disclaimerTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#E65100',
+    fontWeight: "bold",
+    color: "#E65100",
     marginBottom: 8,
   },
   disclaimerText: {
     fontSize: 13,
-    color: '#424242',
+    color: "#424242",
     lineHeight: 20,
   },
 });

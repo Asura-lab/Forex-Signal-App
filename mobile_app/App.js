@@ -1,9 +1,9 @@
-import React from 'react';
-import { StatusBar } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import HomeScreen from './src/screens/HomeScreen';
-import SignalScreen from './src/screens/SignalScreen';
+import React from "react";
+import { StatusBar } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
+import HomeScreen from "./src/screens/HomeScreen";
+import SignalScreen from "./src/screens/SignalScreen";
 
 const Stack = createStackNavigator();
 
@@ -16,14 +16,14 @@ export default function App() {
           initialRouteName="Home"
           screenOptions={{
             headerStyle: {
-              backgroundColor: '#1a237e',
+              backgroundColor: "#1a237e",
             },
-            headerTintColor: '#FFFFFF',
+            headerTintColor: "#FFFFFF",
             headerTitleStyle: {
-              fontWeight: 'bold',
+              fontWeight: "bold",
               fontSize: 20,
             },
-            cardStyle: { backgroundColor: '#F5F5F5' },
+            cardStyle: { backgroundColor: "#F5F5F5" },
           }}
         >
           <Stack.Screen

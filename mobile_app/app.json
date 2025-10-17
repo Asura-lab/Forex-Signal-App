@@ -11,9 +11,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#1a237e"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asuralab.forexsignal"

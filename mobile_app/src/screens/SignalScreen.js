@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,16 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import SignalCard from '../components/SignalCard';
-import StatisticsChart from '../components/StatisticsChart';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import SignalCard from "../components/SignalCard";
+import StatisticsChart from "../components/StatisticsChart";
 import {
   getTradingAdvice,
   getConfidenceLevel,
   formatDate,
-} from '../utils/helpers';
-import { getPrediction } from '../services/api';
+} from "../utils/helpers";
+import { getPrediction } from "../services/api";
 
 /**
  * Сигнал дэлгэц - Дэлгэрэнгүй таамаглал
@@ -32,20 +32,20 @@ const SignalScreen = ({ route, navigation }) => {
       headerStyle: {
         backgroundColor: pair.color,
       },
-      headerTintColor: '#fff',
+      headerTintColor: "#fff",
     });
   }, []);
 
   const handleRefresh = async () => {
     setLoading(true);
     const result = await getPrediction(pair.name);
-    
+
     if (result.success) {
       setPrediction(result.data);
     } else {
-      Alert.alert('Алдаа', 'Шинэчлэхэд алдаа гарлаа');
+      Alert.alert("Алдаа", "Шинэчлэхэд алдаа гарлаа");
     }
-    
+
     setLoading(false);
   };
 
@@ -72,9 +72,7 @@ const SignalScreen = ({ route, navigation }) => {
       >
         <Text style={styles.flag}>{pair.flag}</Text>
         <Text style={styles.pairName}>{pair.displayName}</Text>
-        <Text style={styles.timestamp}>
-          {formatDate(new Date())}
-        </Text>
+        <Text style={styles.timestamp}>{formatDate(new Date())}</Text>
       </LinearGradient>
 
       {/* Үндсэн сигнал */}
@@ -109,14 +107,12 @@ const SignalScreen = ({ route, navigation }) => {
         <View style={styles.adviceContainer}>
           <Text style={styles.adviceText}>{advice}</Text>
         </View>
-        
+
         <View style={styles.tipsContainer}>
           <Text style={styles.tipTitle}>Санамж:</Text>
           <Text style={styles.tipText}>
-            • Risk management-ийг мартуузай{'\n'}
-            • Stop loss ашигла{'\n'}
-            • Позицоо хэт томруулаагүй{'\n'}
-            • Олон шинжилгээний хослол хий
+            • Risk management-ийг мартуузай{"\n"}• Stop loss ашигла{"\n"}•
+            Позицоо хэт томруулаагүй{"\n"}• Олон шинжилгээний хослол хий
           </Text>
         </View>
       </View>
@@ -129,18 +125,18 @@ const SignalScreen = ({ route, navigation }) => {
       {/* Дэлгэрэнгүй мэдээлэл */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>📊 Дэлгэрэнгүй мэдээлэл</Text>
-        
+
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Нийт дата:</Text>
           <Text style={styles.infoValue}>
-            {prediction.total_predictions?.toLocaleString() || 'N/A'}
+            {prediction.total_predictions?.toLocaleString() || "N/A"}
           </Text>
         </View>
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Файл:</Text>
           <Text style={styles.infoValue}>
-            {prediction.file || `${pair.name.replace('/', '_')}_test.csv`}
+            {prediction.file || `${pair.name.replace("/", "_")}_test.csv`}
           </Text>
         </View>
 
@@ -164,7 +160,7 @@ const SignalScreen = ({ route, navigation }) => {
         disabled={loading}
       >
         <LinearGradient
-          colors={['#4CAF50', '#45a049']}
+          colors={["#4CAF50", "#45a049"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.refreshGradient}
@@ -188,21 +184,21 @@ const SignalScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
   },
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
   },
   errorText: {
     fontSize: 18,
-    color: '#F44336',
+    color: "#F44336",
   },
   headerGradient: {
     padding: 24,
-    alignItems: 'center',
+    alignItems: "center",
   },
   flag: {
     fontSize: 64,
@@ -210,47 +206,47 @@ const styles = StyleSheet.create({
   },
   pairName: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: "bold",
+    color: "#FFFFFF",
     marginBottom: 4,
   },
   timestamp: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: "rgba(255, 255, 255, 0.9)",
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 20,
     marginVertical: 8,
     marginHorizontal: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
   },
   cardTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: "bold",
+    color: "#212121",
     marginBottom: 16,
   },
   confidenceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   confidenceInfo: {
     marginRight: 20,
   },
   confidenceValue: {
     fontSize: 36,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: "bold",
+    color: "#212121",
   },
   confidenceLevel: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 4,
   },
   confidenceBarContainer: {
@@ -258,77 +254,77 @@ const styles = StyleSheet.create({
   },
   confidenceBarBg: {
     height: 12,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     borderRadius: 6,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   confidenceBarFill: {
-    height: '100%',
+    height: "100%",
     borderRadius: 6,
   },
   adviceContainer: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: "#E3F2FD",
     borderLeftWidth: 4,
-    borderLeftColor: '#2196F3',
+    borderLeftColor: "#2196F3",
     padding: 16,
     borderRadius: 8,
     marginBottom: 16,
   },
   adviceText: {
     fontSize: 16,
-    color: '#1565C0',
-    fontWeight: '600',
+    color: "#1565C0",
+    fontWeight: "600",
   },
   tipsContainer: {
-    backgroundColor: '#FFF9C4',
+    backgroundColor: "#FFF9C4",
     borderRadius: 8,
     padding: 12,
   },
   tipTitle: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#F57F17',
+    fontWeight: "bold",
+    color: "#F57F17",
     marginBottom: 6,
   },
   tipText: {
     fontSize: 13,
-    color: '#424242',
+    color: "#424242",
     lineHeight: 20,
   },
   infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: "#F5F5F5",
   },
   infoLabel: {
     fontSize: 14,
-    color: '#757575',
+    color: "#757575",
     flex: 1,
   },
   infoValue: {
     fontSize: 14,
-    color: '#212121',
-    fontWeight: '600',
+    color: "#212121",
+    fontWeight: "600",
     flex: 1,
-    textAlign: 'right',
+    textAlign: "right",
   },
   refreshButton: {
     marginHorizontal: 16,
     marginTop: 8,
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     elevation: 3,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
   refreshGradient: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     padding: 16,
   },
   refreshIcon: {
@@ -337,8 +333,8 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    fontWeight: "bold",
+    color: "#FFFFFF",
   },
 });
 

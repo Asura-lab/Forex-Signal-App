@@ -1,6 +1,6 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { SIGNAL_TYPES } from '../utils/helpers';
+import React from "react";
+import { View, Text, StyleSheet } from "react-native";
+import { SIGNAL_TYPES } from "../utils/helpers";
 
 /**
  * Статистикийн график компонент
@@ -17,11 +17,11 @@ const StatisticsChart = ({ statistics }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Таамаглалын хуваарилалт</Text>
-      
+
       {Object.entries(statistics).map(([trendName, data]) => {
         // Ангилалын label олох
         const label = Object.keys(SIGNAL_TYPES).find(
-          key => SIGNAL_TYPES[key].name === trendName
+          (key) => SIGNAL_TYPES[key].name === trendName
         );
         const signal = SIGNAL_TYPES[label];
         const percentage = (data.count / total) * 100;
@@ -29,7 +29,7 @@ const StatisticsChart = ({ statistics }) => {
         return (
           <View key={trendName} style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.emoji}>{signal?.emoji || '❓'}</Text>
+              <Text style={styles.emoji}>{signal?.emoji || "❓"}</Text>
               <Text style={styles.label} numberOfLines={1}>
                 {signal?.shortName || trendName}
               </Text>
@@ -41,7 +41,7 @@ const StatisticsChart = ({ statistics }) => {
                   styles.bar,
                   {
                     width: `${percentage}%`,
-                    backgroundColor: signal?.color || '#9E9E9E',
+                    backgroundColor: signal?.color || "#9E9E9E",
                   },
                 ]}
               />
@@ -63,31 +63,31 @@ const StatisticsChart = ({ statistics }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
     marginHorizontal: 16,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: "bold",
+    color: "#212121",
     marginBottom: 16,
   },
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 12,
   },
   labelContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     width: 100,
   },
   emoji: {
@@ -96,21 +96,21 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12,
-    color: '#424242',
-    fontWeight: '600',
+    color: "#424242",
+    fontWeight: "600",
     flex: 1,
   },
   barContainer: {
     flex: 1,
     height: 24,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: "#E0E0E0",
     borderRadius: 12,
-    overflow: 'hidden',
+    overflow: "hidden",
     marginHorizontal: 8,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   bar: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
@@ -118,34 +118,34 @@ const styles = StyleSheet.create({
   },
   percentage: {
     fontSize: 11,
-    fontWeight: 'bold',
-    color: '#212121',
-    textAlign: 'center',
+    fontWeight: "bold",
+    color: "#212121",
+    textAlign: "center",
     zIndex: 1,
   },
   count: {
     fontSize: 12,
-    color: '#757575',
+    color: "#757575",
     width: 50,
-    textAlign: 'right',
+    textAlign: "right",
   },
   totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 8,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    borderTopColor: "#E0E0E0",
   },
   totalLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#424242',
+    fontWeight: "bold",
+    color: "#424242",
   },
   totalValue: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2196F3',
+    fontWeight: "bold",
+    color: "#2196F3",
   },
 });
 

@@ -1,25 +1,25 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React from "react";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 /**
  * Валютын хос картын компонент
  */
 const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
   const getQuickSignal = () => {
-    if (loading) return { text: '⏳', color: '#9E9E9E' };
+    if (loading) return { text: "⏳", color: "#9E9E9E" };
     if (!prediction || !prediction.latest_prediction) {
-      return { text: '❓', color: '#9E9E9E' };
+      return { text: "❓", color: "#9E9E9E" };
     }
 
     const { label } = prediction.latest_prediction;
-    
-    if (label === 0) return { text: '📉💥', color: '#D32F2F' };
-    if (label === 1) return { text: '📉', color: '#F44336' };
-    if (label === 2) return { text: '➡️', color: '#FFC107' };
-    if (label === 3) return { text: '📈', color: '#4CAF50' };
-    if (label === 4) return { text: '📈🚀', color: '#2E7D32' };
-    
-    return { text: '❓', color: '#9E9E9E' };
+
+    if (label === 0) return { text: "📉💥", color: "#D32F2F" };
+    if (label === 1) return { text: "📉", color: "#F44336" };
+    if (label === 2) return { text: "➡️", color: "#FFC107" };
+    if (label === 3) return { text: "📈", color: "#4CAF50" };
+    if (label === 4) return { text: "📈🚀", color: "#2E7D32" };
+
+    return { text: "❓", color: "#9E9E9E" };
   };
 
   const signal = getQuickSignal();
@@ -57,24 +57,24 @@ const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
     padding: 16,
     marginVertical: 6,
     marginHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderLeftWidth: 4,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3.84,
   },
   leftSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     flex: 1,
   },
   flag: {
@@ -86,23 +86,23 @@ const styles = StyleSheet.create({
   },
   pairName: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212121',
+    fontWeight: "bold",
+    color: "#212121",
     marginBottom: 2,
   },
   displayName: {
     fontSize: 12,
-    color: '#757575',
+    color: "#757575",
   },
   rightSection: {
-    alignItems: 'center',
+    alignItems: "center",
   },
   signalBadge: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 4,
   },
   signalEmoji: {
@@ -110,8 +110,8 @@ const styles = StyleSheet.create({
   },
   confidence: {
     fontSize: 11,
-    color: '#757575',
-    fontWeight: '600',
+    color: "#757575",
+    fontWeight: "600",
   },
 });
 
