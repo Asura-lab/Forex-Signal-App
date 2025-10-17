@@ -7,7 +7,11 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
   const getQuickSignal = () => {
     if (loading) return { text: "⏳", color: "#9E9E9E" };
-    if (!prediction || !prediction.latest_prediction) {
+    if (
+      !prediction ||
+      !prediction.latest_prediction ||
+      prediction.latest_prediction.label == null
+    ) {
       return { text: "❓", color: "#9E9E9E" };
     }
 
@@ -45,11 +49,13 @@ const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
         <View style={[styles.signalBadge, { backgroundColor: signal.color }]}>
           <Text style={styles.signalEmoji}>{signal.text}</Text>
         </View>
-        {prediction && prediction.latest_prediction && (
-          <Text style={styles.confidence}>
-            {prediction.latest_prediction.confidence.toFixed(0)}%
-          </Text>
-        )}
+        {prediction &&
+          prediction.latest_prediction &&
+          prediction.latest_prediction.confidence != null && (
+            <Text style={styles.confidence}>
+              {prediction.latest_prediction.confidence.toFixed(0)}%
+            </Text>
+          )}
       </View>
     </TouchableOpacity>
   );

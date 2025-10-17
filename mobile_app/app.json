@@ -4,6 +4,7 @@
     "slug": "forex-signal-app",
     "version": "1.0.0",
     "orientation": "portrait",
+    "platforms": ["ios", "android"],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {

@@ -11,7 +11,12 @@ import {
  * Сигнал картын компонент
  */
 const SignalCard = ({ prediction, onPress }) => {
-  if (!prediction || !prediction.latest_prediction) {
+  if (
+    !prediction ||
+    !prediction.latest_prediction ||
+    prediction.latest_prediction.label == null ||
+    prediction.latest_prediction.confidence == null
+  ) {
     return null;
   }
 
@@ -36,7 +41,7 @@ const SignalCard = ({ prediction, onPress }) => {
         {/* Сигналын нэр */}
         <View style={styles.signalContainer}>
           <Text style={styles.signalText}>{signalText}</Text>
-          <Text style={styles.trendText}>{trend}</Text>
+          {trend && <Text style={styles.trendText}>{trend}</Text>}
         </View>
 
         {/* Итгэлцэл */}

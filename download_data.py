@@ -2,7 +2,7 @@ from datetime import datetime
 import dukascopy_python as duka
 
 # Валютын хос
-instrument = "USD/JPY"
+instrument = "EUR/USD"
 
 # 1 минутын интервал
 interval = duka.INTERVAL_MIN_1

@@ -49,7 +49,12 @@ const SignalScreen = ({ route, navigation }) => {
     setLoading(false);
   };
 
-  if (!prediction || !prediction.latest_prediction) {
+  if (
+    !prediction ||
+    !prediction.latest_prediction ||
+    prediction.latest_prediction.label == null ||
+    prediction.latest_prediction.confidence == null
+  ) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Таамаглал олдсонгүй</Text>
