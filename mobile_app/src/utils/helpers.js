@@ -172,6 +172,34 @@ export const getTradingAdvice = (label, confidence) => {
   return "⚠️ Хүлээж, зах зээлийг ажиглах";
 };
 
+/**
+ * Get time-based greeting
+ * @param {string} language - Language code ('mn' for Mongolian, 'en' for English)
+ * @returns {string} Greeting message
+ */
+export const getTimeBasedGreeting = (language = "mn") => {
+  const hour = new Date().getHours();
+
+  if (language === "en") {
+    if (hour < 12) {
+      return "Good morning";
+    } else if (hour < 18) {
+      return "Good afternoon";
+    } else {
+      return "Good evening";
+    }
+  }
+
+  // Default to Mongolian
+  if (hour < 12) {
+    return "Өглөөний мэнд"; // Good morning
+  } else if (hour < 18) {
+    return "Өдрийн мэнд"; // Good afternoon
+  } else {
+    return "Оройн мэнд"; // Good evening
+  }
+};
+
 export default {
   CURRENCY_PAIRS,
   SIGNAL_TYPES,
@@ -183,4 +211,5 @@ export default {
   getSignalEmoji,
   getConfidenceLevel,
   getTradingAdvice,
+  getTimeBasedGreeting,
 };

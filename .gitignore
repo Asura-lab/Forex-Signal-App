@@ -50,6 +50,7 @@ Thumbs.db
 desktop.ini
 
 # Environment variables
+mobile_app/.env
 .env
 .env.local
 

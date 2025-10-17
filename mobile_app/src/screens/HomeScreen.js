@@ -10,9 +10,11 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import CurrencyCard from "../components/CurrencyCard";
-import { CURRENCY_PAIRS } from "../utils/helpers";
+import { CURRENCY_PAIRS, getTimeBasedGreeting } from "../utils/helpers";
 import { checkApiStatus, getAllPredictions } from "../services/api";
+import { getUserData } from "../services/auth";
 
 /**
  * Үндсэн дэлгэц - Валютын хослолууд
@@ -22,10 +24,22 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [apiConnected, setApiConnected] = useState(false);
   const [predictions, setPredictions] = useState({});
+  const [userName, setUserName] = useState("");
+  const [greeting, setGreeting] = useState("");
 
   useEffect(() => {
+    loadUserData();
     loadData();
   }, []);
+
+  // Load user data
+  const loadUserData = async () => {
+    const userData = await getUserData();
+    if (userData) {
+      setUserName(userData.name);
+    }
+    setGreeting(getTimeBasedGreeting("mn")); // Use 'en' for English
+  };
 
   const loadData = async () => {
     // API холболт шалгах
@@ -99,8 +113,22 @@ const HomeScreen = ({ navigation }) => {
         end={{ x: 1, y: 1 }}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>Форекс Сигнал</Text>
-        <Text style={styles.headerSubtitle}>AI-аар хөтлөгддөг таамаглал</Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerContent}>
+            {/* Greeting */}
+            {userName ? (
+              <View style={styles.greetingContainer}>
+                <Text style={styles.greetingText}>
+                  {greeting}, {userName}! 👋
+                </Text>
+              </View>
+            ) : null}
+            <Text style={styles.headerTitle}>Форекс Сигнал</Text>
+            <Text style={styles.headerSubtitle}>
+              AI-аар хөтлөгддөг таамаглал
+            </Text>
+          </View>
+        </View>
 
         <View style={styles.statusContainer}>
           <View
@@ -176,6 +204,24 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     paddingHorizontal: 20,
   },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  greetingContainer: {
+    marginBottom: 8,
+  },
+  greetingText: {
+    fontSize: 18,
+    color: "#FFFFFF",
+    fontWeight: "600",
+    opacity: 0.95,
+  },
   headerTitle: {
     fontSize: 32,
     fontWeight: "bold",
@@ -185,7 +231,6 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 16,
     color: "rgba(255, 255, 255, 0.9)",
-    marginBottom: 12,
   },
   statusContainer: {
     flexDirection: "row",
