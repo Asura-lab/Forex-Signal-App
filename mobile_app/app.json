@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "Forex Signal",
+    "slug": "forex-signal-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1a237e"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asuralab.forexsignal"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#1a237e"
+      },
+      "package": "com.asuralab.forexsignal"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}

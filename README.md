@@ -48,12 +48,13 @@
 - **Flask** - REST API
 - **Jupyter Notebook** - Модель сургалт
 
-### Frontend:
+### Mobile App (React Native):
 
-- **React Native** - Cross-platform mobile app
-- **Expo** - Development framework
+- **React Native + Expo** - Cross-platform mobile app
+- **React Navigation** - Navigation system
 - **axios** - API холболт
-- **React Navigation** - Navigation
+- **Linear Gradient** - UI дизайн
+- **Chart Kit** - График харуулалт
 
 ## 📁 Файлын бүтэц
 
@@ -81,7 +82,17 @@ Forex_signal_app/
 │   ├── hmm_forex_model.pkl
 │   └── hmm_scaler.pkl
 │
-├── 📓 HMM_machine_learning.ipynb  # ҮНДСЭН: Модель сургалт
+├── � mobile_app/          # React Native аппликейшн
+│   ├── src/
+│   │   ├── components/    # UI компонентууд
+│   │   ├── screens/       # Дэлгэцүүд
+│   │   ├── services/      # API холболт
+│   │   └── utils/         # Туслах функцууд
+│   ├── App.js
+│   ├── package.json
+│   └── README.md          # Mobile app заавар
+│
+├── �📓 HMM_machine_learning.ipynb  # ҮНДСЭН: Модель сургалт
 ├── 🌐 backend_api.py               # Backend REST API
 ├── 📥 download_data.py             # Дата татах скрипт
 ├── 📋 requirements.txt             # Python dependencies
@@ -147,22 +158,27 @@ API хаяг: `http://localhost:5000`
 - `POST /predict` - Шинэ дата дээр таамаглал
 - `POST /predict_file` - CSV файлаас таамаглал
 
-### 4. React Native аппликейшн үүсгэх
-
-Дэлгэрэнгүй заавар: [`REACT_NATIVE_GUIDE.md`](REACT_NATIVE_GUIDE.md)
+### 4. React Native аппликейшн ажиллуулах
 
 ```powershell
-# Аппликейшн үүсгэх
-npx create-expo-app ForexSignalApp
-cd ForexSignalApp
+# Mobile app folder руу очих
+cd mobile_app
 
 # Dependencies суулгах
-npm install @react-navigation/native @react-navigation/stack
-npm install axios react-native-chart-kit react-native-svg
+npm install
+
+# Backend IP хаяг тохируулах
+# src/services/api.js файлд API_BASE_URL өөрчлөх
 
 # Аппликейшн эхлүүлэх
 npm start
+
+# Android/iOS дээр ажиллуулах
+npm run android  # Android
+npm run ios      # iOS (Mac only)
 ```
+
+**Дэлгэрэнгүй:** [`mobile_app/README.md`](mobile_app/README.md)
 
 ## 📖 Ашиглах
 
@@ -188,10 +204,29 @@ print(f"Нийт дата: {result['total_predictions']}")
 
 ### React Native аппликейшн ашиглах:
 
-1. **Үндсэн дэлгэц** - Валютын хослолуудыг харуулна
-2. **Валют сонгох** - Хослол дээр дарах
-3. **Таамаглал харах** - Хандлага, магадлал, статистик үзэх
-4. **Шинэчлэх** - Дахин таамаглал хийх
+#### 📱 Mobile App Онцлогууд:
+
+1. **Үндсэн дэлгэц**
+   - 6 валютын хослолын жагсаалт
+   - Real-time сигнал (emoji)
+   - Pull-to-refresh шинэчлэлт
+   - API холболтын статус
+
+2. **Дэлгэрэнгүй дэлгэц**
+   - Сигналын мэдээлэл (Strong Buy/Sell, Buy/Sell, Hold)
+   - Итгэлцлийн түвшин (%)
+   - Худалдааны зөвлөмж
+   - Статистикийн график
+   - Дэлгэрэнгүй мэдээлэл
+
+3. **Онцлогууд**
+   - Gradient UI design
+   - Touch animations
+   - Real-time update
+   - Error handling
+   - Loading states
+
+**Дэлгэрэнгүй:** [`mobile_app/README.md`](mobile_app/README.md)
 
 ## 🏗️ Архитектур
 
