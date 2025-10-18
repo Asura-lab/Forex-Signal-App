@@ -11,7 +11,10 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+import hashlib
+import secrets
+import json
 
 app = Flask(__name__)
 CORS(app)  # React Native-аас дуудаж болохоор CORS идэвхжүүлэх
@@ -23,6 +26,53 @@ SCALER_PATH = 'models/hmm_scaler.pkl'
 # Глобал хувьсагчууд
 model = None
 scaler = None
+
+# Хэрэглэгчдийн мэдээлэл хадгалах (JSON файлд)
+USERS_FILE = 'users_data.json'
+SESSIONS_FILE = 'sessions_data.json'
+
+def load_users():
+    """Хэрэглэгчдийн мэдээллийг ачаалах"""
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_users(users):
+    """Хэрэглэгчдийн мэдээллийг хадгалах"""
+    with open(USERS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
+
+def load_sessions():
+    """Session мэдээллийг ачаалах"""
+    if os.path.exists(SESSIONS_FILE):
+        with open(SESSIONS_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_sessions(sessions):
+    """Session мэдээллийг хадгалах"""
+    with open(SESSIONS_FILE, 'w', encoding='utf-8') as f:
+        json.dump(sessions, f, ensure_ascii=False, indent=2)
+
+def hash_password(password):
+    """Нууц үгийг hash хийх"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def generate_token():
+    """Санамсаргүй token үүсгэх"""
+    return secrets.token_urlsafe(32)
+
+def verify_token(token):
+    """Token шалгаж хэрэглэгчийн мэдээллийг буцаах"""
+    sessions = load_sessions()
+    if token in sessions:
+        session = sessions[token]
+        # Token хүчинтэй эсэхийг шалгах (24 цаг)
+        expires_at = datetime.fromisoformat(session['expires_at'])
+        if datetime.now() < expires_at:
+            return session['email']
+    return None
 
 def load_models():
     """Модель ба scaler ачаалах"""

@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { registerUser } from "../services/auth";
 
 /**
  * SignUp Screen - Бүртгүүлэх дэлгэц
@@ -56,29 +57,18 @@ const SignUpScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Use the auth service to register
+      const result = await registerUser(name, email, password);
 
-      // For demo purposes, accept any valid input
-      // In production, replace with actual registration API
-
-      Alert.alert(
-        "Амжилттай",
-        "Бүртгэл амжилттай үүслээ! Та одоо нэвтэрч болно",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Navigate to Main tabs after successful signup
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Main" }],
-              });
-            },
-          },
-        ]
-      );
+      if (result.success) {
+        // Navigate to Main tabs after successful signup
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Main" }],
+        });
+      } else {
+        Alert.alert("Алдаа", result.error || "Бүртгэл үүсгэх амжилтгүй боллоо");
+      }
     } catch (error) {
       Alert.alert(
         "Алдаа",

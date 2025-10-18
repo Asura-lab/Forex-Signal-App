@@ -1,6 +1,6 @@
 /**
  * Authentication Service
- * Handles user authentication, login, signup, and session management
+ * MongoDB + JWT ашигласан бодит authentication
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -9,55 +9,55 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const AUTH_TOKEN_KEY = "@auth_token";
 const USER_DATA_KEY = "@user_data";
 
+// Backend API URL
+// ⚠️ Development: Компьютерийн IP хаяг ашиглах (localhost бус!)
+// Компьютерийн IP олох: cmd дээр "ipconfig" бичээд IPv4 Address хэсгийг харна уу
+const API_URL = "http://192.168.1.44:5001"; // ⚠️ Таны компьютерийн IP
+
 /**
- * Login user
+ * Login user - Бодит MongoDB шалгалттай
  * @param {string} email - User email
  * @param {string} password - User password
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
 export const loginUser = async (email, password) => {
   try {
-    // TODO: Replace with actual API endpoint
-    // Example:
-    // const response = await axios.post('http://YOUR_API_URL/auth/login', {
-    //   email,
-    //   password,
-    // });
-
-    // Simulate API call for demo
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Mock successful response
-    const mockResponse = {
-      token: "mock_token_" + Date.now(),
-      user: {
-        id: 1,
-        name: email.split("@")[0],
-        email: email,
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    };
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || "Имэйл эсвэл нууц үг буруу байна",
+      };
+    }
 
     // Store auth token and user data
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, mockResponse.token);
-    await AsyncStorage.setItem(
-      USER_DATA_KEY,
-      JSON.stringify(mockResponse.user)
-    );
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
 
     return {
       success: true,
-      data: mockResponse,
+      data: data,
     };
   } catch (error) {
+    console.error("Login error:", error);
     return {
       success: false,
-      error: error.message || "Login failed",
+      error: error.message || "Серверт холбогдох боломжгүй байна",
     };
   }
 };
 
 /**
- * Register new user
+ * Register new user - MongoDB-д бүртгэл үүсгэх
  * @param {string} name - User name
  * @param {string} email - User email
  * @param {string} password - User password
@@ -65,42 +65,36 @@ export const loginUser = async (email, password) => {
  */
 export const registerUser = async (name, email, password) => {
   try {
-    // TODO: Replace with actual API endpoint
-    // Example:
-    // const response = await axios.post('http://YOUR_API_URL/auth/register', {
-    //   name,
-    //   email,
-    //   password,
-    // });
-
-    // Simulate API call for demo
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Mock successful response
-    const mockResponse = {
-      token: "mock_token_" + Date.now(),
-      user: {
-        id: Date.now(),
-        name: name,
-        email: email,
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-    };
+      body: JSON.stringify({ name, email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || !data.success) {
+      return {
+        success: false,
+        error: data.error || "Бүртгэл үүсгэхэд алдаа гарлаа",
+      };
+    }
 
     // Store auth token and user data
-    await AsyncStorage.setItem(AUTH_TOKEN_KEY, mockResponse.token);
-    await AsyncStorage.setItem(
-      USER_DATA_KEY,
-      JSON.stringify(mockResponse.user)
-    );
+    await AsyncStorage.setItem(AUTH_TOKEN_KEY, data.token);
+    await AsyncStorage.setItem(USER_DATA_KEY, JSON.stringify(data.user));
 
     return {
       success: true,
-      data: mockResponse,
+      data: data,
     };
   } catch (error) {
+    console.error("Register error:", error);
     return {
       success: false,
-      error: error.message || "Registration failed",
+      error: error.message || "Серверт холбогдох боломжгүй байна",
     };
   }
 };
@@ -120,14 +114,30 @@ export const logoutUser = async () => {
 };
 
 /**
- * Check if user is authenticated
+ * Check if user is authenticated - Token backend-тай шалгах
  * @returns {Promise<boolean>}
  */
 export const isAuthenticated = async () => {
   try {
     const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-    return !!token;
+
+    if (!token) {
+      return false;
+    }
+
+    // Token шалгах (backend-тай)
+    const response = await fetch(`${API_URL}/auth/verify`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await response.json();
+    return data.success && data.valid;
   } catch (error) {
+    console.error("Auth check error:", error);
     return false;
   }
 };
@@ -154,5 +164,27 @@ export const getUserData = async () => {
     return userData ? JSON.parse(userData) : null;
   } catch (error) {
     return null;
+  }
+};
+
+/**
+ * Check authentication status
+ * @returns {Promise<{isAuthenticated: boolean, userData: object|null}>}
+ */
+export const checkAuthStatus = async () => {
+  try {
+    const isAuth = await isAuthenticated();
+    const userData = isAuth ? await getUserData() : null;
+
+    return {
+      isAuthenticated: isAuth,
+      userData: userData,
+    };
+  } catch (error) {
+    console.error("Check auth status error:", error);
+    return {
+      isAuthenticated: false,
+      userData: null,
+    };
   }
 };

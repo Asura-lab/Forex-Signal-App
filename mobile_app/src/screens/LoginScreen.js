@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { loginUser } from "../services/auth";
 
 /**
  * Login Screen - Нэвтрэх дэлгэц
@@ -37,25 +38,18 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // TODO: Replace with actual API call
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Use the auth service to login
+      const result = await loginUser(email, password);
 
-      // For demo purposes, accept any email/password combination
-      // In production, replace with actual authentication API
-
-      Alert.alert("Амжилттай", "Нэвтрэх амжилттай боллоо", [
-        {
-          text: "OK",
-          onPress: () => {
-            // Navigate to Main tabs after successful login
-            navigation.reset({
-              index: 0,
-              routes: [{ name: "Main" }],
-            });
-          },
-        },
-      ]);
+      if (result.success) {
+        // Navigate to Main tabs after successful login
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "Main" }],
+        });
+      } else {
+        Alert.alert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
+      }
     } catch (error) {
       Alert.alert("Алдаа", "Нэвтрэх явцад алдаа гарлаа. Дахин оролдоно уу.");
     } finally {
