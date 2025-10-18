@@ -15,6 +15,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getUserData, logoutUser, getAuthToken } from "../services/auth";
+import { API_ENDPOINTS } from "../config/api";
 
 /**
  * Profile Screen - Хэрэглэгчийн профайл
@@ -36,8 +37,6 @@ const ProfileScreen = ({ navigation }) => {
     signalsReceived: 0,
     lastActive: null,
   });
-
-  const API_URL = "http://192.168.1.44:5001";
 
   useEffect(() => {
     loadUserData();
@@ -100,7 +99,7 @@ const ProfileScreen = ({ navigation }) => {
     try {
       const token = await getAuthToken();
 
-      const response = await fetch(`${API_URL}/auth/update`, {
+      const response = await fetch(API_ENDPOINTS.UPDATE, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -155,7 +154,7 @@ const ProfileScreen = ({ navigation }) => {
     try {
       const token = await getAuthToken();
 
-      const response = await fetch(`${API_URL}/auth/change-password`, {
+      const response = await fetch(API_ENDPOINTS.CHANGE_PASSWORD, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

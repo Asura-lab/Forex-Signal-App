@@ -4,15 +4,11 @@
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { API_ENDPOINTS } from "../config/api";
 
 // Storage keys
 const AUTH_TOKEN_KEY = "@auth_token";
 const USER_DATA_KEY = "@user_data";
-
-// Backend API URL
-// ⚠️ Development: Компьютерийн IP хаяг ашиглах (localhost бус!)
-// Компьютерийн IP олох: cmd дээр "ipconfig" бичээд IPv4 Address хэсгийг харна уу
-const API_URL = "http://192.168.1.44:5001"; // ⚠️ Таны компьютерийн IP
 
 /**
  * Login user - Бодит MongoDB шалгалттай
@@ -22,7 +18,7 @@ const API_URL = "http://192.168.1.44:5001"; // ⚠️ Таны компьюте�
  */
 export const loginUser = async (email, password) => {
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
+    const response = await fetch(API_ENDPOINTS.LOGIN, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -65,7 +61,7 @@ export const loginUser = async (email, password) => {
  */
 export const registerUser = async (name, email, password) => {
   try {
-    const response = await fetch(`${API_URL}/auth/register`, {
+    const response = await fetch(API_ENDPOINTS.REGISTER, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -114,7 +110,7 @@ export const logoutUser = async () => {
 };
 
 /**
- * Check if user is authenticated - Token backend-тай шалгах
+ * Check if user is authenticated
  * @returns {Promise<boolean>}
  */
 export const isAuthenticated = async () => {
@@ -126,18 +122,21 @@ export const isAuthenticated = async () => {
     }
 
     // Token шалгах (backend-тай)
-    const response = await fetch(`${API_URL}/auth/verify`, {
+    const response = await fetch(API_ENDPOINTS.VERIFY, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ token }),
+      timeout: 5000, // 5 second timeout
     });
 
     const data = await response.json();
     return data.success && data.valid;
   } catch (error) {
     console.error("Auth check error:", error);
+    // If network error, assume not authenticated and let user try to login
+    // This prevents the app from getting stuck on network errors
     return false;
   }
 };
