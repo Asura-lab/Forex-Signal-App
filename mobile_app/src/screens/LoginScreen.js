@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { loginUser } from "../services/auth";
+import { loginUser } from "../services/api";
 
 /**
  * Login Screen - Нэвтрэх дэлгэц
@@ -48,7 +48,23 @@ const LoginScreen = ({ navigation }) => {
           routes: [{ name: "Main" }],
         });
       } else {
-        Alert.alert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
+        // Имэйл баталгаажаагүй бол
+        if (result.requiresVerification) {
+          Alert.alert(
+            "Имэйл баталгаажуулах",
+            "Та имэйл хаягаа баталгаажуулах шаардлагатай",
+            [
+              {
+                text: "Баталгаажуулах",
+                onPress: () =>
+                  navigation.navigate("EmailVerification", { email }),
+              },
+              { text: "Болих", style: "cancel" },
+            ]
+          );
+        } else {
+          Alert.alert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
+        }
       }
     } catch (error) {
       Alert.alert("Алдаа", "Нэвтрэх явцад алдаа гарлаа. Дахин оролдоно уу.");
@@ -143,7 +159,10 @@ const LoginScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             {/* Forgot Password */}
-            <TouchableOpacity style={styles.forgotPassword}>
+            <TouchableOpacity
+              style={styles.forgotPassword}
+              onPress={() => navigation.navigate("ForgotPassword")}
+            >
               <Text style={styles.forgotPasswordText}>
                 Нууц үгээ мартсан уу?
               </Text>

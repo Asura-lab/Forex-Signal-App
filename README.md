@@ -713,9 +713,36 @@ npm install
 - **Walking Forward**: Овerfitting-ээс зайлсхийх, илүү бодитой үр дүн гаргах арга
 - **Feature Engineering**: Техникийн шинжилгээний үзүүлэлтүүд (MA, RSI, ATR) ашигладаг
 
-## 👨‍💻 Хөгжүүлэгч
+## � Бодлогууд ба Баримт бичиг
+
+### Хууль эрх зүйн баримтууд:
+
+- 📋 [Үйлчилгээний нөхцөл (Terms of Service)](docs/TERMS_OF_SERVICE.md) - Монгол хэл
+- 📋 [Terms of Service (English)](docs/TERMS_OF_SERVICE_EN.md) - English version
+- 🔒 [Нууцлалын бодлого (Privacy Policy)](docs/PRIVACY_POLICY.md) - Монгол хэл
+- 🔒 [Privacy Policy (English)](docs/PRIVACY_POLICY_EN.md) - English version
+
+### Техникийн баримтууд:
+
+- 📖 [API Documentation](docs/API_DOCUMENTATION.md)
+- 🏗️ [Project Structure Guide](docs/PROJECT_RESTRUCTURING.md)
+- 🔧 [Setup Guide](docs/SETUP_GUIDE.md)
+
+### Анхааруулга:
+
+⚠️ **Эрсдэлийн мэдэгдэл**: Форекс арилжаа нь маш өндөр эрсдэлтэй бөгөөд таны хөрөнгийг бүрэн алдах магадлалтай. Манай апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш юм.
+
+## �👨‍💻 Хөгжүүлэгч
 
 Судалгааны ажил - Форекс сигнал таамаглах систем
+
+**GitHub:** https://github.com/Asura-lab/Forex-Signal-App
+
+## 📞 Холбоо барих
+
+- **Email:** support@forexsignal.mn
+- **Privacy:** privacy@forexsignal.mn
+- **Issues:** [GitHub Issues](https://github.com/Asura-lab/Forex-Signal-App/issues)
 
 ## 📄 Лиценз
 

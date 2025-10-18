@@ -12,6 +12,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from flask_mail import Mail, Message
 from pymongo import MongoClient
 from datetime import datetime, timedelta
 import jwt
@@ -20,15 +21,30 @@ import pandas as pd
 import numpy as np
 import pickle
 import os
+import random
 
 # Import configuration
 from config.settings import (
     MONGO_URI, SECRET_KEY, API_HOST, API_PORT, DEBUG_MODE,
-    MODELS_DIR, CURRENCY_PAIRS
+    MODELS_DIR, CURRENCY_PAIRS,
+    MAIL_SERVER, MAIL_PORT, MAIL_USE_TLS, MAIL_USE_SSL,
+    MAIL_USERNAME, MAIL_PASSWORD, MAIL_DEFAULT_SENDER,
+    VERIFICATION_CODE_EXPIRY_MINUTES, RESET_CODE_EXPIRY_MINUTES
 )
 
 app = Flask(__name__)
 CORS(app)
+
+# Flask-Mail configuration
+app.config['MAIL_SERVER'] = MAIL_SERVER
+app.config['MAIL_PORT'] = MAIL_PORT
+app.config['MAIL_USE_TLS'] = MAIL_USE_TLS
+app.config['MAIL_USE_SSL'] = MAIL_USE_SSL
+app.config['MAIL_USERNAME'] = MAIL_USERNAME
+app.config['MAIL_PASSWORD'] = MAIL_PASSWORD
+app.config['MAIL_DEFAULT_SENDER'] = MAIL_DEFAULT_SENDER
+
+mail = Mail(app)
 
 # ==================== DATABASE SETUP ====================
 
@@ -37,6 +53,8 @@ try:
     client = MongoClient(MONGO_URI)
     db = client['users_db']
     users_collection = db['users']
+    verification_codes = db['verification_codes']  # Имэйл баталгаажуулалт
+    reset_codes = db['reset_codes']  # Нууц үг сэргээх
     print("✓ MongoDB холбогдлоо")
 except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
@@ -77,6 +95,102 @@ def load_ml_models():
 load_ml_models()
 
 # ==================== AUTH HELPER FUNCTIONS ====================
+
+def generate_verification_code():
+    """6 оронтой санамсаргүй код үүсгэх"""
+    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
+
+def send_verification_email(email, code, name=""):
+    """Имэйл баталгаажуулалтын код илгээх"""
+    try:
+        msg = Message(
+            subject='Forex Signal App - Имэйл баталгаажуулалт',
+            recipients=[email]
+        )
+        msg.html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">📈 Forex Signal App</h1>
+        </div>
+        
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="color: #1a237e;">Сайн байна уу {name}!</h2>
+            
+            <p>Forex Signal App-д тавтай морил! 🎉</p>
+            
+            <p>Таны имэйл хаягийг баталгаажуулахын тулд доорх кодыг оруулна уу:</p>
+            
+            <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+                <h1 style="color: #1a237e; font-size: 36px; letter-spacing: 8px; margin: 0;">{code}</h1>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">⏱ Энэ код <strong>{VERIFICATION_CODE_EXPIRY_MINUTES} минутын</strong> хугацаанд хүчинтэй.</p>
+            
+            <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 20px 0;">
+            
+            <p style="color: #999; font-size: 12px;">
+                Хэрэв та энэ бүртгэлийг үүсгээгүй бол энэ имэйлийг үл тоомсорлоорой.
+            </p>
+            
+            <p style="color: #1a237e; font-weight: bold;">Өдрийг сайхан өнгөрүүлээрэй!<br>Forex Signal App баг</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"❌ Email илгээх алдаа: {e}")
+        return False
+
+def send_reset_password_email(email, code, name=""):
+    """Нууц үг сэргээх код илгээх"""
+    try:
+        msg = Message(
+            subject='Forex Signal App - Нууц үг сэргээх',
+            recipients=[email]
+        )
+        msg.html = f"""
+<html>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
+        <div style="background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0;">🔐 Нууц үг сэргээх</h1>
+        </div>
+        
+        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h2 style="color: #1a237e;">Сайн байна уу {name}!</h2>
+            
+            <p>Та нууц үгээ сэргээх хүсэлт илгээсэн байна.</p>
+            
+            <p>Нууц үг сэргээх кодыг доор харна уу:</p>
+            
+            <div style="background-color: #fff3e0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px solid #ff9800;">
+                <h1 style="color: #ff6f00; font-size: 36px; letter-spacing: 8px; margin: 0;">{code}</h1>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">⏱ Энэ код <strong>{RESET_CODE_EXPIRY_MINUTES} минутын</strong> хугацаанд хүчинтэй.</p>
+            
+            <div style="background-color: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;">
+                    ⚠️ <strong>Анхаар:</strong> Хэрэв та энэ хүсэлтийг илгээгээгүй бол нууц үгээ ШУУД солиорой!
+                </p>
+            </div>
+            
+            <p style="color: #1a237e; font-weight: bold;">Forex Signal App баг</p>
+        </div>
+    </div>
+</body>
+</html>
+"""
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"❌ Email илгээх алдаа: {e}")
+        return False
 
 def hash_password(password):
     """Нууц үгийг hash хийх"""
@@ -173,8 +287,13 @@ def index():
         'ml_model': 'HMM' if model else 'Not loaded',
         'endpoints': {
             '/': 'GET - API мэдээлэл',
-            '/auth/register': 'POST - Бүртгүүлэх',
+            '/auth/register': 'POST - Бүртгүүлэх (Имэйл баталгаажуулалт)',
+            '/auth/verify-email': 'POST - Имэйл баталгаажуулах',
+            '/auth/resend-verification': 'POST - Баталгаажуулалтын код дахин илгээх',
             '/auth/login': 'POST - Нэвтрэх',
+            '/auth/forgot-password': 'POST - Нууц үг мартсан',
+            '/auth/verify-reset-code': 'POST - Сэргээх код шалгах',
+            '/auth/reset-password': 'POST - Нууц үг сэргээх',
             '/auth/verify': 'POST - Token шалгах',
             '/auth/me': 'GET - Хэрэглэгчийн мэдээлэл',
             '/auth/update': 'PUT - Мэдээлэл шинэчлэх',
@@ -189,7 +308,7 @@ def index():
 
 @app.route('/auth/register', methods=['POST'])
 def register():
-    """Шинэ хэрэглэгч бүртгүүлэх"""
+    """Шинэ хэрэглэгч бүртгүүлэх - Имэйл баталгаажуулалттай"""
     try:
         data = request.json
         name = data.get('name', '').strip()
@@ -223,34 +342,46 @@ def register():
                 'error': 'Энэ имэйл хаяг аль хэдийн бүртгэлтэй байна'
             }), 400
         
+        # Баталгаажуулалтын код үүсгэх
+        verification_code = generate_verification_code()
+        
         # Нууц үгийг hash хийх
         hashed_password = hash_password(password)
         
-        # Шинэ хэрэглэгч үүсгэх
-        new_user = {
-            'name': name,
+        # Verification code MongoDB-д хадгалах
+        verification_data = {
             'email': email,
+            'name': name,
             'password': hashed_password,
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow(),
-            'last_login': None
+            'code': verification_code,
+            'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES),
+            'created_at': datetime.utcnow()
         }
         
-        result = users_collection.insert_one(new_user)
-        user_id = str(result.inserted_id)
+        # Өмнө илгээсэн verification code байвал устгах
+        verification_codes.delete_many({'email': email})
         
-        # JWT token үүсгэх
-        token = generate_token(user_id, email)
+        # Шинэ verification code хадгалах
+        verification_codes.insert_one(verification_data)
+        
+        # Имэйл илгээх
+        email_sent = send_verification_email(email, verification_code, name)
+        
+        if not email_sent:
+            # Email тохиргоо хийгдээгүй бол DEMO режим
+            return jsonify({
+                'success': True,
+                'demo_mode': True,
+                'verification_code': verification_code,
+                'email': email,
+                'message': 'DEMO режим: Имэйл тохиргоо хийгдээгүй байна'
+            }), 200
         
         return jsonify({
             'success': True,
-            'token': token,
-            'user': {
-                'id': user_id,
-                'name': name,
-                'email': email
-            }
-        }), 201
+            'email': email,
+            'message': f'Баталгаажуулалтын код {email} хаяг руу илгээгдлээ'
+        }), 200
         
     except Exception as e:
         print(f"Register error: {e}")
@@ -282,6 +413,14 @@ def login():
                 'success': False,
                 'error': 'Имэйл эсвэл нууц үг буруу байна'
             }), 401
+        
+        # Имэйл баталгаажсан эсэх шалгах
+        if not user.get('email_verified', False):
+            return jsonify({
+                'success': False,
+                'error': 'Имэйл хаягаа баталгаажуулна уу',
+                'requires_verification': True
+            }), 403
         
         # Нууц үг шалгах
         if not verify_password(password, user['password']):
@@ -355,6 +494,229 @@ def verify():
             'success': False,
             'error': f'Token шалгах явцад алдаа гарлаа: {str(e)}'
         }), 500
+
+@app.route('/auth/verify-email', methods=['POST'])
+def verify_email():
+    """Имэйл баталгаажуулах"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        code = data.get('code', '').strip()
+        
+        if not email or not code:
+            return jsonify({
+                'success': False,
+                'error': 'Имэйл болон код шаардлагатай'
+            }), 400
+        
+        # Verification code олох
+        verification = verification_codes.find_one({'email': email})
+        
+        if not verification:
+            return jsonify({
+                'success': False,
+                'error': 'Баталгаажуулалтын код олдсонгүй'
+            }), 404
+        
+        # Хугацаа шалгах
+        if datetime.utcnow() > verification['expires_at']:
+            verification_codes.delete_one({'email': email})
+            return jsonify({
+                'success': False,
+                'error': 'Баталгаажуулалтын код хугацаа дууссан'
+            }), 400
+        
+        # Код шалгах
+        if verification['code'] != code:
+            return jsonify({
+                'success': False,
+                'error': 'Буруу код'
+            }), 400
+        
+        # Хэрэглэгч үүсгэх
+        new_user = {
+            'name': verification['name'],
+            'email': verification['email'],
+            'password': verification['password'],
+            'email_verified': True,
+            'verified_at': datetime.utcnow(),
+            'created_at': datetime.utcnow(),
+            'updated_at': datetime.utcnow(),
+            'last_login': datetime.utcnow()
+        }
+        
+        result = users_collection.insert_one(new_user)
+        user_id = str(result.inserted_id)
+        
+        # Verification code устгах
+        verification_codes.delete_one({'email': email})
+        
+        # JWT token үүсгэх
+        token = generate_token(user_id, email)
+        
+        return jsonify({
+            'success': True,
+            'token': token,
+            'user': {
+                'id': user_id,
+                'name': new_user['name'],
+                'email': new_user['email']
+            },
+            'message': 'Имэйл амжилттай баталгаажлаа'
+        }), 201
+        
+    except Exception as e:
+        print(f"Verify email error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Баталгаажуулах алдаа: {str(e)}'
+        }), 500
+
+@app.route('/auth/resend-verification', methods=['POST'])
+def resend_verification():
+    """Код дахин илгээх"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'success': False, 'error': 'Имэйл шаардлагатай'}), 400
+        
+        verification = verification_codes.find_one({'email': email})
+        if not verification:
+            return jsonify({'success': False, 'error': 'Бүртгэл олдсонгүй'}), 404
+        
+        new_code = generate_verification_code()
+        
+        verification_codes.update_one(
+            {'email': email},
+            {'$set': {
+                'code': new_code,
+                'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
+            }}
+        )
+        
+        email_sent = send_verification_email(email, new_code, verification['name'])
+        
+        if not email_sent:
+            return jsonify({
+                'success': True,
+                'demo_mode': True,
+                'verification_code': new_code
+            }), 200
+        
+        return jsonify({'success': True, 'message': 'Шинэ код илгээгдлээ'}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/auth/forgot-password', methods=['POST'])
+def forgot_password():
+    """Нууц үг мартсан"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        
+        if not email:
+            return jsonify({'success': False, 'error': 'Имэйл шаардлагатай'}), 400
+        
+        user = users_collection.find_one({'email': email})
+        if not user:
+            return jsonify({'success': True, 'message': 'Хэрэв бүртгэлтэй бол код илгээгдсэн'}), 200
+        
+        reset_code = generate_verification_code()
+        
+        reset_codes.delete_many({'email': email})
+        reset_codes.insert_one({
+            'email': email,
+            'code': reset_code,
+            'expires_at': datetime.utcnow() + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES),
+            'created_at': datetime.utcnow()
+        })
+        
+        email_sent = send_reset_password_email(email, reset_code, user['name'])
+        
+        if not email_sent:
+            return jsonify({
+                'success': True,
+                'demo_mode': True,
+                'reset_code': reset_code
+            }), 200
+        
+        return jsonify({'success': True, 'message': 'Сэргээх код илгээгдлээ'}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/auth/verify-reset-code', methods=['POST'])
+def verify_reset_code():
+    """Сэргээх код шалгах"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        code = data.get('code', '').strip()
+        
+        if not email or not code:
+            return jsonify({'success': False, 'error': 'Имэйл болон код шаардлагатай'}), 400
+        
+        reset_data = reset_codes.find_one({'email': email})
+        if not reset_data:
+            return jsonify({'success': False, 'error': 'Код олдсонгүй'}), 404
+        
+        if datetime.utcnow() > reset_data['expires_at']:
+            reset_codes.delete_one({'email': email})
+            return jsonify({'success': False, 'error': 'Код хугацаа дууссан'}), 400
+        
+        if reset_data['code'] != code:
+            return jsonify({'success': False, 'error': 'Буруу код'}), 400
+        
+        return jsonify({'success': True, 'message': 'Код баталгаажлаа'}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/auth/reset-password', methods=['POST'])
+def reset_password():
+    """Нууц үг сэргээх"""
+    try:
+        data = request.json
+        email = data.get('email', '').strip().lower()
+        code = data.get('code', '').strip()
+        new_password = data.get('new_password', '')
+        
+        if not email or not code or not new_password:
+            return jsonify({'success': False, 'error': 'Бүх талбар шаардлагатай'}), 400
+        
+        if len(new_password) < 6:
+            return jsonify({'success': False, 'error': 'Нууц үг дор хаяж 6 тэмдэгт'}), 400
+        
+        reset_data = reset_codes.find_one({'email': email})
+        if not reset_data:
+            return jsonify({'success': False, 'error': 'Код олдсонгүй'}), 404
+        
+        if datetime.utcnow() > reset_data['expires_at']:
+            reset_codes.delete_one({'email': email})
+            return jsonify({'success': False, 'error': 'Код хугацаа дууссан'}), 400
+        
+        if reset_data['code'] != code:
+            return jsonify({'success': False, 'error': 'Буруу код'}), 400
+        
+        hashed_password = hash_password(new_password)
+        
+        users_collection.update_one(
+            {'email': email},
+            {'$set': {
+                'password': hashed_password,
+                'updated_at': datetime.utcnow()
+            }}
+        )
+        
+        reset_codes.delete_one({'email': email})
+        
+        return jsonify({'success': True, 'message': 'Нууц үг амжилттай солигдлоо'}), 200
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/auth/me', methods=['GET'])
 def get_me():

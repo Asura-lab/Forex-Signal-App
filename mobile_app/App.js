@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { StatusBar, ActivityIndicator, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import LoginScreen from "./src/screens/LoginScreen";
 import SignUpScreen from "./src/screens/SignUpScreen";
+import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
+import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import SignalScreen from "./src/screens/SignalScreen";
-import { isAuthenticated } from "./src/services/auth";
 
 const Stack = createStackNavigator();
 
@@ -20,8 +22,8 @@ export default function App() {
 
   const checkAuthStatus = async () => {
     try {
-      const authenticated = await isAuthenticated();
-      setUserLoggedIn(authenticated);
+      const token = await AsyncStorage.getItem("userToken");
+      setUserLoggedIn(!!token);
     } catch (error) {
       setUserLoggedIn(false);
     } finally {
@@ -70,6 +72,16 @@ export default function App() {
           <Stack.Screen
             name="SignUp"
             component={SignUpScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="EmailVerification"
+            component={EmailVerificationScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="ForgotPassword"
+            component={ForgotPasswordScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen

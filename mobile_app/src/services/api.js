@@ -1,5 +1,5 @@
 import axios from "axios";
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Backend API хаяг - ЭНИЙГ ӨӨРИЙН BACKEND IP-ЭЭР СОЛИНО УУ!
 const API_BASE_URL = "http://192.168.1.44:5000"; // Жишээ: Өөрийн компьютерын IP
@@ -11,6 +11,183 @@ const apiClient = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+// Request interceptor - Token автоматаар нэмэх
+apiClient.interceptors.request.use(
+  async (config) => {
+    const token = await AsyncStorage.getItem("userToken");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// ==================== AUTH ENDPOINTS ====================
+
+/**
+ * Бүртгүүлэх (Имэйл баталгаажуулалттай)
+ */
+export const registerUser = async (name, email, password) => {
+  try {
+    const response = await apiClient.post("/auth/register", {
+      name,
+      email,
+      password,
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Имэйл баталгаажуулах
+ */
+export const verifyEmail = async (email, code) => {
+  try {
+    const response = await apiClient.post("/auth/verify-email", {
+      email,
+      code,
+    });
+
+    // Token-ийг хадгалах
+    if (response.data.token) {
+      await AsyncStorage.setItem("userToken", response.data.token);
+      await AsyncStorage.setItem(
+        "userData",
+        JSON.stringify(response.data.user)
+      );
+    }
+
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Баталгаажуулалтын код дахин илгээх
+ */
+export const resendVerificationCode = async (email) => {
+  try {
+    const response = await apiClient.post("/auth/resend-verification", {
+      email,
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Нэвтрэх
+ */
+export const loginUser = async (email, password) => {
+  try {
+    const response = await apiClient.post("/auth/login", {
+      email,
+      password,
+    });
+
+    // Token хадгалах
+    if (response.data.token) {
+      await AsyncStorage.setItem("userToken", response.data.token);
+      await AsyncStorage.setItem(
+        "userData",
+        JSON.stringify(response.data.user)
+      );
+    }
+
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+      requiresVerification:
+        error.response?.data?.requires_verification || false,
+    };
+  }
+};
+
+/**
+ * Нууц үг мартсан
+ */
+export const forgotPassword = async (email) => {
+  try {
+    const response = await apiClient.post("/auth/forgot-password", { email });
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Сэргээх код шалгах
+ */
+export const verifyResetCode = async (email, code) => {
+  try {
+    const response = await apiClient.post("/auth/verify-reset-code", {
+      email,
+      code,
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Нууц үг сэргээх
+ */
+export const resetPassword = async (email, code, newPassword) => {
+  try {
+    const response = await apiClient.post("/auth/reset-password", {
+      email,
+      code,
+      new_password: newPassword,
+    });
+    return { success: true, data: response.data };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Гарах
+ */
+export const logoutUser = async () => {
+  try {
+    await AsyncStorage.removeItem("userToken");
+    await AsyncStorage.removeItem("userData");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+};
+
+// ==================== API STATUS ====================
 
 /**
  * API холболтыг шалгах

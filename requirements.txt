@@ -23,6 +23,7 @@ seaborn>=0.12.0
 # === BACKEND API ===
 flask>=3.0.0
 flask-cors>=4.0.0
+flask-mail>=0.9.1
 
 # === БУСАД ===
 jupyter>=1.0.0

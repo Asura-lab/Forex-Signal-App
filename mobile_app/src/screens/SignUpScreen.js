@@ -10,10 +10,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { registerUser } from "../services/auth";
+import { registerUser } from "../services/api";
 
 /**
  * SignUp Screen - Бүртгүүлэх дэлгэц
@@ -26,6 +27,7 @@ const SignUpScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleSignUp = async () => {
     // Validation
@@ -36,6 +38,14 @@ const SignUpScreen = ({ navigation }) => {
       !confirmPassword.trim()
     ) {
       Alert.alert("Алдаа", "Бүх талбаруудыг бөглөнө үү");
+      return;
+    }
+
+    if (!acceptedTerms) {
+      Alert.alert(
+        "Анхаар",
+        "Үргэлжлүүлэхийн тулд Үйлчилгээний нөхцөл болон Нууцлалын бодлогыг зөвшөөрөх шаардлагатай"
+      );
       return;
     }
 
@@ -57,14 +67,17 @@ const SignUpScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Use the auth service to register
+      // Бүртгүүлэх - имэйл баталгаажуулалтын код илгээнэ
       const result = await registerUser(name, email, password);
 
       if (result.success) {
-        // Navigate to Main tabs after successful signup
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "Main" }],
+        // Email verification screen рүү шилжих
+        navigation.navigate("EmailVerification", {
+          email: email,
+          name: name,
+          verificationCode: result.data.demo_mode
+            ? result.data.verification_code
+            : null,
         });
       } else {
         Alert.alert("Алдаа", result.error || "Бүртгэл үүсгэх амжилтгүй боллоо");
@@ -81,6 +94,39 @@ const SignUpScreen = ({ navigation }) => {
 
   const handleLogin = () => {
     navigation.navigate("Login");
+  };
+
+  const openTermsOfService = () => {
+    Alert.alert(
+      "Үйлчилгээний нөхцөл",
+      "📋 ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ\n\n" +
+        "1. Үйлчилгээний тухай\n" +
+        "Forex Signal App нь гадаад валютын арилжааны мэдээлэл, аналитик тайлан өгдөг. " +
+        "Энэ нь зөвлөмж бөгөөд хөрөнгө оруулалтын зөвлөгөө БИШ.\n\n" +
+        "2. Эрсдэлийн анхааруулга\n" +
+        "⚠️ Forex арилжаа өндөр эрсдэлтэй. Та хөрөнгөө бүрэн алдаж болзошгүй.\n\n" +
+        "3. Хэрэглэгчийн хариуцлага\n" +
+        "Та өөрийн шийдвэрээ өөрөө гаргаж, эрсдэлээ өөрөө хариуцна.\n\n" +
+        "Дэлгэрэнгүй унших: Профайл → Мэдээлэл → Үйлчилгээний нөхцөл"
+    );
+  };
+
+  const openPrivacyPolicy = () => {
+    Alert.alert(
+      "Нууцлалын бодлого",
+      "🔒 НУУЦЛАЛЫН БОДЛОГО\n\n" +
+        "1. Цуглуулах мэдээлэл\n" +
+        "• Нэр, имэйл хаяг\n" +
+        "• Апп ашиглалтын мэдээлэл\n\n" +
+        "2. Мэдээлэл хамгаалалт\n" +
+        "• HTTPS/TLS шифрлэлт\n" +
+        "• Bcrypt нууц үг хадгалалт\n" +
+        "• MongoDB Atlas аюулгүй сервер\n\n" +
+        "3. Таны эрх\n" +
+        "• Мэдээлэл үзэх, засах, устгах эрхтэй\n" +
+        "• Бидэнтэй холбогдох: contact@forexsignal.com\n\n" +
+        "Дэлгэрэнгүй унших: Профайл → Мэдээлэл → Нууцлалын бодлого"
+    );
   };
 
   return (
@@ -202,11 +248,52 @@ const SignUpScreen = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
 
+              {/* Terms and Privacy Policy Checkbox */}
+              <View style={styles.termsContainer}>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setAcceptedTerms(!acceptedTerms)}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      acceptedTerms && styles.checkboxChecked,
+                    ]}
+                  >
+                    {acceptedTerms && (
+                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <View style={styles.termsTextContainer}>
+                    <Text style={styles.termsLabel}>
+                      Би{" "}
+                      <Text
+                        style={styles.termsLink}
+                        onPress={openTermsOfService}
+                      >
+                        Үйлчилгээний нөхцөл
+                      </Text>{" "}
+                      болон{" "}
+                      <Text
+                        style={styles.termsLink}
+                        onPress={openPrivacyPolicy}
+                      >
+                        Нууцлалын бодлого
+                      </Text>
+                      -той танилцаж зөвшөөрч байна
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+
               {/* SignUp Button */}
               <TouchableOpacity
-                style={[styles.signupButton, loading && styles.disabledButton]}
+                style={[
+                  styles.signupButton,
+                  (loading || !acceptedTerms) && styles.disabledButton,
+                ]}
                 onPress={handleSignUp}
-                disabled={loading}
+                disabled={loading || !acceptedTerms}
               >
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
@@ -222,14 +309,6 @@ const SignUpScreen = ({ navigation }) => {
                   <Text style={styles.loginLink}>Нэвтрэх</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
-            {/* Terms */}
-            <View style={styles.terms}>
-              <Text style={styles.termsText}>
-                Бүртгүүлснээр та манай үйлчилгээний нөхцөл болон{"\n"}
-                нууцлалын бодлогыг зөвшөөрч байна
-              </Text>
             </View>
           </View>
         </ScrollView>
@@ -348,6 +427,43 @@ const styles = StyleSheet.create({
     color: "#2196F3",
     fontSize: 14,
     fontWeight: "bold",
+  },
+  termsContainer: {
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "#CCC",
+    backgroundColor: "#FFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 12,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: "#4CAF50",
+    borderColor: "#4CAF50",
+  },
+  termsTextContainer: {
+    flex: 1,
+  },
+  termsLabel: {
+    fontSize: 13,
+    color: "#666",
+    lineHeight: 20,
+  },
+  termsLink: {
+    color: "#2196F3",
+    fontWeight: "600",
+    textDecorationLine: "underline",
   },
   terms: {
     marginTop: 24,

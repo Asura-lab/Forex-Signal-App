@@ -10,11 +10,13 @@ import {
   Switch,
   Modal,
   ActivityIndicator,
+  Linking,
+  Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getUserData, logoutUser, getAuthToken } from "../services/auth";
+import { logoutUser } from "../services/api";
 import { API_ENDPOINTS } from "../config/api";
 
 /**
@@ -32,6 +34,8 @@ const ProfileScreen = ({ navigation }) => {
   const [oldPassword, setOldPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState(null);
   const [stats, setStats] = useState({
     daysUsed: 0,
     signalsReceived: 0,
@@ -45,11 +49,16 @@ const ProfileScreen = ({ navigation }) => {
   }, []);
 
   const loadUserData = async () => {
-    const data = await getUserData();
-    if (data) {
-      setUserData(data);
-      setName(data.name);
-      setEmail(data.email);
+    try {
+      const data = await AsyncStorage.getItem("userData");
+      if (data) {
+        const parsed = JSON.parse(data);
+        setUserData(parsed);
+        setName(parsed.name);
+        setEmail(parsed.email);
+      }
+    } catch (error) {
+      console.error("Load user data error:", error);
     }
   };
 
@@ -235,6 +244,189 @@ const ProfileScreen = ({ navigation }) => {
         },
       },
     ]);
+  };
+
+  // Open document modal
+  const openDocument = (docType) => {
+    const documents = {
+      help: {
+        title: "Тусламж",
+        content: `🚀 Форекс Сигнал Апп
+
+Энэ апп нь Hidden Markov Model (HMM) машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах боломж олгодог.
+
+📊 Үндсэн функцүүд:
+• 6 валютын хос (EUR/USD, GBP/USD, USD/CAD, USD/CHF, USD/JPY, XAU/USD)
+• 5 төрлийн сигнал (STRONG BUY, BUY, NEUTRAL, SELL, STRONG SELL)
+• Real-time магадлал
+• Өдрийн тойм статистик
+
+⚠️ Анхааруулга:
+Энэ апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш. Бүх арилжааны шийдвэр таны хувийн хариуцлага юм.
+
+📞 Холбоо барих:
+• Email: support@forexsignal.mn
+• GitHub: github.com/Asura-lab/Forex-Signal-App`,
+      },
+      terms: {
+        title: "Үйлчилгээний нөхцөл",
+        content: `📋 ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ
+
+1. ХҮЛЭЭН ЗӨВШӨӨРӨХ
+Апп-г ашиглаж эхлэхдээ та эдгээр үйлчилгээний нөхцөлтэй бүрэн танилцаж, хүлээн зөвшөөрч байна.
+
+2. ҮЙЛЧИЛГЭЭНИЙ ТОДОРХОЙЛОЛТ
+• HMM ашиглан форекс зах зээлийн чиг хандлагыг таамаглах
+• Техникийн шинжилгээний мэдээлэл өгөх
+• Валютын хосын мэдээлэл харуулах
+
+⚠️ БИД САНАЛ, ЗӨВЛӨМЖ ӨГДӨГГҮЙ
+Манай апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш.
+
+3. ЭРСДЭЛИЙН АНХААРУУЛГА
+• Форекс зах зээл маш өндөр эрсдэлтэй
+• Таамаглал 100% үнэн зөв байх баталгаагүй
+• Өнгөрсөн үр дүн ирээдүйн амжилтыг батлахгүй
+• HMM загвар нь алдаа гарч болно
+
+4. ХЭРЭГЛЭГЧИЙН ХАРИУЦЛАГА
+• Бүртгэлийн мэдээллээ үнэн зөв өгөх
+• Нууц үгээ нууцлах
+• Өөрийн хөрөнгө оруулалтын шийдвэр өөрөө гаргах
+
+5. ХОРИОТОЙ ҮЙЛДЛҮҮД
+❌ Системийг хакердах
+❌ Бусад хэрэглэгчийн данс руу нэвтрэх
+❌ Автоматжуулсан систем ашиглах
+❌ Апп-ын код хуулах
+
+6. ХАРИУЦЛАГЫН ХЯЗГААРЛАЛТ
+Бид дараах зүйлд хариуцлага хүлээхгүй:
+• Таны арилжааны алдагдал
+• Апп-ын алдаа, техникийн саатал
+• Мэдээллийн алдаа, хоцрогдол
+
+Дэлгэрэнгүй: docs/TERMS_OF_SERVICE.md`,
+      },
+      privacy: {
+        title: "Нууцлалын бодлого",
+        content: `🔒 НУУЦЛАЛЫН БОДЛОГО
+
+1. ЦУГЛУУЛАХ МЭДЭЭЛЭЛ
+
+✅ Бид цуглуулдаг:
+• Нэр, имэйл хаяг
+• Нууц үг (hash хэлбэрээр)
+• Төхөөрөмжийн мэдээлэл
+• Апп ашиглалтын статистик
+
+❌ Бид цуглуулдаггүй:
+• Санхүүгийн дансны мэдээлэл
+• Кредит карт
+• Арилжааны түүх
+• Утасны дугаар
+• GPS байршил
+
+2. МЭДЭЭЛЭЛ АШИГЛАХ
+
+Зориулалт:
+• Үйлчилгээ үзүүлэх (нэвтрэх, профайл)
+• Апп сайжруулах
+• Хэрэглэгчтэй харилцах
+• Аюулгүй байдал
+
+3. ХАДГАЛАХ БАЙРШИЛ
+
+• MongoDB Atlas (AWS, Ази-Номхон далай)
+• Утас дээр encrypted (AsyncStorage)
+• Backup: 30 хоног
+
+4. ХАМГААЛАЛТ
+
+🔐 Техникийн:
+• HTTPS/TLS encryption
+• bcrypt password hashing
+• JWT токен (7 хоног)
+• MongoDB Atlas Security
+• Firewall protection
+
+5. БИД ХУВААЛЦДАГГҮЙ
+
+✅ Бид таны мэдээллийг:
+• БОРЛУУЛДАГГҮЙ
+• ЗАРДАГГҮЙ
+• МАРКЕТИНГ ХИЙДЭГГҮЙ
+
+6. ТАНЫ ЭРХҮҮД
+
+• Үзэх эрх - Апп → Профайл → "Миний мэдээлэл"
+• Засах эрх - Апп → Профайл → "Мэдээлэл засах"
+• Устгах эрх - Апп → Профайл → "Бүртгэл устгах"
+
+⚠️ Устгасны дараа сэргээх боломжгүй!
+
+7. ХОЛБОО БАРИХ
+
+📧 privacy@forexsignal.mn
+📧 support@forexsignal.mn
+
+Дэлгэрэнгүй: docs/PRIVACY_POLICY.md`,
+      },
+      about: {
+        title: "Апп-ын тухай",
+        content: `ℹ️ ФОРЕКС СИГНАЛ АПП
+
+Хувилбар: 1.0.0
+Шинэчилсэн: 2025.10.18
+
+🎯 Зорилго:
+Hidden Markov Model (HMM) машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах, хэрэглэгчдэд техникийн шинжилгээний мэдээлэл өгөх.
+
+🛠️ Технологи:
+• Frontend: React Native + Expo
+• Backend: Python Flask
+• Database: MongoDB Atlas
+• ML Model: Hidden Markov Model
+• Security: JWT + bcrypt
+
+📊 Дэмждэг валютууд:
+• EUR/USD (Евро/Ам.доллар)
+• GBP/USD (Фунт/Ам.доллар)
+• USD/CAD (Ам.доллар/Канад доллар)
+• USD/CHF (Ам.доллар/Швейцар франк)
+• USD/JPY (Ам.доллар/Иен)
+• XAU/USD (Алт/Ам.доллар)
+
+🎓 Судалгааны ажил:
+Энэ апп нь судалгааны зориулалтаар хөгжүүлэгдсэн бөгөөд боловсролын зорилготой.
+
+⚠️ Санамж:
+Энэ нь санхүүгийн зөвлөгөө биш. Форекс арилжаа маш өндөр эрсдэлтэй бөгөөд таны бүх хөрөнгийг алдах магадлалтай.
+
+👨‍💻 Хөгжүүлэгч:
+GitHub: github.com/Asura-lab/Forex-Signal-App
+
+📄 Лиценз:
+Судалгааны зориулалтаар үнэгүй ашиглаж болно.
+
+© 2025 Форекс Сигнал`,
+      },
+    };
+
+    setCurrentDocument(documents[docType]);
+    setShowDocumentModal(true);
+  };
+
+  // Open external link
+  const openExternalLink = (url) => {
+    Alert.alert(
+      "Холбоос нээх",
+      "Та вэб хөтөч дээр нээхдээ итгэлтэй байна уу?",
+      [
+        { text: "Үгүй", style: "cancel" },
+        { text: "Тийм", onPress: () => Linking.openURL(url) },
+      ]
+    );
   };
 
   return (
@@ -456,7 +648,10 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Мэдээлэл</Text>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => openDocument("help")}
+          >
             <View style={styles.menuItemLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons name="help-circle-outline" size={22} color="#666" />
@@ -466,7 +661,10 @@ const ProfileScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={22} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => openDocument("terms")}
+          >
             <View style={styles.menuItemLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons name="document-text-outline" size={22} color="#666" />
@@ -476,7 +674,10 @@ const ProfileScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={22} color="#999" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => openDocument("privacy")}
+          >
             <View style={styles.menuItemLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons
@@ -490,7 +691,10 @@ const ProfileScreen = ({ navigation }) => {
             <Ionicons name="chevron-forward" size={22} color="#999" />
           </TouchableOpacity>
 
-          <View style={styles.menuItem}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => openDocument("about")}
+          >
             <View style={styles.menuItemLeft}>
               <View style={styles.menuIcon}>
                 <Ionicons
@@ -498,6 +702,16 @@ const ProfileScreen = ({ navigation }) => {
                   size={22}
                   color="#666"
                 />
+              </View>
+              <Text style={styles.menuItemText}>Апп-ын тухай</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color="#999" />
+          </TouchableOpacity>
+
+          <View style={styles.menuItem}>
+            <View style={styles.menuItemLeft}>
+              <View style={styles.menuIcon}>
+                <Ionicons name="code-outline" size={22} color="#666" />
               </View>
               <Text style={styles.menuItemText}>Хувилбар</Text>
             </View>
@@ -586,6 +800,48 @@ const ProfileScreen = ({ navigation }) => {
                 ) : (
                   <Text style={styles.modalButtonText}>Нууц үг солих</Text>
                 )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Document Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDocumentModal}
+        onRequestClose={() => setShowDocumentModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.documentModalContainer}>
+            <View style={styles.documentModalHeader}>
+              <Text style={styles.documentModalTitle}>
+                {currentDocument?.title}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowDocumentModal(false)}
+                style={styles.documentCloseButton}
+              >
+                <Ionicons name="close" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.documentContent}
+              showsVerticalScrollIndicator={true}
+            >
+              <Text style={styles.documentText}>
+                {currentDocument?.content}
+              </Text>
+            </ScrollView>
+
+            <View style={styles.documentModalFooter}>
+              <TouchableOpacity
+                style={styles.documentButton}
+                onPress={() => setShowDocumentModal(false)}
+              >
+                <Text style={styles.documentButtonText}>Хаах</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -904,6 +1160,57 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  // Document Modal Styles
+  documentModalContainer: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: "85%",
+    paddingBottom: 0,
+  },
+  documentModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  documentModalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#212121",
+    flex: 1,
+  },
+  documentCloseButton: {
+    padding: 4,
+  },
+  documentContent: {
+    flex: 1,
+    padding: 20,
+  },
+  documentText: {
+    fontSize: 15,
+    lineHeight: 24,
+    color: "#424242",
+    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+  },
+  documentModalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: "#E0E0E0",
+  },
+  documentButton: {
+    backgroundColor: "#1a237e",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+  },
+  documentButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
