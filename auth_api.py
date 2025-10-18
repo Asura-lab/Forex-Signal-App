@@ -358,6 +358,82 @@ def update_profile():
             'error': f'Мэдээлэл шинэчлэх явцад алдаа гарлаа: {str(e)}'
         }), 500
 
+@app.route('/auth/change-password', methods=['PUT'])
+def change_password():
+    """Нууц үг солих"""
+    try:
+        # Authorization header-өөс token авах
+        auth_header = request.headers.get('Authorization', '')
+        
+        if not auth_header.startswith('Bearer '):
+            return jsonify({
+                'success': False,
+                'error': 'Authorization header шаардлагатай'
+            }), 401
+        
+        token = auth_header.split(' ')[1]
+        payload = verify_token(token)
+        
+        if not payload:
+            return jsonify({
+                'success': False,
+                'error': 'Token буруу эсвэл хугацаа дууссан'
+            }), 401
+        
+        data = request.json
+        old_password = data.get('oldPassword', '')
+        new_password = data.get('newPassword', '')
+        
+        if not old_password or not new_password:
+            return jsonify({
+                'success': False,
+                'error': 'Хуучин болон шинэ нууц үг шаардлагатай'
+            }), 400
+        
+        if len(new_password) < 6:
+            return jsonify({
+                'success': False,
+                'error': 'Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой'
+            }), 400
+        
+        # Хэрэглэгч олох
+        user = users_collection.find_one({'_id': payload['user_id']})
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': 'Хэрэглэгч олдсонгүй'
+            }), 404
+        
+        # Хуучин нууц үг шалгах
+        if not verify_password(old_password, user['password']):
+            return jsonify({
+                'success': False,
+                'error': 'Хуучин нууц үг буруу байна'
+            }), 401
+        
+        # Шинэ нууц үг hash хийж шинэчлэх
+        new_hashed_password = hash_password(new_password)
+        users_collection.update_one(
+            {'_id': payload['user_id']},
+            {'$set': {
+                'password': new_hashed_password,
+                'updated_at': datetime.utcnow()
+            }}
+        )
+        
+        return jsonify({
+            'success': True,
+            'message': 'Нууц үг амжилттай солигдлоо'
+        })
+        
+    except Exception as e:
+        print(f"Change password error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Нууц үг солих явцад алдаа гарлаа: {str(e)}'
+        }), 500
+
 # ==================== HEALTH CHECK ====================
 
 @app.route('/health', methods=['GET'])
@@ -391,12 +467,13 @@ if __name__ == '__main__':
     print("\n🚀 API эхэлж байна...")
     print("📡 Холбогдох хаяг: http://localhost:5001")
     print("\nEndpoints:")
-    print("  POST /auth/register  - Бүртгүүлэх")
-    print("  POST /auth/login     - Нэвтрэх")
-    print("  POST /auth/verify    - Token шалгах")
-    print("  GET  /auth/me        - Хэрэглэгчийн мэдээлэл")
-    print("  PUT  /auth/update    - Мэдээлэл шинэчлэх")
-    print("  GET  /health         - Health check")
+    print("  POST /auth/register        - Бүртгүүлэх")
+    print("  POST /auth/login           - Нэвтрэх")
+    print("  POST /auth/verify          - Token шалгах")
+    print("  GET  /auth/me              - Хэрэглэгчийн мэдээлэл")
+    print("  PUT  /auth/update          - Мэдээлэл шинэчлэх")
+    print("  PUT  /auth/change-password - Нууц үг солих")
+    print("  GET  /health               - Health check")
     print("\n" + "=" * 60)
     
     app.run(debug=True, host='0.0.0.0', port=5001)

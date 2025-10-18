@@ -8,10 +8,13 @@ import {
   Alert,
   TextInput,
   Switch,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { getUserData, logoutUser } from "../services/auth";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getUserData, logoutUser, getAuthToken } from "../services/auth";
 
 /**
  * Profile Screen - Хэрэглэгчийн профайл
@@ -23,9 +26,23 @@ const ProfileScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [oldPassword, setOldPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [stats, setStats] = useState({
+    daysUsed: 0,
+    signalsReceived: 0,
+    lastActive: null,
+  });
+
+  const API_URL = "http://192.168.1.44:5001";
 
   useEffect(() => {
     loadUserData();
+    loadSettings();
+    loadStats();
   }, []);
 
   const loadUserData = async () => {
@@ -37,10 +54,169 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
-  const handleSave = () => {
-    Alert.alert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
-      { text: "OK", onPress: () => setEditMode(false) },
-    ]);
+  const loadSettings = async () => {
+    try {
+      const savedNotifications = await AsyncStorage.getItem(
+        "@notification_settings"
+      );
+      const savedDarkMode = await AsyncStorage.getItem("@dark_mode");
+
+      if (savedNotifications !== null) {
+        setNotifications(JSON.parse(savedNotifications));
+      }
+      if (savedDarkMode !== null) {
+        setDarkMode(JSON.parse(savedDarkMode));
+      }
+    } catch (error) {
+      console.error("Load settings error:", error);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const createdAt = await AsyncStorage.getItem("@user_created_at");
+      if (createdAt) {
+        const daysDiff = Math.floor(
+          (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
+        );
+        setStats((prev) => ({
+          ...prev,
+          daysUsed: daysDiff,
+          lastActive: new Date().toLocaleDateString("mn-MN"),
+        }));
+      }
+    } catch (error) {
+      console.error("Load stats error:", error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert("Алдаа", "Нэр хоосон байж болохгүй");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+
+      const response = await fetch(`${API_URL}/auth/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        // Update local storage
+        const updatedUser = { ...userData, name };
+        await AsyncStorage.setItem("@user_data", JSON.stringify(updatedUser));
+        setUserData(updatedUser);
+
+        Alert.alert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
+          { text: "OK", onPress: () => setEditMode(false) },
+        ]);
+      } else {
+        Alert.alert("Алдаа", data.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
+      }
+    } catch (error) {
+      Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
+      console.error("Update error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangePassword = () => {
+    setShowPasswordModal(true);
+  };
+
+  const handlePasswordChange = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Алдаа", "Бүх талбарыг бөглөнө үү");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Алдаа", "Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Алдаа", "Шинэ нууц үг таарахгүй байна");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = await getAuthToken();
+
+      const response = await fetch(`${API_URL}/auth/change-password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          oldPassword,
+          newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        Alert.alert("Амжилттай", "Нууц үг амжилттай солигдлоо", [
+          {
+            text: "OK",
+            onPress: () => {
+              setShowPasswordModal(false);
+              setOldPassword("");
+              setNewPassword("");
+              setConfirmPassword("");
+            },
+          },
+        ]);
+      } else {
+        Alert.alert("Алдаа", data.error || "Нууц үг солихоо алдаа гарлаа");
+      }
+    } catch (error) {
+      Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
+      console.error("Password change error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNotificationToggle = async (value) => {
+    setNotifications(value);
+    try {
+      await AsyncStorage.setItem(
+        "@notification_settings",
+        JSON.stringify(value)
+      );
+    } catch (error) {
+      console.error("Save notification settings error:", error);
+    }
+  };
+
+  const handleDarkModeToggle = async (value) => {
+    setDarkMode(value);
+    try {
+      await AsyncStorage.setItem("@dark_mode", JSON.stringify(value));
+      if (value) {
+        Alert.alert(
+          "Удахгүй",
+          "Харанхуй горим одоогоор бэлэн биш байна. Удахгүй нэмэгдэнэ."
+        );
+      }
+    } catch (error) {
+      console.error("Save dark mode settings error:", error);
+    }
   };
 
   const handleLogout = () => {
@@ -59,12 +235,6 @@ const ProfileScreen = ({ navigation }) => {
           });
         },
       },
-    ]);
-  };
-
-  const handleChangePassword = () => {
-    Alert.alert("Нууц үг солих", "Нууц үг солих функц удахгүй нэмэгдэнэ", [
-      { text: "OK" },
     ]);
   };
 
@@ -92,6 +262,47 @@ const ProfileScreen = ({ navigation }) => {
       </LinearGradient>
 
       <ScrollView style={styles.content}>
+        {/* Statistics Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Статистик</Text>
+
+          <View style={styles.statsContainer}>
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <Ionicons name="calendar-outline" size={24} color="#4CAF50" />
+              </View>
+              <Text style={styles.statValue}>{stats.daysUsed}</Text>
+              <Text style={styles.statLabel}>Хоног ашигласан</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <Ionicons
+                  name="notifications-outline"
+                  size={24}
+                  color="#2196F3"
+                />
+              </View>
+              <Text style={styles.statValue}>{stats.signalsReceived}</Text>
+              <Text style={styles.statLabel}>Сигнал авсан</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={styles.statIconContainer}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={24}
+                  color="#FF9800"
+                />
+              </View>
+              <Text style={styles.statValue}>
+                {stats.lastActive || "Өнөөдөр"}
+              </Text>
+              <Text style={styles.statLabel}>Сүүлд нэвтэрсэн</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Personal Information Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -166,8 +377,13 @@ const ProfileScreen = ({ navigation }) => {
                   <TouchableOpacity
                     style={[styles.actionButton, styles.saveButton]}
                     onPress={handleSave}
+                    disabled={loading}
                   >
-                    <Text style={styles.saveButtonText}>Хадгалах</Text>
+                    {loading ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.saveButtonText}>Хадгалах</Text>
+                    )}
                   </TouchableOpacity>
                 </View>
               </>
@@ -192,7 +408,7 @@ const ProfileScreen = ({ navigation }) => {
               </View>
               <Switch
                 value={notifications}
-                onValueChange={setNotifications}
+                onValueChange={handleNotificationToggle}
                 trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
                 thumbColor={notifications ? "#FFFFFF" : "#F5F5F5"}
               />
@@ -210,7 +426,7 @@ const ProfileScreen = ({ navigation }) => {
               </View>
               <Switch
                 value={darkMode}
-                onValueChange={setDarkMode}
+                onValueChange={handleDarkModeToggle}
                 disabled={true}
                 trackColor={{ false: "#E0E0E0", true: "#424242" }}
                 thumbColor={darkMode ? "#FFFFFF" : "#F5F5F5"}
@@ -300,6 +516,82 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Password Change Modal */}
+      <Modal
+        visible={showPasswordModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPasswordModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Нууц үг солих</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setOldPassword("");
+                  setNewPassword("");
+                  setConfirmPassword("");
+                }}
+              >
+                <Ionicons name="close" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Хуучин нууц үг</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={oldPassword}
+                  onChangeText={setOldPassword}
+                  secureTextEntry
+                  placeholder="Хуучин нууц үг оруулах"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Шинэ нууц үг</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  placeholder="Шинэ нууц үг (дор хаяж 6 тэмдэгт)"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Нууц үг баталгаажуулах</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  placeholder="Шинэ нууц үг дахин оруулах"
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={handlePasswordChange}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Нууц үг солих</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -361,6 +653,43 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 20,
     paddingHorizontal: 16,
+  },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#F5F5F5",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#212121",
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: "#757575",
+    textAlign: "center",
   },
   sectionHeader: {
     flexDirection: "row",
@@ -521,6 +850,63 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 16,
     color: "#F44336",
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#212121",
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#424242",
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: "#212121",
+    backgroundColor: "#FAFAFA",
+  },
+  modalButton: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 8,
+    padding: 16,
+    alignItems: "center",
+    marginTop: 10,
+  },
+  modalButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
     fontWeight: "600",
   },
 });
