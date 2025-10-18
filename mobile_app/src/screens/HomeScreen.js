@@ -11,10 +11,17 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import CurrencyCard from "../components/CurrencyCard";
 import { CURRENCY_PAIRS, getTimeBasedGreeting } from "../utils/helpers";
 import { checkApiStatus, getAllPredictions } from "../services/api";
-import { getUserData } from "../services/auth";
+import {
+  colors,
+  gradients,
+  spacing,
+  fontSize,
+  fontWeight,
+} from "../config/theme";
 
 /**
  * Үндсэн дэлгэц - Валютын хослолууд
@@ -34,9 +41,14 @@ const HomeScreen = ({ navigation }) => {
 
   // Load user data
   const loadUserData = async () => {
-    const userData = await getUserData();
-    if (userData) {
-      setUserName(userData.name);
+    try {
+      const userData = await AsyncStorage.getItem("userData");
+      if (userData) {
+        const parsed = JSON.parse(userData);
+        setUserName(parsed.name);
+      }
+    } catch (error) {
+      console.error("Load user data error:", error);
     }
     setGreeting(getTimeBasedGreeting("mn")); // Use 'en' for English
   };
@@ -98,7 +110,7 @@ const HomeScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196F3" />
+        <ActivityIndicator size="large" color={colors.info} />
         <Text style={styles.loadingText}>Ачааллаж байна...</Text>
       </View>
     );
@@ -108,7 +120,7 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
+        colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.header}
@@ -134,7 +146,7 @@ const HomeScreen = ({ navigation }) => {
           <View
             style={[
               styles.statusDot,
-              { backgroundColor: apiConnected ? "#4CAF50" : "#F44336" },
+              { backgroundColor: apiConnected ? colors.success : colors.error },
             ]}
           />
           <Text style={styles.statusText}>
@@ -186,51 +198,51 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
+    backgroundColor: colors.background,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: "#757575",
+    marginTop: spacing.sm,
+    fontSize: fontSize.md,
+    color: colors.textMuted,
   },
   header: {
     paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.lg,
   },
   headerTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: 12,
+    marginBottom: spacing.sm,
   },
   headerContent: {
     flex: 1,
   },
   greetingContainer: {
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   greetingText: {
-    fontSize: 18,
-    color: "#FFFFFF",
-    fontWeight: "600",
+    fontSize: fontSize.lg,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold,
     opacity: 0.95,
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 4,
+    fontSize: fontSize.display,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: "rgba(255, 255, 255, 0.9)",
+    fontSize: fontSize.md,
+    color: colors.textSecondary,
   },
   statusContainer: {
     flexDirection: "row",
@@ -243,46 +255,46 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   statusText: {
-    fontSize: 13,
-    color: "#FFFFFF",
-    fontWeight: "600",
+    fontSize: fontSize.xs,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.semibold,
   },
   scrollView: {
     flex: 1,
   },
   section: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#212121",
-    marginBottom: 4,
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.bold,
+    color: colors.textDark,
+    marginBottom: spacing.xs,
   },
   sectionSubtitle: {
-    fontSize: 14,
-    color: "#757575",
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
   },
   disclaimer: {
     backgroundColor: "#FFF3E0",
     borderLeftWidth: 4,
-    borderLeftColor: "#FF9800",
-    padding: 16,
-    marginHorizontal: 16,
-    marginTop: 20,
-    borderRadius: 8,
+    borderLeftColor: colors.warning,
+    padding: spacing.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    borderRadius: spacing.sm,
   },
   disclaimerTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.bold,
     color: "#E65100",
-    marginBottom: 8,
+    marginBottom: spacing.sm,
   },
   disclaimerText: {
-    fontSize: 13,
-    color: "#424242",
+    fontSize: fontSize.xs,
+    color: colors.textDark,
     lineHeight: 20,
   },
 });
