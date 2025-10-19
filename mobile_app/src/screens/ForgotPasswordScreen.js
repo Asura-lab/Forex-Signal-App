@@ -164,20 +164,25 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   const renderStep1 = () => (
     <>
-      <View style={styles.headerContainer}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="key-outline" size={60} color="#FFFFFF" />
-        </View>
-        <Text style={styles.title}>Нууц үг сэргээх</Text>
-        <Text style={styles.subtitle}>Бүртгэлтэй имэйл хаягаа оруулна уу</Text>
+      <View style={styles.stepHeader}>
+        <Ionicons name="mail" size={48} color="#1a237e" />
+        <Text style={styles.stepTitle}>Алхам 1: Имэйл хаяг</Text>
+        <Text style={styles.stepSubtitle}>
+          Бүртгэлтэй имэйл хаягаа оруулна уу
+        </Text>
       </View>
 
       <View style={styles.inputContainer}>
-        <Ionicons name="mail-outline" size={20} color="#FFFFFF" />
+        <Ionicons
+          name="mail-outline"
+          size={20}
+          color="#666"
+          style={styles.inputIcon}
+        />
         <TextInput
           style={styles.input}
           placeholder="Имэйл хаяг"
-          placeholderTextColor="rgba(255,255,255,0.6)"
+          placeholderTextColor="#999"
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
@@ -187,17 +192,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
       </View>
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, loading && styles.disabledButton]}
         onPress={handleSendEmail}
         disabled={loading}
       >
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <>
-            <Ionicons name="send-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Код илгээх</Text>
-          </>
+          <Text style={styles.primaryButtonText}>Код илгээх</Text>
         )}
       </TouchableOpacity>
     </>
@@ -205,12 +207,10 @@ const ForgotPasswordScreen = ({ navigation }) => {
 
   const renderStep2 = () => (
     <>
-      <View style={styles.headerContainer}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="shield-checkmark-outline" size={60} color="#FFFFFF" />
-        </View>
-        <Text style={styles.title}>Код баталгаажуулах</Text>
-        <Text style={styles.subtitle}>
+      <View style={styles.stepHeader}>
+        <Ionicons name="shield-checkmark" size={48} color="#1a237e" />
+        <Text style={styles.stepTitle}>Алхам 2: Код баталгаажуулах</Text>
+        <Text style={styles.stepSubtitle}>
           {email} хаягт илгээсэн 6 оронтой кодыг оруулна уу
         </Text>
       </View>
@@ -232,21 +232,17 @@ const ForgotPasswordScreen = ({ navigation }) => {
       </View>
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[
+          styles.primaryButton,
+          (loading || code.join("").length !== 6) && styles.disabledButton,
+        ]}
         onPress={handleVerifyCode}
         disabled={loading || code.join("").length !== 6}
       >
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <>
-            <Ionicons
-              name="checkmark-circle-outline"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.primaryButtonText}>Үргэлжлүүлэх</Text>
-          </>
+          <Text style={styles.primaryButtonText}>Үргэлжлүүлэх</Text>
         )}
       </TouchableOpacity>
 
@@ -257,73 +253,84 @@ const ForgotPasswordScreen = ({ navigation }) => {
           setCode(["", "", "", "", "", ""]);
         }}
       >
-        <Text style={styles.secondaryButtonText}>Буцах</Text>
+        <Text style={styles.secondaryButtonText}>← Буцах</Text>
       </TouchableOpacity>
     </>
   );
 
   const renderStep3 = () => (
     <>
-      <View style={styles.headerContainer}>
-        <View style={styles.iconContainer}>
-          <Ionicons name="lock-closed-outline" size={60} color="#FFFFFF" />
-        </View>
-        <Text style={styles.title}>Шинэ нууц үг</Text>
-        <Text style={styles.subtitle}>Шинэ нууц үгээ оруулна уу</Text>
+      <View style={styles.stepHeader}>
+        <Ionicons name="key" size={48} color="#1a237e" />
+        <Text style={styles.stepTitle}>Алхам 3: Шинэ нууц үг</Text>
+        <Text style={styles.stepSubtitle}>Шинэ нууц үгээ оруулна уу</Text>
       </View>
 
       <View style={styles.inputContainer}>
-        <Ionicons name="lock-closed-outline" size={20} color="#FFFFFF" />
+        <Ionicons
+          name="lock-closed-outline"
+          size={20}
+          color="#666"
+          style={styles.inputIcon}
+        />
         <TextInput
-          style={styles.input}
+          style={[styles.input, styles.passwordInput]}
           placeholder="Шинэ нууц үг"
-          placeholderTextColor="rgba(255,255,255,0.6)"
+          placeholderTextColor="#999"
           value={newPassword}
           onChangeText={setNewPassword}
           secureTextEntry={!showNewPassword}
+          autoCapitalize="none"
         />
-        <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)}>
+        <TouchableOpacity
+          onPress={() => setShowNewPassword(!showNewPassword)}
+          style={styles.eyeIcon}
+        >
           <Ionicons
-            name={showNewPassword ? "eye-off-outline" : "eye-outline"}
+            name={showNewPassword ? "eye-outline" : "eye-off-outline"}
             size={20}
-            color="#FFFFFF"
+            color="#666"
           />
         </TouchableOpacity>
       </View>
 
       <View style={styles.inputContainer}>
-        <Ionicons name="lock-closed-outline" size={20} color="#FFFFFF" />
+        <Ionicons
+          name="lock-closed-outline"
+          size={20}
+          color="#666"
+          style={styles.inputIcon}
+        />
         <TextInput
-          style={styles.input}
+          style={[styles.input, styles.passwordInput]}
           placeholder="Нууц үг давтах"
-          placeholderTextColor="rgba(255,255,255,0.6)"
+          placeholderTextColor="#999"
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
         />
         <TouchableOpacity
           onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+          style={styles.eyeIcon}
         >
           <Ionicons
-            name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+            name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
             size={20}
-            color="#FFFFFF"
+            color="#666"
           />
         </TouchableOpacity>
       </View>
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, loading && styles.disabledButton]}
         onPress={handleResetPassword}
         disabled={loading}
       >
         {loading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <>
-            <Ionicons name="checkmark-done-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>Нууц үг солих</Text>
-          </>
+          <Text style={styles.primaryButtonText}>Нууц үг солих</Text>
         )}
       </TouchableOpacity>
 
@@ -331,7 +338,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         style={styles.secondaryButton}
         onPress={() => setStep(2)}
       >
-        <Text style={styles.secondaryButtonText}>Буцах</Text>
+        <Text style={styles.secondaryButtonText}>← Буцах</Text>
       </TouchableOpacity>
     </>
   );
@@ -342,7 +349,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       style={styles.container}
     >
       <LinearGradient
-        colors={["#d84315", "#e64a19", "#ff5722"]}
+        colors={["#1a237e", "#283593", "#3949ab"]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -352,23 +359,33 @@ const ForgotPasswordScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.content}>
-            {/* Progress Indicator */}
-            <View style={styles.progressContainer}>
-              {[1, 2, 3].map((s) => (
-                <View
-                  key={s}
-                  style={[
-                    styles.progressDot,
-                    s <= step && styles.progressDotActive,
-                  ]}
-                />
-              ))}
+            {/* Logo/Title */}
+            <View style={styles.logoContainer}>
+              <Ionicons name="lock-closed" size={60} color="#FFFFFF" />
+              <Text style={styles.logoTitle}>Форекс Сигнал</Text>
+              <Text style={styles.logoSubtitle}>Нууц үг сэргээх</Text>
             </View>
 
-            {/* Render current step */}
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
+            {/* Form Container */}
+            <View style={styles.formContainer}>
+              {/* Progress Indicator */}
+              <View style={styles.progressContainer}>
+                {[1, 2, 3].map((s) => (
+                  <View
+                    key={s}
+                    style={[
+                      styles.progressDot,
+                      s <= step && styles.progressDotActive,
+                    ]}
+                  />
+                ))}
+              </View>
+
+              {/* Render current step */}
+              {step === 1 && renderStep1()}
+              {step === 2 && renderStep2()}
+              {step === 3 && renderStep3()}
+            </View>
 
             {/* Back to Login */}
             <TouchableOpacity
@@ -400,122 +417,157 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: "center",
-    paddingHorizontal: 30,
-    paddingVertical: 40,
+    padding: 24,
+  },
+  logoContainer: {
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  logoTitle: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    marginTop: 16,
+  },
+  logoSubtitle: {
+    fontSize: 16,
+    color: "#B0BEC5",
+    marginTop: 8,
+  },
+  formContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
   },
   progressContainer: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 12,
-    marginBottom: 40,
+    marginBottom: 30,
   },
   progressDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "rgba(255,255,255,0.3)",
+    backgroundColor: "#E0E0E0",
   },
   progressDotActive: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#1a237e",
     width: 30,
   },
-  headerContainer: {
+  stepHeader: {
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 24,
   },
-  iconContainer: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
+  stepTitle: {
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 10,
+    color: "#1a237e",
+    marginTop: 12,
+    marginBottom: 8,
     textAlign: "center",
   },
-  subtitle: {
+  stepSubtitle: {
     fontSize: 14,
-    color: "#FFE0B2",
+    color: "#666",
     textAlign: "center",
-    paddingHorizontal: 20,
     lineHeight: 20,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.15)",
+    backgroundColor: "#F5F5F5",
     borderRadius: 12,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.3)",
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 15,
-    paddingHorizontal: 10,
     fontSize: 16,
-    color: "#FFFFFF",
+    color: "#333",
+  },
+  passwordInput: {
+    paddingRight: 40,
+  },
+  eyeIcon: {
+    position: "absolute",
+    right: 16,
   },
   codeContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 30,
+    marginBottom: 24,
+    gap: 8,
   },
   codeInput: {
-    width: 50,
+    flex: 1,
     height: 60,
     borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
+    borderColor: "#E0E0E0",
     borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#FFFFFF",
+    backgroundColor: "#F5F5F5",
+    color: "#333",
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
   },
   codeInputFilled: {
-    borderColor: "#4CAF50",
-    backgroundColor: "rgba(76,175,80,0.2)",
+    borderColor: "#1a237e",
+    backgroundColor: "#E8EAF6",
   },
   primaryButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 15,
+    backgroundColor: "#1a237e",
+    paddingVertical: 16,
     borderRadius: 12,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
-    marginBottom: 15,
+    marginBottom: 12,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "bold",
   },
+  disabledButton: {
+    backgroundColor: "#BDBDBD",
+    opacity: 0.7,
+  },
   secondaryButton: {
     paddingVertical: 12,
     alignItems: "center",
-    marginBottom: 20,
   },
   secondaryButtonText: {
-    color: "#FFFFFF",
+    color: "#666",
     fontSize: 14,
     fontWeight: "500",
-    textDecorationLine: "underline",
   },
   backButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    paddingVertical: 12,
-    marginTop: 20,
+    paddingVertical: 16,
+    marginTop: 16,
   },
   backButtonText: {
     color: "#FFFFFF",

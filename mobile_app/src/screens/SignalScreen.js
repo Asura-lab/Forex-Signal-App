@@ -16,7 +16,7 @@ import {
   getConfidenceLevel,
   formatDate,
 } from "../utils/helpers";
-import { getPrediction } from "../services/api";
+import { getPrediction, getSpecificRate } from "../services/api";
 import {
   colors,
   gradients,
@@ -25,6 +25,7 @@ import {
   fontWeight,
   shadows,
 } from "../config/theme";
+import { Ionicons } from "@expo/vector-icons";
 
 /**
  * Сигнал дэлгэц - Дэлгэрэнгүй таамаглал
@@ -33,6 +34,8 @@ const SignalScreen = ({ route, navigation }) => {
   const { pair, prediction: initialPrediction } = route.params;
   const [prediction, setPrediction] = useState(initialPrediction);
   const [loading, setLoading] = useState(false);
+  const [liveRate, setLiveRate] = useState(null);
+  const [rateLoading, setRateLoading] = useState(true);
 
   useEffect(() => {
     navigation.setOptions({
@@ -42,19 +45,56 @@ const SignalScreen = ({ route, navigation }) => {
       },
       headerTintColor: "#fff",
     });
+
+    // Fetch live rate
+    fetchLiveRate();
+
+    // Auto-refresh rate every 30 seconds
+    const interval = setInterval(fetchLiveRate, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchLiveRate = async () => {
+    try {
+      const result = await getSpecificRate(pair.name);
+      if (result.success) {
+        setLiveRate(result.data.rate);
+      }
+    } catch (error) {
+      console.error("Live rate авах алдаа:", error);
+    } finally {
+      setRateLoading(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setLoading(true);
-    const result = await getPrediction(pair.name);
 
-    if (result.success) {
-      setPrediction(result.data);
+    // Fetch both prediction and live rate
+    const [predResult, rateResult] = await Promise.all([
+      getPrediction(pair.name),
+      getSpecificRate(pair.name),
+    ]);
+
+    if (predResult.success) {
+      setPrediction(predResult.data);
     } else {
       Alert.alert("Алдаа", "Шинэчлэхэд алдаа гарлаа");
     }
 
+    if (rateResult.success) {
+      setLiveRate(rateResult.data.rate);
+    }
+
     setLoading(false);
+  };
+
+  const formatRate = (rate) => {
+    if (!rate) return "—";
+    if (pair.name.includes("JPY")) {
+      return rate.toFixed(3);
+    }
+    return rate.toFixed(5);
   };
 
   if (
@@ -86,6 +126,17 @@ const SignalScreen = ({ route, navigation }) => {
         <Text style={styles.flag}>{pair.flag}</Text>
         <Text style={styles.pairName}>{pair.displayName}</Text>
         <Text style={styles.timestamp}>{formatDate(new Date())}</Text>
+
+        {/* Live Rate Display */}
+        <View style={styles.liveRateContainer}>
+          <Ionicons name="stats-chart" size={16} color="#fff" />
+          <Text style={styles.liveRateLabel}>Бодит ханш:</Text>
+          {rateLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.liveRateValue}>{formatRate(liveRate)}</Text>
+          )}
+        </View>
       </LinearGradient>
 
       {/* Үндсэн сигнал */}
@@ -226,6 +277,26 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: fontSize.xs,
     color: colors.textSecondary,
+  },
+  liveRateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: spacing.md,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: spacing.sm,
+    gap: spacing.xs,
+  },
+  liveRateLabel: {
+    fontSize: fontSize.sm,
+    color: colors.textPrimary,
+    marginLeft: spacing.xs,
+  },
+  liveRateValue: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: colors.textPrimary,
   },
   card: {
     backgroundColor: colors.card,

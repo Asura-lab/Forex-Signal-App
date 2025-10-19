@@ -77,7 +77,9 @@ export default function App() {
           <Stack.Screen
             name="EmailVerification"
             component={EmailVerificationScreen}
-            options={{ headerShown: false }}
+            options={{
+              headerShown: false,
+            }}
           />
           <Stack.Screen
             name="ForgotPassword"
@@ -93,6 +95,8 @@ export default function App() {
             name="Signal"
             component={SignalScreen}
             options={{
+              headerShown: true,
+              title: "Форекс Сигнал",
               headerBackTitleVisible: false,
             }}
           />

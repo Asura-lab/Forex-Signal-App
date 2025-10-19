@@ -39,6 +39,16 @@ MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 VERIFICATION_CODE_EXPIRY_MINUTES = 10
 RESET_CODE_EXPIRY_MINUTES = 10
 
+# Currency Exchange Rate API (apilayer.net)
+CURRENCY_API_KEY = os.getenv('CURRENCY_API_KEY', 'ec0d85ea8b39c6b2996b1a016cca58b9')
+CURRENCY_API_BASE_URL = 'http://apilayer.net/api/live'
+
+# MT5 Configuration (Optional - хэрэв MT5 ашиглах бол)
+MT5_ENABLED = os.getenv('MT5_ENABLED', 'False').lower() == 'true'
+MT5_LOGIN = int(os.getenv('MT5_LOGIN')) if os.getenv('MT5_LOGIN') else None  # MT5 account number (int)
+MT5_PASSWORD = os.getenv('MT5_PASSWORD')  # MT5 password
+MT5_SERVER = os.getenv('MT5_SERVER')  # MT5 server name
+
 # API Configuration
 API_HOST = os.getenv('API_HOST', '0.0.0.0')
 API_PORT = int(os.getenv('API_PORT', 5000))

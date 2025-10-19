@@ -14,7 +14,12 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import CurrencyCard from "../components/CurrencyCard";
 import { CURRENCY_PAIRS, getTimeBasedGreeting } from "../utils/helpers";
-import { checkApiStatus, getAllPredictions } from "../services/api";
+import {
+  checkApiStatus,
+  getAllPredictions,
+  getLiveRates,
+  getMT5Status,
+} from "../services/api";
 import {
   colors,
   gradients,
@@ -33,10 +38,24 @@ const HomeScreen = ({ navigation }) => {
   const [predictions, setPredictions] = useState({});
   const [userName, setUserName] = useState("");
   const [greeting, setGreeting] = useState("");
+  const [emailVerified, setEmailVerified] = useState(true);
+  const [userEmail, setUserEmail] = useState("");
+  const [liveRates, setLiveRates] = useState({});
+  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  const [mt5Connected, setMt5Connected] = useState(false);
+  const [dataSource, setDataSource] = useState("API");
 
   useEffect(() => {
     loadUserData();
     loadData();
+    checkMT5Status();
+
+    // Auto-refresh live rates every 30 seconds
+    const ratesInterval = setInterval(() => {
+      fetchLiveRates();
+    }, 30000);
+
+    return () => clearInterval(ratesInterval);
   }, []);
 
   // Load user data
@@ -46,11 +65,40 @@ const HomeScreen = ({ navigation }) => {
       if (userData) {
         const parsed = JSON.parse(userData);
         setUserName(parsed.name);
+        setUserEmail(parsed.email || "");
+        setEmailVerified(parsed.email_verified !== false);
       }
     } catch (error) {
       console.error("Load user data error:", error);
     }
     setGreeting(getTimeBasedGreeting("mn")); // Use 'en' for English
+  };
+
+  const fetchLiveRates = async () => {
+    try {
+      // MT5-аас авах (хэрэв холбогдсон бол)
+      const result = await getLiveRates(null, "mt5");
+      if (result.success) {
+        setLiveRates(result.data.rates || {});
+        setLastUpdateTime(
+          result.data.timestamp || new Date().toLocaleTimeString()
+        );
+        setDataSource(result.data.source || "API");
+      }
+    } catch (error) {
+      console.error("Live rates авах алдаа:", error);
+    }
+  };
+
+  const checkMT5Status = async () => {
+    try {
+      const result = await getMT5Status();
+      if (result.success) {
+        setMt5Connected(result.data.connected || false);
+      }
+    } catch (error) {
+      console.error("MT5 статус шалгах алдаа:", error);
+    }
   };
 
   const loadData = async () => {
@@ -72,17 +120,32 @@ const HomeScreen = ({ navigation }) => {
       return;
     }
 
+    // Бодит цагийн ханш авах
+    await fetchLiveRates();
+
     // Бүх таамаглалуудыг авах
     const result = await getAllPredictions();
 
     if (result.success) {
       const predictionsMap = {};
       result.data.forEach((item) => {
-        if (item.success) {
-          predictionsMap[item.pair] = item.data;
+        if (item.success && item.data) {
+          // Backend-ийн response format-г mobile app format руу хөрвүүлэх
+          const predictionData = item.data;
+          predictionsMap[item.pair] = {
+            latest_prediction: {
+              label: predictionData.signal, // signal -> label
+              confidence: predictionData.confidence * 100, // 0.9 -> 90
+            },
+            signal_name: predictionData.signal_name,
+            historical_accuracy: predictionData.historical_accuracy,
+            timestamp: predictionData.timestamp,
+          };
         }
       });
       setPredictions(predictionsMap);
+    } else {
+      console.error("Таамаглал авах алдаа:", result.error);
     }
 
     setLoading(false);
@@ -152,6 +215,20 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.statusText}>
             {apiConnected ? "Холбогдсон" : "Холбогдоогүй"}
           </Text>
+
+          {/* MT5 Badge */}
+          {mt5Connected && (
+            <View style={styles.mt5Badge}>
+              <Text style={styles.mt5BadgeText}>MT5</Text>
+            </View>
+          )}
+
+          {/* Data Source */}
+          {lastUpdateTime && (
+            <Text style={styles.sourceText}>
+              {dataSource} • {lastUpdateTime}
+            </Text>
+          )}
         </View>
       </LinearGradient>
 
@@ -162,34 +239,91 @@ const HomeScreen = ({ navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Валютын хослолууд</Text>
-          <Text style={styles.sectionSubtitle}>
-            Хослол сонгож дэлгэрэнгүй таамаглал үзнэ үү
-          </Text>
-        </View>
+        {/* Имэйл баталгаажуулалтын мэдэгдэл */}
+        {!emailVerified ? (
+          <View style={styles.verificationAlert}>
+            <View style={styles.verificationHeader}>
+              <Ionicons name="warning" size={24} color={colors.warning} />
+              <Text style={styles.verificationTitle}>
+                Имэйл баталгаажуулаагүй байна
+              </Text>
+            </View>
+            <Text style={styles.verificationText}>
+              Таны имэйл хаяг ({userEmail}) баталгаажаагүй байна. Валютын
+              хослолуудыг үзэхийн тулд эхлээд имэйл хаягаа баталгаажуулна уу.
+            </Text>
+            <TouchableOpacity
+              style={styles.verificationButton}
+              onPress={() =>
+                navigation.navigate("EmailVerification", { email: userEmail })
+              }
+            >
+              <Text style={styles.verificationButtonText}>Баталгаажуулах</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.white} />
+            </TouchableOpacity>
 
-        {CURRENCY_PAIRS.map((pair) => (
-          <CurrencyCard
-            key={pair.id}
-            pair={pair}
-            prediction={predictions[pair.name]}
-            onPress={() => handlePairPress(pair)}
-            loading={false}
-          />
-        ))}
+            {/* Хаалттай валютын хослолууд */}
+            <View style={styles.lockedSection}>
+              <Ionicons
+                name="lock-closed"
+                size={60}
+                color={colors.textMuted}
+                style={styles.lockIcon}
+              />
+              <Text style={styles.lockedTitle}>Валютын хослолууд</Text>
+              <Text style={styles.lockedText}>
+                Имэйл баталгаажуулсны дараа бүх валютын хослолууд болон AI
+                таамаглалууд танд нээгдэнэ
+              </Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <View>
+                  <Text style={styles.sectionTitle}>Валютын хослолууд</Text>
+                  <Text style={styles.sectionSubtitle}>
+                    Хослол сонгож дэлгэрэнгүй таамаглал үзнэ үү
+                  </Text>
+                </View>
+                {lastUpdateTime && (
+                  <View style={styles.updateTimeContainer}>
+                    <Ionicons
+                      name="time-outline"
+                      size={12}
+                      color={colors.textMuted}
+                    />
+                    <Text style={styles.updateTimeText}>{lastUpdateTime}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
 
-        {/* Анхааруулга */}
-        <View style={styles.disclaimer}>
-          <Text style={styles.disclaimerTitle}>⚠️ Анхааруулга</Text>
-          <Text style={styles.disclaimerText}>
-            Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн. Бодит худалдаанд
-            ашиглахаас өмнө өөрийн судалгаа хийж, эрсдлийн менежментийг сайн
-            тооцоолоорой.
-          </Text>
-        </View>
+            {CURRENCY_PAIRS.map((pair) => (
+              <CurrencyCard
+                key={pair.id}
+                pair={pair}
+                prediction={predictions[pair.name]}
+                liveRate={liveRates[pair.name]}
+                onPress={() => handlePairPress(pair)}
+                loading={false}
+              />
+            ))}
 
-        <View style={{ height: 20 }} />
+            {/* Анхааруулга */}
+            <View style={styles.disclaimer}>
+              <Text style={styles.disclaimerTitle}>⚠️ Анхааруулга</Text>
+              <Text style={styles.disclaimerText}>
+                Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн. Бодит
+                худалдаанд ашиглахаас өмнө өөрийн судалгаа хийж, эрсдлийн
+                менежментийг сайн тооцоолоорой.
+              </Text>
+            </View>
+
+            <View style={{ height: 20 }} />
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -247,6 +381,7 @@ const styles = StyleSheet.create({
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
+    flexWrap: "wrap",
   },
   statusDot: {
     width: 8,
@@ -259,6 +394,23 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: fontWeight.semibold,
   },
+  mt5Badge: {
+    backgroundColor: colors.success,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 8,
+  },
+  mt5BadgeText: {
+    fontSize: fontSize.xs,
+    color: colors.textPrimary,
+    fontWeight: fontWeight.bold,
+  },
+  sourceText: {
+    fontSize: fontSize.xs,
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
   scrollView: {
     flex: 1,
   },
@@ -266,6 +418,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sectionTitle: {
     fontSize: fontSize.xxl,
@@ -275,6 +432,19 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: {
     fontSize: fontSize.sm,
+    color: colors.textMuted,
+  },
+  updateTimeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.background,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: spacing.xs,
+    gap: 4,
+  },
+  updateTimeText: {
+    fontSize: fontSize.xs,
     color: colors.textMuted,
   },
   disclaimer: {
@@ -295,6 +465,73 @@ const styles = StyleSheet.create({
   disclaimerText: {
     fontSize: fontSize.xs,
     color: colors.textDark,
+    lineHeight: 20,
+  },
+  verificationAlert: {
+    backgroundColor: "#FFF3CD",
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+    padding: spacing.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    borderRadius: spacing.sm,
+  },
+  verificationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  verificationTitle: {
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.bold,
+    color: "#856404",
+    marginLeft: spacing.sm,
+  },
+  verificationText: {
+    fontSize: fontSize.sm,
+    color: "#856404",
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  verificationButton: {
+    backgroundColor: colors.warning,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: spacing.sm,
+    gap: spacing.xs,
+  },
+  verificationButtonText: {
+    color: colors.white,
+    fontSize: fontSize.md,
+    fontWeight: fontWeight.semibold,
+  },
+  lockedSection: {
+    marginTop: spacing.xl,
+    padding: spacing.xl,
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    borderRadius: spacing.md,
+    borderWidth: 2,
+    borderColor: "#E0E0E0",
+    borderStyle: "dashed",
+  },
+  lockIcon: {
+    marginBottom: spacing.md,
+    opacity: 0.5,
+  },
+  lockedTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.bold,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+  },
+  lockedText: {
+    fontSize: fontSize.sm,
+    color: colors.textMuted,
+    textAlign: "center",
     lineHeight: 20,
   },
 });

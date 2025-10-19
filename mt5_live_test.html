@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="mn">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MT5 Live Rates Test</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #fff;
+      }
+      .container {
+        background: rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(10px);
+        border-radius: 15px;
+        padding: 30px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 30px;
+      }
+      .status {
+        background: rgba(255, 255, 255, 0.2);
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+      }
+      .rate-card {
+        background: rgba(255, 255, 255, 0.15);
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+        transition: transform 0.2s;
+      }
+      .rate-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.25);
+      }
+      .rate-pair {
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 10px;
+      }
+      .rate-value {
+        font-size: 32px;
+        color: #4ade80;
+        margin: 10px 0;
+      }
+      .rate-details {
+        display: flex;
+        justify-content: space-around;
+        margin-top: 10px;
+      }
+      .detail {
+        text-align: center;
+      }
+      .detail-label {
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      .detail-value {
+        font-size: 18px;
+        font-weight: bold;
+      }
+      button {
+        background: #4ade80;
+        color: #1a1a1a;
+        border: none;
+        padding: 15px 30px;
+        border-radius: 10px;
+        font-size: 16px;
+        font-weight: bold;
+        cursor: pointer;
+        width: 100%;
+        margin: 10px 0;
+        transition: all 0.3s;
+      }
+      button:hover {
+        background: #22c55e;
+        transform: scale(1.02);
+      }
+      .loading {
+        text-align: center;
+        padding: 40px;
+        font-size: 18px;
+      }
+      .error {
+        background: rgba(239, 68, 68, 0.3);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+      }
+      .success {
+        background: rgba(34, 197, 94, 0.3);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 10px 0;
+      }
+      .source-badge {
+        display: inline-block;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+        margin-left: 10px;
+      }
+      .source-mt5 {
+        background: #4ade80;
+        color: #1a1a1a;
+      }
+      .source-api {
+        background: #fbbf24;
+        color: #1a1a1a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>📊 MT5 Бодит цагийн ханш</h1>
+
+      <div id="status" class="status">
+        <div class="loading">🔄 MT5 статус шалгаж байна...</div>
+      </div>
+
+      <button onclick="checkMT5Status()">🔍 MT5 Статус шалгах</button>
+      <button onclick="fetchLiveRates('mt5')">📈 MT5-аас ханш авах</button>
+      <button onclick="fetchLiveRates('auto')">🔄 Auto (MT5 эсвэл API)</button>
+      <button onclick="fetchLiveRates('api')">🌐 API-аас ханш авах</button>
+
+      <div id="rates" style="margin-top: 20px"></div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:5000";
+
+      async function checkMT5Status() {
+        const statusDiv = document.getElementById("status");
+        statusDiv.innerHTML = '<div class="loading">🔄 Шалгаж байна...</div>';
+
+        try {
+          const response = await fetch(`${API_BASE}/rates/mt5/status`);
+          const data = await response.json();
+
+          let html = "<h3>MT5 Статус</h3>";
+          html += `<p><strong>Идэвхтэй:</strong> ${
+            data.enabled ? "✅ Тийм" : "❌ Үгүй"
+          }</p>`;
+          html += `<p><strong>Холбогдсон:</strong> ${
+            data.connected ? "✅ Тийм" : "❌ Үгүй"
+          }</p>`;
+
+          if (data.account_info) {
+            html += "<h4>Акаунт мэдээлэл:</h4>";
+            html += `<p>Login: ${data.account_info.login}</p>`;
+            html += `<p>Server: ${data.account_info.server}</p>`;
+            html += `<p>Company: ${data.account_info.company}</p>`;
+            html += `<p>Balance: $${data.account_info.balance}</p>`;
+            statusDiv.className = "status success";
+          } else {
+            statusDiv.className = "status error";
+          }
+
+          statusDiv.innerHTML = html;
+        } catch (error) {
+          statusDiv.className = "status error";
+          statusDiv.innerHTML = `<p>❌ Алдаа: ${error.message}</p>`;
+        }
+      }
+
+      async function fetchLiveRates(source = "auto") {
+        const ratesDiv = document.getElementById("rates");
+        ratesDiv.innerHTML =
+          '<div class="loading">📊 Ханш татаж байна...</div>';
+
+        try {
+          const response = await fetch(
+            `${API_BASE}/rates/live?source=${source}`
+          );
+          const data = await response.json();
+
+          if (!data.success) {
+            throw new Error(data.error || "Unknown error");
+          }
+
+          let html = `<div class="success">
+                    <h3>✅ Амжилттай татагдлаа
+                        <span class="source-badge source-${data.source.toLowerCase()}">${
+            data.source
+          }</span>
+                    </h3>
+                    <p>⏰ ${data.timestamp}</p>
+                    <p>📊 ${data.count} ханш</p>
+                </div>`;
+
+          for (const [pair, rateData] of Object.entries(data.rates)) {
+            // Check if rateData is an object or just a number
+            if (typeof rateData === "object" && rateData.rate) {
+              html += `
+                        <div class="rate-card">
+                            <div class="rate-pair">${pair}</div>
+                            <div class="rate-value">${rateData.rate.toFixed(
+                              5
+                            )}</div>
+                            <div class="rate-details">
+                                <div class="detail">
+                                    <div class="detail-label">Bid</div>
+                                    <div class="detail-value">${
+                                      rateData.bid
+                                        ? rateData.bid.toFixed(5)
+                                        : "N/A"
+                                    }</div>
+                                </div>
+                                <div class="detail">
+                                    <div class="detail-label">Ask</div>
+                                    <div class="detail-value">${
+                                      rateData.ask
+                                        ? rateData.ask.toFixed(5)
+                                        : "N/A"
+                                    }</div>
+                                </div>
+                                <div class="detail">
+                                    <div class="detail-label">Spread</div>
+                                    <div class="detail-value">${
+                                      rateData.spread
+                                        ? rateData.spread.toFixed(5)
+                                        : "N/A"
+                                    }</div>
+                                </div>
+                            </div>
+                        </div>`;
+            } else {
+              // Simple number format (API response)
+              const rate =
+                typeof rateData === "object" ? rateData.rate : rateData;
+              html += `
+                        <div class="rate-card">
+                            <div class="rate-pair">${pair}</div>
+                            <div class="rate-value">${Number(rate).toFixed(
+                              5
+                            )}</div>
+                        </div>`;
+            }
+          }
+
+          ratesDiv.innerHTML = html;
+        } catch (error) {
+          ratesDiv.className = "error";
+          ratesDiv.innerHTML = `<p>❌ Алдаа: ${error.message}</p>`;
+        }
+      }
+
+      // Auto-load status on page load
+      window.addEventListener("load", () => {
+        checkMT5Status();
+      });
+    </script>
+  </body>
+</html>

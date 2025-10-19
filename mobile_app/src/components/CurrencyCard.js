@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 /**
  * Валютын хос картын компонент
  */
-const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
+const CurrencyCard = ({ pair, prediction, liveRate, onPress, loading }) => {
   const getQuickSignal = () => {
     if (loading) return { text: "⏳", color: "#9E9E9E" };
     if (
@@ -26,7 +26,34 @@ const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
     return { text: "❓", color: "#9E9E9E" };
   };
 
+  const formatRate = (rate) => {
+    if (!rate) return null;
+
+    // Handle MT5 format (object with rate, bid, ask)
+    const rateValue = typeof rate === "object" ? rate.rate : rate;
+
+    if (!rateValue) return null;
+
+    // JPY has different decimal places (2-3 digits)
+    if (pair.name.includes("JPY")) {
+      return rateValue.toFixed(3);
+    }
+    // Most pairs: 4-5 decimal places
+    return rateValue.toFixed(5);
+  };
+
+  const getRateDetails = () => {
+    if (!liveRate || typeof liveRate !== "object") return null;
+
+    return {
+      bid: liveRate.bid ? liveRate.bid.toFixed(5) : null,
+      ask: liveRate.ask ? liveRate.ask.toFixed(5) : null,
+      spread: liveRate.spread ? liveRate.spread.toFixed(5) : null,
+    };
+  };
+
   const signal = getQuickSignal();
+  const rateDetails = getRateDetails();
 
   return (
     <TouchableOpacity
@@ -42,6 +69,16 @@ const CurrencyCard = ({ pair, prediction, onPress, loading }) => {
           <Text style={styles.displayName} numberOfLines={1}>
             {pair.displayName}
           </Text>
+          {liveRate && (
+            <View>
+              <Text style={styles.liveRate}>💱 {formatRate(liveRate)}</Text>
+              {rateDetails && rateDetails.bid && rateDetails.ask && (
+                <Text style={styles.rateDetails}>
+                  Bid: {rateDetails.bid} • Ask: {rateDetails.ask}
+                </Text>
+              )}
+            </View>
+          )}
         </View>
       </View>
 
@@ -99,6 +136,17 @@ const styles = StyleSheet.create({
   displayName: {
     fontSize: 12,
     color: "#757575",
+  },
+  liveRate: {
+    fontSize: 13,
+    color: "#1a237e",
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  rateDetails: {
+    fontSize: 10,
+    color: "#757575",
+    marginTop: 2,
   },
   rightSection: {
     alignItems: "center",

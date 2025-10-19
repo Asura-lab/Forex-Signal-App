@@ -284,10 +284,84 @@ export const predictWithData = async (ohlcvData) => {
   }
 };
 
+// ==================== LIVE RATES ENDPOINTS ====================
+
+/**
+ * Бодит цагийн валютын ханш авах
+ * @param {Array} currencies - Optional: ['EUR', 'GBP', 'JPY'] гэх мэт
+ * @param {String} source - 'mt5', 'api', or 'auto' (default: 'auto')
+ * @returns {Object} { success, data: { rates, timestamp, source } }
+ */
+export const getLiveRates = async (currencies = null, source = "auto") => {
+  try {
+    let url = "/rates/live";
+    const params = [];
+
+    if (currencies && currencies.length > 0) {
+      params.push(`currencies=${currencies.join(",")}`);
+    }
+
+    if (source) {
+      params.push(`source=${source}`);
+    }
+
+    if (params.length > 0) {
+      url += `?${params.join("&")}`;
+    }
+
+    const response = await apiClient.get(url);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Live rates авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Тодорхой хослолын бодит цагийн ханш авах
+ * @param {String} pair - Жишээ: "EUR_USD", "USD_JPY"
+ * @returns {Object} { success, data: { pair, rate, timestamp } }
+ */
+export const getSpecificRate = async (pair) => {
+  try {
+    const response = await apiClient.get(`/rates/specific?pair=${pair}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error(`${pair} ханш авах алдаа:`, error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * MT5 холболтын статус шалгах
+ * @returns {Object} { success, data: { enabled, connected, account_info } }
+ */
+export const getMT5Status = async () => {
+  try {
+    const response = await apiClient.get("/rates/mt5/status");
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("MT5 статус шалгах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
 export default {
   checkApiStatus,
   getModelInfo,
   getPrediction,
   getAllPredictions,
   predictWithData,
+  getLiveRates,
+  getSpecificRate,
+  getMT5Status,
 };
