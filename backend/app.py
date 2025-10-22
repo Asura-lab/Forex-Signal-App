@@ -1745,7 +1745,7 @@ if __name__ == '__main__':
     print(f"\n🚀 API эхэлж байна...")
     print(f"📡 Холбогдох хаяг: http://localhost:{PORT}")
     print(f"📱 Android Emulator: http://10.0.2.2:{PORT}")
-    print(f"📱 Physical Device: http://192.168.20.22:{PORT}")
+    print(f"📱 Physical Device: http://192.168.60.49:{PORT}")
     print(f"\n🔐 Authentication Endpoints:")
     print(f"  POST /auth/register        - Бүртгүүлэх")
     print(f"  POST /auth/login           - Нэвтрэх")
