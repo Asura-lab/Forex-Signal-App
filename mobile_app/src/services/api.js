@@ -1,12 +1,10 @@
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-// Backend API хаяг - ЭНИЙГ ӨӨРИЙН BACKEND IP-ЭЭР СОЛИНО УУ!
-const API_BASE_URL = "http://192.168.1.44:5000"; // Жишээ: Өөрийн компьютерын IP
+import { API_BASE_URL } from "../config/api";
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 30000, // 30 секунд
   headers: {
     "Content-Type": "application/json",
   },
@@ -218,8 +216,9 @@ export const getModelInfo = async () => {
 /**
  * Форекс хослолын таамаглал авах
  * @param {string} currencyPair - Валютын хос (жишээ: EUR/USD)
+ * @param {boolean} forceRefresh - Кэшийг давж шинээр тооцоолох эсэх
  */
-export const getPrediction = async (currencyPair) => {
+export const getPrediction = async (currencyPair, forceRefresh = false) => {
   try {
     // Файлын нэр үүсгэх
     const fileName = currencyPair.replace("/", "_") + "_test.csv";
@@ -227,6 +226,7 @@ export const getPrediction = async (currencyPair) => {
 
     const response = await apiClient.post("/predict_file", {
       file_path: filePath,
+      force_refresh: forceRefresh,
     });
 
     return { success: true, data: response.data };
@@ -238,8 +238,9 @@ export const getPrediction = async (currencyPair) => {
 
 /**
  * Бүх валютын хослолуудын таамаглал авах
+ * @param {boolean} forceRefresh - Кэшийг давж шинээр тооцоолох эсэх
  */
-export const getAllPredictions = async () => {
+export const getAllPredictions = async (forceRefresh = false) => {
   const pairs = [
     "EUR/USD",
     "GBP/USD",
@@ -252,7 +253,7 @@ export const getAllPredictions = async () => {
   try {
     const predictions = await Promise.all(
       pairs.map(async (pair) => {
-        const result = await getPrediction(pair);
+        const result = await getPrediction(pair, forceRefresh);
         return {
           pair,
           ...result,
@@ -355,6 +356,48 @@ export const getMT5Status = async () => {
   }
 };
 
+/**
+ * MT5-аас ханшийн түүх авах (график зурахад)
+ */
+export const getMT5HistoricalRates = async (
+  pair,
+  timeframe = "M1",
+  count = 30
+) => {
+  try {
+    // Convert EUR/USD to EURUSD format
+    const symbol = pair.replace("/", "").replace("_", "");
+    const response = await apiClient.get(
+      `/rates/mt5/historical?symbol=${symbol}&timeframe=${timeframe}&count=${count}`
+    );
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("MT5 historical rates авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Ханшийн түүх авах (график зурахад) - устгах
+ */
+export const getHistoricalRates = async (pair, limit = 20) => {
+  try {
+    const response = await apiClient.get(
+      `/rates/history?pair=${pair}&limit=${limit}`
+    );
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Historical rates авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
 export default {
   checkApiStatus,
   getModelInfo,
@@ -364,4 +407,6 @@ export default {
   getLiveRates,
   getSpecificRate,
   getMT5Status,
+  getMT5HistoricalRates,
+  getHistoricalRates, // Keep for backward compatibility
 };

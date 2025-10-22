@@ -1,21 +1,37 @@
 {
   "expo": {
-    "name": "Forex Signal",
-    "slug": "forex-signal-app",
-    "version": "1.0.0",
+    "name": "Predictrix",
+    "slug": "predictrix",
+    "version": "1.0.6",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
     "platforms": ["ios", "android"],
     "userInterfaceStyle": "automatic",
+    "sdkVersion": "54.0.0",
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
     "splash": {
+      "image": "./assets/icon.png",
+      "resizeMode": "contain",
       "backgroundColor": "#1a237e"
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asuralab.forexsignal"
+      "bundleIdentifier": "com.asuralab.predictrix"
     },
     "android": {
-      "package": "com.asuralab.forexsignal"
+      "package": "com.asuralab.predictrix",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#1a237e"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "b1fff19c-7b43-49f0-89dc-a3d6f2ed5c33"
+      }
     }
   }
 }

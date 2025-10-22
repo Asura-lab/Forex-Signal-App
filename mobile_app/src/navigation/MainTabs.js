@@ -1,6 +1,8 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { getColors } from "../config/theme";
 import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
@@ -10,6 +12,9 @@ const Tab = createBottomTabNavigator();
  * Main Tabs Navigator - Bottom navigation
  */
 const MainTabs = () => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -25,12 +30,12 @@ const MainTabs = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: "#2196F3",
-        tabBarInactiveTintColor: "#757575",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.icon,
         tabBarStyle: {
-          backgroundColor: "#FFFFFF",
+          backgroundColor: colors.card,
           borderTopWidth: 1,
-          borderTopColor: "#E0E0E0",
+          borderTopColor: colors.border,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,

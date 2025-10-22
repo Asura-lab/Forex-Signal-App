@@ -1,16 +1,16 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import {
-  getSignalEmoji,
-  getSignalText,
-  getSignalColor,
-} from "../utils/helpers";
+import { View, Text, StyleSheet } from "react-native";
+import { useTheme } from "../context/ThemeContext";
+import { getColors } from "../config/theme";
+import { getSignalText } from "../utils/helpers";
 
 /**
  * Сигнал картын компонент
  */
-const SignalCard = ({ prediction, onPress }) => {
+const SignalCard = ({ prediction }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+
   if (
     !prediction ||
     !prediction.latest_prediction ||
@@ -21,93 +21,77 @@ const SignalCard = ({ prediction, onPress }) => {
   }
 
   const { label, trend, confidence } = prediction.latest_prediction;
-  const signalColor = getSignalColor(label);
   const signalText = getSignalText(label);
-  const signalEmoji = getSignalEmoji(label);
+
+  // Confidence badge color based on level
+  let badgeColor = "#4CAF50"; // Green for high confidence
+  if (confidence < 60) {
+    badgeColor = "#FF5252"; // Red for low confidence
+  } else if (confidence < 80) {
+    badgeColor = "#FFC107"; // Yellow for medium confidence
+  }
+
+  const styles = createStyles(colors, badgeColor);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <LinearGradient
-        colors={[signalColor, `${signalColor}CC`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        {/* Emoji */}
-        <View style={styles.emojiContainer}>
-          <Text style={styles.emoji}>{signalEmoji}</Text>
-        </View>
-
-        {/* Сигналын нэр */}
-        <View style={styles.signalContainer}>
+    <View style={styles.card}>
+      {/* Сигнал */}
+      <View style={styles.signalHeader}>
+        <View style={styles.signalInfo}>
           <Text style={styles.signalText}>{signalText}</Text>
           {trend && <Text style={styles.trendText}>{trend}</Text>}
         </View>
-
-        {/* Итгэлцэл */}
-        <View style={styles.confidenceContainer}>
+        <View style={styles.confidenceBadge}>
           <Text style={styles.confidenceValue}>{confidence.toFixed(1)}%</Text>
-          <Text style={styles.confidenceLabel}>Итгэлцэл</Text>
         </View>
-      </LinearGradient>
-    </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
-const styles = StyleSheet.create({
-  card: {
-    marginVertical: 8,
-    marginHorizontal: 16,
-    borderRadius: 16,
-    overflow: "hidden",
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-  },
-  gradient: {
-    padding: 20,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  emojiContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  emoji: {
-    fontSize: 32,
-  },
-  signalContainer: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  signalText: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  trendText: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.9)",
-  },
-  confidenceContainer: {
-    alignItems: "flex-end",
-  },
-  confidenceValue: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-  },
-  confidenceLabel: {
-    fontSize: 12,
-    color: "rgba(255, 255, 255, 0.9)",
-  },
-});
+const createStyles = (colors, badgeColor) =>
+  StyleSheet.create({
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      marginVertical: 8,
+      marginHorizontal: 16,
+      overflow: "hidden",
+      elevation: 3,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+    },
+    signalHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      padding: 20,
+    },
+    signalInfo: {
+      flex: 1,
+    },
+    signalText: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.textDark,
+      marginBottom: 4,
+    },
+    trendText: {
+      fontSize: 13,
+      color: colors.textLabel,
+    },
+    confidenceBadge: {
+      backgroundColor: badgeColor,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+    },
+    confidenceValue: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: "#FFFFFF",
+    },
+  });
 
 export default SignalCard;

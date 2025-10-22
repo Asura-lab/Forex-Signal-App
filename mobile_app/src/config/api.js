@@ -3,6 +3,8 @@
  * Backend server холболтын тохиргоо
  */
 
+import { Platform } from "react-native";
+
 // Development режимд ашиглах backend URL
 //
 // Android Emulator:     10.0.2.2 (host машины localhost-ийг заана)
@@ -13,14 +15,18 @@
 
 // Автоматаар тогтоох
 const getApiUrl = () => {
-  // Хэрвээ та бодит утас дээр туршиж байвал энийг uncomment хийнэ үү
-  // return "http://192.168.1.44:5000";
+  // Development mode: Check __DEV__ flag
+  if (__DEV__) {
+    // Development - use emulator address
+    if (Platform.OS === "android") {
+      return "http://10.0.2.2:5000";
+    }
+    // iOS Simulator
+    return "http://localhost:5000";
+  }
 
-  // Android Emulator дээр
-  return "http://10.0.2.2:5000";
-
-  // iOS Simulator дээр
-  // return "http://localhost:5000";
+  // Production - Physical Device with WiFi IP
+  return "http://192.168.20.22:5000";
 };
 
 export const API_BASE_URL = getApiUrl();

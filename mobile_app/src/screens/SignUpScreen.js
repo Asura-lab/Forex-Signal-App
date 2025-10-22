@@ -14,12 +14,18 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { getColors, getGradients } from "../config/theme";
 import { registerUser } from "../services/api";
 
 /**
  * SignUp Screen - Бүртгүүлэх дэлгэц
  */
 const SignUpScreen = ({ navigation }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const gradients = getGradients(isDark);
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -101,7 +107,7 @@ const SignUpScreen = ({ navigation }) => {
       "Үйлчилгээний нөхцөл",
       "📋 ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ\n\n" +
         "1. Үйлчилгээний тухай\n" +
-        "Forex Signal App нь гадаад валютын арилжааны мэдээлэл, аналитик тайлан өгдөг. " +
+        "Predictrix нь гадаад валютын арилжааны мэдээлэл, аналитик тайлан өгдөг. " +
         "Энэ нь зөвлөмж бөгөөд хөрөнгө оруулалтын зөвлөгөө БИШ.\n\n" +
         "2. Эрсдэлийн анхааруулга\n" +
         "⚠️ Forex арилжаа өндөр эрсдэлтэй. Та хөрөнгөө бүрэн алдаж болзошгүй.\n\n" +
@@ -124,10 +130,12 @@ const SignUpScreen = ({ navigation }) => {
         "• MongoDB Atlas аюулгүй сервер\n\n" +
         "3. Таны эрх\n" +
         "• Мэдээлэл үзэх, засах, устгах эрхтэй\n" +
-        "• Бидэнтэй холбогдох: contact@forexsignal.com\n\n" +
+        "• Бидэнтэй холбогдох: contact@predictrix.com\n\n" +
         "Дэлгэрэнгүй унших: Профайл → Мэдээлэл → Нууцлалын бодлого"
     );
   };
+
+  const styles = createStyles(colors, gradients);
 
   return (
     <KeyboardAvoidingView
@@ -135,7 +143,7 @@ const SignUpScreen = ({ navigation }) => {
       style={styles.container}
     >
       <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
+        colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -147,7 +155,11 @@ const SignUpScreen = ({ navigation }) => {
           <View style={styles.content}>
             {/* Logo/Title */}
             <View style={styles.headerContainer}>
-              <Ionicons name="trending-up" size={60} color="#FFFFFF" />
+              <Ionicons
+                name="trending-up"
+                size={60}
+                color={colors.textPrimary}
+              />
               <Text style={styles.title}>Бүртгүүлэх</Text>
               <Text style={styles.subtitle}>Шинэ хэрэглэгч үүсгэх</Text>
             </View>
@@ -158,13 +170,13 @@ const SignUpScreen = ({ navigation }) => {
                 <Ionicons
                   name="person-outline"
                   size={20}
-                  color="#666"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={styles.input}
                   placeholder="Нэр"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.placeholderText}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -175,13 +187,13 @@ const SignUpScreen = ({ navigation }) => {
                 <Ionicons
                   name="mail-outline"
                   size={20}
-                  color="#666"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={styles.input}
                   placeholder="Имэйл хаяг"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.placeholderText}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -194,13 +206,13 @@ const SignUpScreen = ({ navigation }) => {
                 <Ionicons
                   name="lock-closed-outline"
                   size={20}
-                  color="#666"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={[styles.input, styles.passwordInput]}
                   placeholder="Нууц үг (дор хаяж 6 тэмдэгт)"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.placeholderText}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -213,7 +225,7 @@ const SignUpScreen = ({ navigation }) => {
                   <Ionicons
                     name={showPassword ? "eye-outline" : "eye-off-outline"}
                     size={20}
-                    color="#666"
+                    color={colors.icon}
                   />
                 </TouchableOpacity>
               </View>
@@ -222,13 +234,13 @@ const SignUpScreen = ({ navigation }) => {
                 <Ionicons
                   name="lock-closed-outline"
                   size={20}
-                  color="#666"
+                  color={colors.icon}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={[styles.input, styles.passwordInput]}
                   placeholder="Нууц үг дахин оруулах"
-                  placeholderTextColor="#999"
+                  placeholderTextColor={colors.placeholderText}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -243,7 +255,7 @@ const SignUpScreen = ({ navigation }) => {
                       showConfirmPassword ? "eye-outline" : "eye-off-outline"
                     }
                     size={20}
-                    color="#666"
+                    color={colors.icon}
                   />
                 </TouchableOpacity>
               </View>
@@ -317,164 +329,167 @@ const SignUpScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    paddingTop: 60,
-    paddingBottom: 40,
-  },
-  headerContainer: {
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#B0BEC5",
-    marginTop: 8,
-  },
-  formContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
+const createStyles = (colors, gradients) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-  },
-  passwordInput: {
-    paddingRight: 40,
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    padding: 8,
-  },
-  signupButton: {
-    backgroundColor: "#4CAF50",
-    borderRadius: 12,
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-    shadowColor: "#4CAF50",
-    shadowOffset: {
-      width: 0,
-      height: 4,
+    gradient: {
+      flex: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  signupButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  loginContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-  },
-  loginText: {
-    color: "#666",
-    fontSize: 14,
-  },
-  loginLink: {
-    color: "#2196F3",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  termsContainer: {
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#CCC",
-    backgroundColor: "#FFF",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-    marginTop: 2,
-  },
-  checkboxChecked: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#4CAF50",
-  },
-  termsTextContainer: {
-    flex: 1,
-  },
-  termsLabel: {
-    fontSize: 13,
-    color: "#666",
-    lineHeight: 20,
-  },
-  termsLink: {
-    color: "#2196F3",
-    fontWeight: "600",
-    textDecorationLine: "underline",
-  },
-  terms: {
-    marginTop: 24,
-    alignItems: "center",
-  },
-  termsText: {
-    color: "#B0BEC5",
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
-  },
-});
+    scrollContent: {
+      flexGrow: 1,
+    },
+    content: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 24,
+      paddingTop: 60,
+      paddingBottom: 40,
+    },
+    headerContainer: {
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginTop: 16,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    formContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 4.65,
+      elevation: 8,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.input,
+      borderRadius: 12,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+      height: 56,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    inputIcon: {
+      marginRight: 12,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textInput,
+    },
+    passwordInput: {
+      paddingRight: 40,
+    },
+    eyeIcon: {
+      position: "absolute",
+      right: 16,
+      padding: 8,
+    },
+    signupButton: {
+      backgroundColor: colors.secondary,
+      borderRadius: 12,
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 8,
+      shadowColor: colors.secondary,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 4.65,
+      elevation: 8,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    signupButtonText: {
+      color: colors.textPrimary,
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+    loginContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: 24,
+      paddingTop: 24,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDark,
+    },
+    loginText: {
+      color: colors.textDark,
+      fontSize: 14,
+    },
+    loginLink: {
+      color: colors.info,
+      fontSize: 14,
+      fontWeight: "bold",
+    },
+    termsContainer: {
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    checkboxContainer: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.borderDark,
+      backgroundColor: colors.card,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+      marginTop: 2,
+    },
+    checkboxChecked: {
+      backgroundColor: colors.secondary,
+      borderColor: colors.secondary,
+    },
+    termsTextContainer: {
+      flex: 1,
+    },
+    termsLabel: {
+      fontSize: 13,
+      color: colors.textDark,
+      lineHeight: 20,
+    },
+    termsLink: {
+      color: colors.info,
+      fontWeight: "600",
+      textDecorationLine: "underline",
+    },
+    terms: {
+      marginTop: 24,
+      alignItems: "center",
+    },
+    termsText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: "center",
+      lineHeight: 18,
+    },
+  });
 
 export default SignUpScreen;

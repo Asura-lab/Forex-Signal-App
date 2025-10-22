@@ -78,6 +78,11 @@ except Exception as e:
 model = None
 scaler = None
 
+# Prediction Cache (5 минут тутамд шинэчлэгдэнэ)
+prediction_cache = {}
+prediction_cache_time = {}
+PREDICTION_CACHE_DURATION = 300  # 5 минут (секундээр)
+
 def load_ml_models():
     """HMM модель ба scaler ачаалах"""
     global model, scaler
@@ -1090,6 +1095,169 @@ def predict():
             'error': f'Таамаглах явцад алдаа гарлаа: {str(e)}'
         }), 500
 
+def calculate_prediction_for_pair(currency_pair, force_refresh=False):
+    """
+    Валютын хослолын таамаглал тооцоолох (кэштэй)
+    
+    Args:
+        currency_pair: EUR/USD гэх мэт
+        force_refresh: Кэшийг давж шинэчлэх эсэх
+    
+    Returns:
+        dict: Таамаглалын үр дүн
+    """
+    global prediction_cache, prediction_cache_time
+    
+    # Normalize
+    normalized_pair = currency_pair.replace('/', '_').upper()
+    
+    # Check cache
+    current_time = datetime.now()
+    if not force_refresh and normalized_pair in prediction_cache:
+        cache_time = prediction_cache_time.get(normalized_pair)
+        if cache_time and (current_time - cache_time).total_seconds() < PREDICTION_CACHE_DURATION:
+            age = (current_time - cache_time).total_seconds()
+            print(f"✓ Cache hit: {normalized_pair} (age: {age:.1f}s)")
+            return prediction_cache[normalized_pair]
+    
+    print(f"\n{'='*60}")
+    print(f"🔄 ШИНЭ ТААМАГЛАЛ: {currency_pair}")
+    print(f"{'='*60}")
+    
+    if model is None or scaler is None:
+        return {
+            'success': False,
+            'error': 'ML модель ачаалагдаагүй'
+        }
+    
+    # MT5 symbol format
+    mt5_symbol = normalized_pair.replace('_', '')
+    if mt5_symbol == 'XAUUSD':
+        pass  # Already correct
+    
+    print(f"📊 Symbol: {mt5_symbol}")
+    
+    # Fetch data
+    df = None
+    data_source = 'FILE'
+    
+    if MT5_ENABLED and mt5_handler.connected:
+        try:
+            print(f"🔄 MT5-аас өгөгдөл татаж байна...")
+            df = mt5_handler.get_historical_data(mt5_symbol, 'M1', 1000)
+            if df is not None and len(df) > 0:
+                print(f"   ✓ {len(df)} bars (MT5)")
+                data_source = 'MT5'
+        except Exception as e:
+            print(f"   ⚠ MT5 алдаа: {e}")
+    
+    # Fallback to file
+    if df is None or len(df) == 0:
+        file_path = f"data/test/{normalized_pair}_test.csv"
+        try:
+            full_path = Path(__file__).parent.parent / file_path
+            if full_path.exists():
+                df = pd.read_csv(full_path)
+                print(f"   ✓ {len(df)} rows (FILE)")
+                data_source = 'FILE'
+        except Exception as e:
+            return {
+                'success': False,
+                'error': f'Өгөгдөл олдсонгүй: {str(e)}'
+            }
+    
+    if df is None or len(df) < 50:
+        return {
+            'success': False,
+            'error': 'Хангалтгүй өгөгдөл (50+ шаардлагатай)'
+        }
+    
+    # Calculate features
+    try:
+        df = calculate_features(df)
+        
+        # Get recent data
+        recent_df = df.tail(100).copy()
+        
+        # Feature columns
+        feature_columns = ['returns', 'MA_5', 'MA_20', 'volatility', 'RSI', 'volume_ma']
+        
+        # Check available features
+        available = [col for col in feature_columns if col in recent_df.columns]
+        if len(available) < 6:
+            return {
+                'success': False,
+                'error': f'Features дутуу: {len(available)}/6'
+            }
+        
+        # Prepare data
+        X = recent_df[available].values
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+        X_scaled = scaler.transform(X)
+        
+        # Predict
+        print(f"🤖 HMM таамаглал...")
+        hidden_states = model.predict(X_scaled)
+        current_state = hidden_states[-1]
+        predicted_signal = int(current_state) % 5
+        
+        # Confidence
+        try:
+            state_probs = model.predict_proba(X_scaled)
+            confidence = float(state_probs[-1, current_state])
+        except:
+            confidence = 0.65 + (predicted_signal * 0.05)
+        
+        # Historical accuracy
+        try:
+            if len(hidden_states) >= 50:
+                recent_states = hidden_states[-50:]
+                most_common = np.bincount(recent_states).argmax()
+                consistency = np.sum(recent_states == most_common) / len(recent_states)
+                historical_accuracy = 0.60 + (consistency * 0.30)
+            else:
+                historical_accuracy = 0.75
+        except:
+            historical_accuracy = 0.75
+        
+        # Price info
+        last_close = float(recent_df['close'].iloc[-1])
+        prev_close = float(recent_df['close'].iloc[-2])
+        price_change = ((last_close - prev_close) / prev_close) * 100
+        
+        signal_name = get_signal_name(predicted_signal)
+        print(f"   ✓ Үр дүн: {signal_name} ({confidence:.2%})")
+        
+        result = {
+            'success': True,
+            'currency_pair': currency_pair,
+            'signal': int(predicted_signal),
+            'signal_name': signal_name,
+            'confidence': float(f"{confidence:.2f}"),
+            'historical_accuracy': float(f"{historical_accuracy:.2f}"),
+            'timestamp': current_time.isoformat(),
+            'current_price': float(last_close),
+            'price_change_percent': float(f"{price_change:.4f}"),
+            'data_source': data_source,
+            'bars_analyzed': len(recent_df)
+        }
+        
+        # Cache result
+        prediction_cache[normalized_pair] = result
+        prediction_cache_time[normalized_pair] = current_time
+        print(f"💾 Кэшлэгдлээ: {normalized_pair}")
+        
+        return result
+        
+    except Exception as e:
+        print(f"⚠ Тооцоолох алдаа: {e}")
+        import traceback
+        traceback.print_exc()
+        return {
+            'success': False,
+            'error': f'Тооцоолох алдаа: {str(e)}'
+        }
+
 @app.route('/predict_file', methods=['POST'])
 def predict_file():
     """
@@ -1106,8 +1274,6 @@ def predict_file():
         data = request.json
         file_path = data.get('file_path', '')
         
-        print(f"📂 Predict file хүсэлт: {file_path}")
-        
         if not file_path:
             return jsonify({
                 'success': False,
@@ -1116,175 +1282,39 @@ def predict_file():
         
         # Extract currency pair from file path
         # Example: data/test/EUR_USD_test.csv -> EUR/USD
-        import os
         file_name = os.path.basename(file_path)
         currency_pair = file_name.replace('_test.csv', '').replace('_', '/')
         
-        print(f"💱 Валют: {currency_pair}")
-        
-        # Validate currency pair (accept both / and _ formats)
+        # Validate currency pair
         normalized_pair = currency_pair.replace('/', '_')
         valid_pairs_normalized = [p.replace('/', '_') for p in CURRENCY_PAIRS]
         
         if normalized_pair.upper() not in valid_pairs_normalized:
             return jsonify({
                 'success': False,
-                'error': f'Дэмжигдэхгүй валют: {currency_pair}. Дэмжигдэх: {", ".join(CURRENCY_PAIRS)}'
+                'error': f'Дэмжигдэхгүй валют: {currency_pair}'
             }), 400
         
-        # Convert to MT5 symbol format
-        mt5_symbol = normalized_pair.replace('_', '') + 'USD' if not normalized_pair.endswith('_USD') else 'USD' + normalized_pair.replace('_USD', '')
-        if normalized_pair == 'XAU_USD':
-            mt5_symbol = 'XAUUSD'
-        elif normalized_pair == 'EUR_USD':
-            mt5_symbol = 'EURUSD'
-        elif normalized_pair == 'GBP_USD':
-            mt5_symbol = 'GBPUSD'
-        elif normalized_pair == 'USD_JPY':
-            mt5_symbol = 'USDJPY'
-        elif normalized_pair == 'USD_CAD':
-            mt5_symbol = 'USDCAD'
-        elif normalized_pair == 'USD_CHF':
-            mt5_symbol = 'USDCHF'
+        # Check for force_refresh parameter
+        force_refresh = data.get('force_refresh', False)
         
-        print(f"📊 MT5 symbol: {mt5_symbol}")
+        # Use new calculation function with cache
+        result = calculate_prediction_for_pair(currency_pair, force_refresh=force_refresh)
         
-        # MT5-аас бодит өгөгдөл татах (сүүлийн 1000 барууд)
-        df = None
-        if MT5_ENABLED and mt5_handler.connected:
-            try:
-                print(f"🔄 MT5-аас {mt5_symbol} өгөгдөл татаж байна...")
-                df = mt5_handler.get_historical_data(mt5_symbol, 'M1', 1000)
-                if df is not None and len(df) > 0:
-                    print(f"   ✓ {len(df)} bar өгөгдөл татагдлаа")
-            except Exception as mt5_error:
-                print(f"   ⚠ MT5 өгөгдөл татах алдаа: {mt5_error}")
-        
-        # Хэрэв MT5 өгөгдөл байхгүй бол файлаас уншина
-        if df is None or len(df) == 0:
-            print(f"📁 Файлаас өгөгдөл уншиж байна: {file_path}")
-            try:
-                # Try to load from test file
-                full_path = Path(__file__).parent.parent / file_path
-                if full_path.exists():
-                    df = pd.read_csv(full_path)
-                    print(f"   ✓ Файлаас {len(df)} мөр уншигдлаа")
-                else:
-                    print(f"   ⚠ Файл олдсонгүй: {full_path}")
-            except Exception as file_error:
-                print(f"   ⚠ Файл унших алдаа: {file_error}")
-        
-        # Хэрэв ямар ч өгөгдөл байхгүй бол алдаа
-        if df is None or len(df) == 0:
-            return jsonify({
-                'success': False,
-                'error': 'Өгөгдөл олдсонгүй (MT5 болон файл хоёулаа амжилтгүй)'
-            }), 404
-        
-        # Техникийн шинж чанарууд тооцоолох
-        print(f"🔧 Техникийн шинж чанарууд тооцоолж байна...")
-        df = calculate_features(df)
-        
-        if len(df) < 50:
-            return jsonify({
-                'success': False,
-                'error': 'Хангалттай өгөгдөл байхгүй (50+ мөр шаардлагатай)'
-            }), 400
-        
-        # Сүүлийн 100 барыг авах
-        recent_df = df.tail(100).copy()
-        
-        # Features бэлтгэх (model-д тохирсон feature-ууд - 6 feature)
-        feature_columns = ['returns', 'MA_5', 'MA_20', 'volatility', 'RSI', 'volume_ma']
-        
-        # Байгаа columns-ыг шалгах
-        available_features = [col for col in feature_columns if col in recent_df.columns]
-        
-        if len(available_features) < 6:
-            return jsonify({
-                'success': False,
-                'error': f'Техникийн шинж чанарууд дутуу ({len(available_features)}/6): {available_features}'
-            }), 500
-        
-        print(f"   ✓ Features ({len(available_features)}): {available_features}")
-        
-        # Feature matrix үүсгэх
-        X = recent_df[available_features].values
-        
-        # NaN утгуудыг арилгах
-        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-        
-        # Scaling хийх
-        X_scaled = scaler.transform(X)
-        
-        # HMM model ашиглан таамаглал хийх
-        print(f"🤖 HMM model ашиглан таамаглал хийж байна...")
-        
-        # Predict hidden states
-        hidden_states = model.predict(X_scaled)
-        
-        # Сүүлийн state-ыг авах
-        current_state = hidden_states[-1]
-        
-        # State-ээс signal руу хөрвүүлэх (0-4)
-        # HMM нь ихэвчлэн 0-based state гаргадаг
-        predicted_signal = int(current_state) % 5  # 0-4 хүртэл
-        
-        # Confidence тооцоолох (state transition probability ашиглах)
-        try:
-            # Get state probabilities
-            state_probs = model.predict_proba(X_scaled)
-            current_prob = state_probs[-1, current_state]
-            confidence = float(current_prob)
-        except:
-            # Fallback: state-ийн байршил дээр үндэслэнэ
-            confidence = 0.65 + (predicted_signal * 0.05)  # 0.65-0.85
-        
-        # Historical accuracy тооцоолох (training data дээр)
-        try:
-            # Сүүлийн 50 bar дээр accuracy шалгах
-            if len(hidden_states) >= 50:
-                recent_states = hidden_states[-50:]
-                # State consistency шалгах
-                most_common_state = np.bincount(recent_states).argmax()
-                consistency = np.sum(recent_states == most_common_state) / len(recent_states)
-                historical_accuracy = 0.60 + (consistency * 0.30)  # 60-90%
-            else:
-                historical_accuracy = 0.75  # Default
-        except:
-            historical_accuracy = 0.75
-        
-        # Сүүлийн үнийн хөдөлгөөн
-        last_close = float(recent_df['close'].iloc[-1])
-        prev_close = float(recent_df['close'].iloc[-2])
-        price_change = ((last_close - prev_close) / prev_close) * 100
-        
-        print(f"   ✓ Таамаглал: {get_signal_name(predicted_signal)} (state: {current_state})")
-        print(f"   ✓ Confidence: {confidence:.2%}")
-        print(f"   ✓ Үнийн өөрчлөлт: {price_change:+.4f}%")
-        
-        return jsonify({
-            'success': True,
-            'currency_pair': currency_pair,
-            'signal': int(predicted_signal),
-            'signal_name': get_signal_name(predicted_signal),
-            'confidence': float(f"{confidence:.2f}"),
-            'historical_accuracy': float(f"{historical_accuracy:.2f}"),
-            'timestamp': datetime.now().isoformat(),
-            'file_path': file_path,
-            'current_price': float(last_close),
-            'price_change_percent': float(f"{price_change:.4f}"),
-            'data_source': 'MT5' if MT5_ENABLED and mt5_handler.connected else 'FILE',
-            'bars_analyzed': len(recent_df)
-        })
+        if result['success']:
+            # Add file_path for compatibility
+            result['file_path'] = file_path
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 500
         
     except Exception as e:
-        print(f"Predict file error: {e}")
+        print(f"⚠ Predict file алдаа: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({
             'success': False,
-            'error': f'Файлаас таамаглал хийх явцад алдаа гарлаа: {str(e)}'
+            'error': f'Таамаглах алдаа: {str(e)}'
         }), 500
 
 @app.route('/currencies', methods=['GET'])
@@ -1603,6 +1633,77 @@ def get_specific_rate():
             'error': str(e)
         }), 500
 
+@app.route('/rates/history', methods=['GET'])
+def get_rate_history():
+    """
+    Ханшийн түүх авах (график зурахад ашиглана)
+    
+    Query params:
+        pair: Currency pair (e.g., ?pair=EUR/USD or ?pair=EUR_USD)
+        limit: Хэдэн мөр авах (default: 20)
+    
+    Returns:
+        {
+            'success': true,
+            'pair': 'EUR_USD',
+            'data': [
+                {'time': '2025-10-19 12:00:00', 'close': 1.176},
+                ...
+            ]
+        }
+    """
+    try:
+        pair = request.args.get('pair', '').upper().replace('/', '_')
+        limit = int(request.args.get('limit', 20))
+        
+        if not pair:
+            return jsonify({
+                'success': False,
+                'error': 'Pair параметр шаардлагатай'
+            }), 400
+        
+        # Найд test data файлаас уншина
+        test_file = os.path.join(Path(__file__).parent.parent, 'data', 'test', f'{pair}_test.csv')
+        
+        if not os.path.exists(test_file):
+            return jsonify({
+                'success': False,
+                'error': f'{pair} өгөгдөл олдсонгүй'
+            }), 404
+        
+        # Read last N rows from CSV
+        df = pd.read_csv(test_file)
+        
+        # Take last 'limit' rows
+        df = df.tail(limit)
+        
+        # Convert to list of dicts
+        history = []
+        for idx, row in df.iterrows():
+            history.append({
+                'time': str(row.get('date', row.get('time', str(idx)))),
+                'close': float(row.get('close', row.get('Close', row.get('rate', 0)))),
+                'open': float(row.get('open', row.get('Open', 0))) if 'open' in row or 'Open' in row else None,
+                'high': float(row.get('high', row.get('High', 0))) if 'high' in row or 'High' in row else None,
+                'low': float(row.get('low', row.get('Low', 0))) if 'low' in row or 'Low' in row else None,
+            })
+        
+        return jsonify({
+            'success': True,
+            'pair': pair,
+            'count': len(history),
+            'data': history
+        })
+        
+    except Exception as e:
+        print(f"❌ Get rate history error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # ==================== HEALTH CHECK ====================
 
 @app.route('/health', methods=['GET'])
@@ -1644,7 +1745,7 @@ if __name__ == '__main__':
     print(f"\n🚀 API эхэлж байна...")
     print(f"📡 Холбогдох хаяг: http://localhost:{PORT}")
     print(f"📱 Android Emulator: http://10.0.2.2:{PORT}")
-    print(f"📱 Physical Device: http://192.168.1.44:{PORT}")
+    print(f"📱 Physical Device: http://192.168.20.22:{PORT}")
     print(f"\n🔐 Authentication Endpoints:")
     print(f"  POST /auth/register        - Бүртгүүлэх")
     print(f"  POST /auth/login           - Нэвтрэх")
@@ -1658,10 +1759,11 @@ if __name__ == '__main__':
     print(f"\n� Live Rates Endpoints:")
     print(f"  GET  /rates/live           - Бодит цагийн бүх ханш")
     print(f"  GET  /rates/specific       - Тодорхой хослолын ханш")
-    print(f"\n�📊 System:")
+    print(f"\n📊 System:")
     print(f"  GET  /health               - Health check")
     print(f"  GET  /                     - API мэдээлэл")
     print("\n" + "=" * 70)
     
-    app.run(debug=DEBUG_MODE, host=API_HOST, port=PORT)
+    # Production mode - no debug, no auto-reload
+    app.run(debug=False, host=API_HOST, port=PORT, use_reloader=False, threaded=True)
 

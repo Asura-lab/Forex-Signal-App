@@ -16,6 +16,8 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "../context/ThemeContext";
+import { getColors } from "../config/theme";
 import { logoutUser } from "../services/api";
 import { API_ENDPOINTS } from "../config/api";
 
@@ -23,12 +25,15 @@ import { API_ENDPOINTS } from "../config/api";
  * Profile Screen - Хэрэглэгчийн профайл
  */
 const ProfileScreen = ({ navigation }) => {
+  const { isDark, themeMode, setTheme } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+
   const [userData, setUserData] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [oldPassword, setOldPassword] = useState("");
@@ -67,13 +72,9 @@ const ProfileScreen = ({ navigation }) => {
       const savedNotifications = await AsyncStorage.getItem(
         "@notification_settings"
       );
-      const savedDarkMode = await AsyncStorage.getItem("@dark_mode");
 
       if (savedNotifications !== null) {
         setNotifications(JSON.parse(savedNotifications));
-      }
-      if (savedDarkMode !== null) {
-        setDarkMode(JSON.parse(savedDarkMode));
       }
     } catch (error) {
       console.error("Load settings error:", error);
@@ -213,18 +214,10 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleDarkModeToggle = async (value) => {
-    setDarkMode(value);
-    try {
-      await AsyncStorage.setItem("@dark_mode", JSON.stringify(value));
-      if (value) {
-        Alert.alert(
-          "Удахгүй",
-          "Харанхуй горим одоогоор бэлэн биш байна. Удахгүй нэмэгдэнэ."
-        );
-      }
-    } catch (error) {
-      console.error("Save dark mode settings error:", error);
-    }
+    // 'light', 'dark', 'auto'
+    const newMode =
+      value === "light" ? "dark" : value === "dark" ? "auto" : "light";
+    setTheme(newMode);
   };
 
   const handleLogout = () => {
@@ -265,8 +258,8 @@ const ProfileScreen = ({ navigation }) => {
 Энэ апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш. Бүх арилжааны шийдвэр таны хувийн хариуцлага юм.
 
 📞 Холбоо барих:
-• Email: support@forexsignal.mn
-• GitHub: github.com/Asura-lab/Forex-Signal-App`,
+• Email: support@predictrix.com
+• GitHub: github.com/Asura-lab/Predictrix`,
       },
       terms: {
         title: "Үйлчилгээний нөхцөл",
@@ -367,8 +360,8 @@ const ProfileScreen = ({ navigation }) => {
 
 7. ХОЛБОО БАРИХ
 
-📧 privacy@forexsignal.mn
-📧 support@forexsignal.mn
+📧 privacy@predictrix.com
+📧 support@predictrix.com
 
 Дэлгэрэнгүй: docs/PRIVACY_POLICY.md`,
       },
@@ -376,7 +369,7 @@ const ProfileScreen = ({ navigation }) => {
         title: "Апп-ын тухай",
         content: `ℹ️ ФОРЕКС СИГНАЛ АПП
 
-Хувилбар: 1.0.0
+Хувилбар: 1.0.1
 Шинэчилсэн: 2025.10.18
 
 🎯 Зорилго:
@@ -404,12 +397,12 @@ Hidden Markov Model (HMM) машин сургалт ашиглан форекс 
 Энэ нь санхүүгийн зөвлөгөө биш. Форекс арилжаа маш өндөр эрсдэлтэй бөгөөд таны бүх хөрөнгийг алдах магадлалтай.
 
 👨‍💻 Хөгжүүлэгч:
-GitHub: github.com/Asura-lab/Forex-Signal-App
+GitHub: github.com/Asura-lab/Predictrix
 
 📄 Лиценз:
 Судалгааны зориулалтаар үнэгүй ашиглаж болно.
 
-© 2025 Форекс Сигнал`,
+© 2025 Predictrix`,
       },
     };
 
@@ -609,19 +602,34 @@ GitHub: github.com/Asura-lab/Forex-Signal-App
 
             <View style={styles.infoRow}>
               <View style={styles.infoIcon}>
-                <Ionicons name="moon-outline" size={22} color="#666" />
+                <Ionicons
+                  name={
+                    themeMode === "dark"
+                      ? "moon"
+                      : themeMode === "light"
+                      ? "sunny"
+                      : "contrast"
+                  }
+                  size={22}
+                  color="#666"
+                />
               </View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Харанхуй горим</Text>
-                <Text style={styles.infoDescription}>Удахгүй нэмэгдэнэ</Text>
+                <Text style={styles.infoLabel}>Дэлгэцийн горим</Text>
+                <Text style={styles.infoDescription}>
+                  {themeMode === "dark"
+                    ? "🌙 Харанхуй"
+                    : themeMode === "light"
+                    ? "☀️ Гэрэл"
+                    : "⚙️ Автомат"}
+                </Text>
               </View>
-              <Switch
-                value={darkMode}
-                onValueChange={handleDarkModeToggle}
-                disabled={true}
-                trackColor={{ false: "#E0E0E0", true: "#424242" }}
-                thumbColor={darkMode ? "#FFFFFF" : "#F5F5F5"}
-              />
+              <TouchableOpacity
+                style={styles.themeButton}
+                onPress={() => handleDarkModeToggle(themeMode)}
+              >
+                <Text style={styles.themeButtonText}>Солих</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -851,370 +859,382 @@ GitHub: github.com/Asura-lab/Forex-Signal-App
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
-    alignItems: "center",
-  },
-  headerContent: {
-    alignItems: "center",
-  },
-  avatarContainer: {
-    position: "relative",
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#FFFFFF",
-  },
-  editAvatarButton: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: "#2196F3",
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#FFFFFF",
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: "rgba(255, 255, 255, 0.8)",
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginTop: 20,
-    paddingHorizontal: 16,
-  },
-  statsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#212121",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: "#757575",
-    textAlign: "center",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#212121",
-    marginBottom: 12,
-  },
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#E3F2FD",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  editButtonText: {
-    marginLeft: 4,
-    color: "#2196F3",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  infoCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 12,
-  },
-  infoIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 12,
-    color: "#757575",
-    marginBottom: 4,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: "#212121",
-    fontWeight: "500",
-  },
-  infoDescription: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 2,
-  },
-  input: {
-    fontSize: 16,
-    color: "#212121",
-    fontWeight: "500",
-    borderBottomWidth: 1,
-    borderBottomColor: "#2196F3",
-    paddingVertical: 4,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#E0E0E0",
-    marginVertical: 8,
-  },
-  buttonRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  cancelButton: {
-    backgroundColor: "#F5F5F5",
-  },
-  cancelButtonText: {
-    color: "#666",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  saveButton: {
-    backgroundColor: "#4CAF50",
-  },
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  menuItemLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  menuIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: "#212121",
-    fontWeight: "500",
-  },
-  versionText: {
-    fontSize: 14,
-    color: "#999",
-  },
-  logoutButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#F44336",
-  },
-  logoutButtonText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: "#F44336",
-    fontWeight: "600",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 40,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#212121",
-  },
-  modalBody: {
-    padding: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#424242",
-    marginBottom: 8,
-  },
-  modalInput: {
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: "#212121",
-    backgroundColor: "#FAFAFA",
-  },
-  modalButton: {
-    backgroundColor: "#4CAF50",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 10,
-  },
-  modalButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  // Document Modal Styles
-  documentModalContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: "85%",
-    paddingBottom: 0,
-  },
-  documentModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E0E0E0",
-  },
-  documentModalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#212121",
-    flex: 1,
-  },
-  documentCloseButton: {
-    padding: 4,
-  },
-  documentContent: {
-    flex: 1,
-    padding: 20,
-  },
-  documentText: {
-    fontSize: 15,
-    lineHeight: 24,
-    color: "#424242",
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-  },
-  documentModalFooter: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-  },
-  documentButton: {
-    backgroundColor: "#1a237e",
-    borderRadius: 8,
-    padding: 16,
-    alignItems: "center",
-  },
-  documentButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-});
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      paddingTop: 60,
+      paddingBottom: 30,
+      paddingHorizontal: 20,
+      alignItems: "center",
+    },
+    headerContent: {
+      alignItems: "center",
+    },
+    avatarContainer: {
+      position: "relative",
+      marginBottom: 16,
+    },
+    avatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 3,
+      borderColor: "#FFFFFF",
+    },
+    editAvatarButton: {
+      position: "absolute",
+      bottom: 0,
+      right: 0,
+      backgroundColor: colors.info,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: "center",
+      alignItems: "center",
+      borderWidth: 3,
+      borderColor: "#FFFFFF",
+    },
+    userName: {
+      fontSize: 24,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    userEmail: {
+      fontSize: 14,
+      color: "rgba(255, 255, 255, 0.8)",
+    },
+    content: {
+      flex: 1,
+    },
+    section: {
+      marginTop: 20,
+      paddingHorizontal: 16,
+    },
+    statsContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    statCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    statIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.input,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 8,
+    },
+    statValue: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textDark,
+      marginBottom: 4,
+    },
+    statLabel: {
+      fontSize: 12,
+      color: colors.textLabel,
+      textAlign: "center",
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: "bold",
+      color: colors.textDark,
+      marginBottom: 12,
+    },
+    editButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.primary + "20",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
+    editButtonText: {
+      marginLeft: 4,
+      color: colors.primary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+    infoCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    infoRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 12,
+    },
+    infoIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.input,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    infoContent: {
+      flex: 1,
+    },
+    infoLabel: {
+      fontSize: 12,
+      color: colors.textLabel,
+      marginBottom: 4,
+    },
+    infoValue: {
+      fontSize: 16,
+      color: colors.textDark,
+      fontWeight: "500",
+    },
+    infoDescription: {
+      fontSize: 12,
+      color: colors.textLabel,
+      marginTop: 2,
+    },
+    input: {
+      fontSize: 16,
+      color: colors.textDark,
+      fontWeight: "500",
+      borderBottomWidth: 1,
+      borderBottomColor: "#2196F3",
+      paddingVertical: 4,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.borderDark,
+      marginVertical: 8,
+    },
+    buttonRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginTop: 16,
+      gap: 12,
+    },
+    actionButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: "center",
+    },
+    cancelButton: {
+      backgroundColor: colors.input,
+    },
+    cancelButtonText: {
+      color: colors.textLabel,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    saveButton: {
+      backgroundColor: colors.secondary,
+    },
+    saveButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    menuItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      backgroundColor: colors.card,
+      padding: 16,
+      borderRadius: 12,
+      marginBottom: 8,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    menuItemLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    menuIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.input,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
+    menuItemText: {
+      fontSize: 16,
+      color: colors.textDark,
+      fontWeight: "500",
+    },
+    versionText: {
+      fontSize: 14,
+      color: colors.textLabel,
+    },
+    logoutButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.card,
+      padding: 16,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: "#F44336",
+    },
+    logoutButtonText: {
+      marginLeft: 8,
+      fontSize: 16,
+      color: "#F44336",
+      fontWeight: "600",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      justifyContent: "flex-end",
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 40,
+    },
+    modalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: "#E0E0E0",
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: "bold",
+      color: colors.textDark,
+    },
+    modalBody: {
+      padding: 20,
+    },
+    inputGroup: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textDark,
+      marginBottom: 8,
+    },
+    modalInput: {
+      borderWidth: 1,
+      borderColor: colors.borderDark,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.textDark,
+      backgroundColor: colors.cardSecondary,
+    },
+    modalButton: {
+      backgroundColor: colors.secondary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: "center",
+      marginTop: 10,
+    },
+    modalButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    // Document Modal Styles
+    documentModalContainer: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      height: "85%",
+      paddingBottom: 0,
+    },
+    documentModalHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: "#E0E0E0",
+    },
+    documentModalTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.textDark,
+      flex: 1,
+    },
+    documentCloseButton: {
+      padding: 4,
+    },
+    documentContent: {
+      flex: 1,
+      padding: 20,
+    },
+    documentText: {
+      fontSize: 15,
+      lineHeight: 24,
+      color: colors.textDark,
+      fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+    },
+    documentModalFooter: {
+      padding: 20,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDark,
+    },
+    documentButton: {
+      backgroundColor: colors.primary,
+      borderRadius: 8,
+      padding: 16,
+      alignItems: "center",
+    },
+    documentButtonText: {
+      color: colors.textPrimary,
+      fontSize: 16,
+      fontWeight: "600",
+    },
+    themeButton: {
+      backgroundColor: colors.secondary,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+    },
+    themeButtonText: {
+      color: colors.textPrimary,
+      fontSize: 14,
+      fontWeight: "600",
+    },
+  });
 
 export default ProfileScreen;

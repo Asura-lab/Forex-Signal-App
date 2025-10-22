@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from "react";
-import { StatusBar, ActivityIndicator, View } from "react-native";
+import {
+  StatusBar,
+  ActivityIndicator,
+  View,
+  useColorScheme,
+} from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
+import { getColors } from "./src/config/theme";
 import LoginScreen from "./src/screens/LoginScreen";
 import SignUpScreen from "./src/screens/SignUpScreen";
 import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
@@ -12,9 +19,11 @@ import SignalScreen from "./src/screens/SignalScreen";
 
 const Stack = createStackNavigator();
 
-export default function App() {
+function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
 
   useEffect(() => {
     checkAuthStatus();
@@ -38,30 +47,33 @@ export default function App() {
           flex: 1,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: "#1a237e",
+          backgroundColor: colors.background,
         }}
       >
-        <ActivityIndicator size="large" color="#FFFFFF" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   return (
     <>
-      <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.primary}
+      />
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName={userLoggedIn ? "Main" : "Login"}
           screenOptions={{
             headerStyle: {
-              backgroundColor: "#1a237e",
+              backgroundColor: colors.primary,
             },
-            headerTintColor: "#FFFFFF",
+            headerTintColor: colors.textPrimary,
             headerTitleStyle: {
               fontWeight: "bold",
               fontSize: 20,
             },
-            cardStyle: { backgroundColor: "#F5F5F5" },
+            cardStyle: { backgroundColor: colors.background },
           }}
         >
           <Stack.Screen
@@ -103,5 +115,13 @@ export default function App() {
         </Stack.Navigator>
       </NavigationContainer>
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

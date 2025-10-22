@@ -7,6 +7,7 @@ export const CURRENCY_PAIRS = [
     name: "EUR/USD",
     displayName: "Euro / US Dollar",
     flag: "🇪🇺🇺🇸",
+    icon: "💶",
     color: "#2196F3",
   },
   {
@@ -14,6 +15,7 @@ export const CURRENCY_PAIRS = [
     name: "GBP/USD",
     displayName: "British Pound / US Dollar",
     flag: "🇬🇧🇺🇸",
+    icon: "💷",
     color: "#4CAF50",
   },
   {
@@ -21,6 +23,7 @@ export const CURRENCY_PAIRS = [
     name: "USD/CAD",
     displayName: "US Dollar / Canadian Dollar",
     flag: "🇺🇸🇨🇦",
+    icon: "🍁",
     color: "#FF9800",
   },
   {
@@ -28,6 +31,7 @@ export const CURRENCY_PAIRS = [
     name: "USD/CHF",
     displayName: "US Dollar / Swiss Franc",
     flag: "🇺🇸🇨🇭",
+    icon: "🏔️",
     color: "#9C27B0",
   },
   {
@@ -35,6 +39,7 @@ export const CURRENCY_PAIRS = [
     name: "USD/JPY",
     displayName: "US Dollar / Japanese Yen",
     flag: "🇺🇸🇯🇵",
+    icon: "💴",
     color: "#F44336",
   },
   {
@@ -42,6 +47,7 @@ export const CURRENCY_PAIRS = [
     name: "XAU/USD",
     displayName: "Gold / US Dollar",
     flag: "🏅🇺🇸",
+    icon: "🥇",
     color: "#FFD700",
   },
 ];

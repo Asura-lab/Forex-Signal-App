@@ -7,47 +7,56 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  RefreshControl,
+  Dimensions,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import SignalCard from "../components/SignalCard";
-import StatisticsChart from "../components/StatisticsChart";
+import { LineChart } from "react-native-chart-kit";
+import { useTheme } from "../context/ThemeContext";
 import {
-  getTradingAdvice,
-  getConfidenceLevel,
-  formatDate,
-} from "../utils/helpers";
-import { getPrediction, getSpecificRate } from "../services/api";
-import {
-  colors,
-  gradients,
+  getColors,
   spacing,
   fontSize,
   fontWeight,
   shadows,
 } from "../config/theme";
+import SignalCard from "../components/SignalCard";
+import { formatDate } from "../utils/helpers";
+import {
+  getPrediction,
+  getSpecificRate,
+  getMT5HistoricalRates,
+} from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
 
 /**
  * Сигнал дэлгэц - Дэлгэрэнгүй таамаглал
  */
 const SignalScreen = ({ route, navigation }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+
   const { pair, prediction: initialPrediction } = route.params;
   const [prediction, setPrediction] = useState(initialPrediction);
   const [loading, setLoading] = useState(false);
   const [liveRate, setLiveRate] = useState(null);
   const [rateLoading, setRateLoading] = useState(true);
+  const [historicalData, setHistoricalData] = useState(null);
+  const [chartLoading, setChartLoading] = useState(true);
 
   useEffect(() => {
     navigation.setOptions({
       title: pair.name,
       headerStyle: {
-        backgroundColor: pair.color,
+        backgroundColor: colors.card,
       },
-      headerTintColor: "#fff",
+      headerTintColor: colors.textDark,
     });
 
     // Fetch live rate
     fetchLiveRate();
+    // Fetch historical data
+    fetchHistoricalData();
 
     // Auto-refresh rate every 30 seconds
     const interval = setInterval(fetchLiveRate, 30000);
@@ -67,26 +76,74 @@ const SignalScreen = ({ route, navigation }) => {
     }
   };
 
+  const fetchHistoricalData = async () => {
+    try {
+      setChartLoading(true);
+      console.log("📊 Fetching MT5 historical data for:", pair.name);
+
+      // Use MT5 historical data - M1 timeframe, last 30 bars
+      const result = await getMT5HistoricalRates(pair.name, "M1", 30);
+
+      console.log("📊 MT5 result:", result);
+
+      if (result.success && result.data.data) {
+        // Convert MT5 data format to chart format
+        const chartData = result.data.data.map((item) => ({
+          time: item.time,
+          close: item.close,
+          open: item.open,
+          high: item.high,
+          low: item.low,
+        }));
+        console.log("📊 Chart data prepared:", chartData.length, "points");
+        setHistoricalData(chartData);
+      } else {
+        console.error("MT5 data алдаа:", result.error);
+        Alert.alert(
+          "Мэдэгдэл",
+          "MT5-аас өгөгдөл татах боломжгүй. MT5 холбогдсон эсэхийг шалгана уу."
+        );
+      }
+    } catch (error) {
+      console.error("Historical data авах алдаа:", error);
+      Alert.alert("Алдаа", "График өгөгдөл татахад алдаа гарлаа");
+    } finally {
+      setChartLoading(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setLoading(true);
 
-    // Fetch both prediction and live rate
-    const [predResult, rateResult] = await Promise.all([
-      getPrediction(pair.name),
-      getSpecificRate(pair.name),
-    ]);
+    try {
+      // Fetch both prediction and live rate
+      const [predResult, rateResult] = await Promise.all([
+        getPrediction(pair.name),
+        getSpecificRate(pair.name),
+      ]);
 
-    if (predResult.success) {
-      setPrediction(predResult.data);
-    } else {
+      console.log("🔄 Refresh result:", predResult);
+
+      if (predResult.success && predResult.data) {
+        // Ensure we have the correct structure
+        if (predResult.data.latest_prediction) {
+          setPrediction(predResult.data);
+        } else {
+          Alert.alert("Алдаа", "Таамаглалын өгөгдөл олдсонгүй");
+        }
+      } else {
+        Alert.alert("Алдаа", predResult.message || "Шинэчлэхэд алдаа гарлаа");
+      }
+
+      if (rateResult.success && rateResult.data) {
+        setLiveRate(rateResult.data.rate);
+      }
+    } catch (error) {
+      console.error("Refresh error:", error);
       Alert.alert("Алдаа", "Шинэчлэхэд алдаа гарлаа");
+    } finally {
+      setLoading(false);
     }
-
-    if (rateResult.success) {
-      setLiveRate(rateResult.data.rate);
-    }
-
-    setLoading(false);
   };
 
   const formatRate = (rate) => {
@@ -95,6 +152,31 @@ const SignalScreen = ({ route, navigation }) => {
       return rate.toFixed(3);
     }
     return rate.toFixed(5);
+  };
+
+  // Prepare chart data from historical data
+  const prepareChartData = () => {
+    if (!historicalData || historicalData.length === 0) {
+      return null;
+    }
+
+    const labels = historicalData.map((item, index) => {
+      // Show every 4th label to avoid crowding
+      if (index % 4 === 0) {
+        const time = item.time || "";
+        // Extract time part (HH:MM)
+        const timePart = time.split(" ")[1] || "";
+        return timePart.substring(0, 5); // HH:MM format
+      }
+      return "";
+    });
+
+    const values = historicalData.map((item) => item.close);
+
+    return {
+      labels,
+      datasets: [{ data: values }],
+    };
   };
 
   if (
@@ -111,307 +193,279 @@ const SignalScreen = ({ route, navigation }) => {
   }
 
   const { label, trend, confidence } = prediction.latest_prediction;
-  const confLevel = getConfidenceLevel(confidence);
-  const advice = getTradingAdvice(label, confidence);
 
   return (
-    <ScrollView style={styles.container}>
-      {/* Header */}
-      <LinearGradient
-        colors={[pair.color, `${pair.color}CC`]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <Text style={styles.flag}>{pair.flag}</Text>
-        <Text style={styles.pairName}>{pair.displayName}</Text>
-        <Text style={styles.timestamp}>{formatDate(new Date())}</Text>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={handleRefresh}
+          colors={[colors.primary]}
+          tintColor={colors.primary}
+        />
+      }
+    >
+      {/* Live Rate Card */}
+      <View style={styles.rateCard}>
+        <View style={styles.rateHeader}>
+          <Text style={styles.pairName}>{pair.displayName}</Text>
+        </View>
 
-        {/* Live Rate Display */}
-        <View style={styles.liveRateContainer}>
-          <Ionicons name="stats-chart" size={16} color="#fff" />
-          <Text style={styles.liveRateLabel}>Бодит ханш:</Text>
+        <View style={styles.rateDisplay}>
           {rateLoading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.liveRateValue}>{formatRate(liveRate)}</Text>
-          )}
-        </View>
-      </LinearGradient>
-
-      {/* Үндсэн сигнал */}
-      <SignalCard prediction={prediction} />
-
-      {/* Итгэлцлийн түвшин */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Итгэлцлийн түвшин</Text>
-        <View style={styles.confidenceRow}>
-          <View style={styles.confidenceInfo}>
-            <Text style={styles.confidenceValue}>{confidence.toFixed(1)}%</Text>
-            <Text style={[styles.confidenceLevel, { color: confLevel.color }]}>
-              {confLevel.text}
-            </Text>
-          </View>
-          <View style={styles.confidenceBarContainer}>
-            <View style={styles.confidenceBarBg}>
-              <View
-                style={[
-                  styles.confidenceBarFill,
-                  { width: `${confidence}%`, backgroundColor: confLevel.color },
-                ]}
-              />
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Худалдааны зөвлөмж */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>💡 Худалдааны зөвлөмж</Text>
-        <View style={styles.adviceContainer}>
-          <Text style={styles.adviceText}>{advice}</Text>
-        </View>
-
-        <View style={styles.tipsContainer}>
-          <Text style={styles.tipTitle}>Санамж:</Text>
-          <Text style={styles.tipText}>
-            • Risk management-ийг мартуузай{"\n"}• Stop loss ашигла{"\n"}•
-            Позицоо хэт томруулаагүй{"\n"}• Олон шинжилгээний хослол хий
-          </Text>
-        </View>
-      </View>
-
-      {/* Статистик */}
-      {prediction.statistics && (
-        <StatisticsChart statistics={prediction.statistics} />
-      )}
-
-      {/* Дэлгэрэнгүй мэдээлэл */}
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>📊 Дэлгэрэнгүй мэдээлэл</Text>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Нийт дата:</Text>
-          <Text style={styles.infoValue}>
-            {prediction.total_predictions?.toLocaleString() || "N/A"}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Файл:</Text>
-          <Text style={styles.infoValue}>
-            {prediction.file || `${pair.name.replace("/", "_")}_test.csv`}
-          </Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Модель:</Text>
-          <Text style={styles.infoValue}>HMM (Gaussian)</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Шинж чанарууд:</Text>
-          <Text style={styles.infoValue} numberOfLines={2}>
-            Returns, Volatility, ATR, MA Cross, RSI, Volume
-          </Text>
-        </View>
-      </View>
-
-      {/* Шинэчлэх товч */}
-      <TouchableOpacity
-        style={styles.refreshButton}
-        onPress={handleRefresh}
-        disabled={loading}
-      >
-        <LinearGradient
-          colors={["#4CAF50", "#45a049"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.refreshGradient}
-        >
-          {loading ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator size="large" color={colors.primary} />
           ) : (
             <>
-              <Text style={styles.refreshIcon}>🔄</Text>
-              <Text style={styles.refreshText}>Шинэчлэх</Text>
+              <Text style={styles.rateLabel}>Одоогийн ханш</Text>
+              <Text style={styles.rateValue}>{formatRate(liveRate)}</Text>
             </>
           )}
-        </LinearGradient>
-      </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Prediction Signal */}
+      <SignalCard prediction={prediction} />
+
+      {/* Price Chart */}
+      <View style={styles.card}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="trending-up" size={20} color={colors.primary} />
+          <Text style={styles.sectionTitle}>MT5 Ханшийн график</Text>
+        </View>
+        {chartLoading ? (
+          <View
+            style={{
+              height: 220,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : prepareChartData() ? (
+          <LineChart
+            data={prepareChartData()}
+            width={Dimensions.get("window").width - 64}
+            height={220}
+            chartConfig={{
+              backgroundColor: colors.card,
+              backgroundGradientFrom: colors.card,
+              backgroundGradientTo: colors.card,
+              decimalPlaces: pair.name.includes("JPY") ? 2 : 5,
+              color: (opacity = 1) => colors.primary,
+              labelColor: (opacity = 1) => colors.textLabel,
+              style: {
+                borderRadius: 16,
+              },
+              propsForDots: {
+                r: "0", // Hide dots
+              },
+              propsForBackgroundLines: {
+                strokeDasharray: "",
+                stroke: colors.borderDark,
+                strokeWidth: 1,
+              },
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 16,
+            }}
+          />
+        ) : (
+          <Text style={styles.chartNote}>
+            MT5 өгөгдөл олдсонгүй. MT5 холбогдсон эсэхийг шалгана уу.
+          </Text>
+        )}
+        <View>
+          <Text style={styles.chartNote}>
+            * MT5-аас авсан бодит цагийн өгөгдөл (1 минутын график)
+          </Text>
+        </View>
+      </View>
+
+      {/* Model Info */}
+      <View style={styles.card}>
+        <View style={styles.sectionHeader}>
+          <Ionicons
+            name="information-circle"
+            size={20}
+            color={colors.primary}
+          />
+          <Text style={styles.sectionTitle}>Дэлгэрэнгүй мэдээлэл</Text>
+        </View>
+
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Модель</Text>
+            <Text style={styles.infoValue}>HMM Gaussian</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>Нийт дата</Text>
+            <Text style={styles.infoValue}>
+              {prediction.total_predictions?.toLocaleString() || "—"}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.featuresList}>
+          <Text style={styles.featuresTitle}>Шинж чанарууд:</Text>
+          <View style={styles.featureTags}>
+            <Text style={styles.featureTag}>Returns</Text>
+            <Text style={styles.featureTag}>Volatility</Text>
+            <Text style={styles.featureTag}>ATR</Text>
+            <Text style={styles.featureTag}>MA Cross</Text>
+            <Text style={styles.featureTag}>RSI</Text>
+            <Text style={styles.featureTag}>Volume</Text>
+          </View>
+        </View>
+      </View>
 
       <View style={{ height: 30 }} />
     </ScrollView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-  errorText: {
-    fontSize: fontSize.lg,
-    color: colors.error,
-  },
-  headerGradient: {
-    padding: spacing.lg,
-    alignItems: "center",
-  },
-  flag: {
-    fontSize: 64,
-    marginBottom: spacing.sm,
-  },
-  pairName: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  timestamp: {
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-  },
-  liveRateContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: spacing.md,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: spacing.sm,
-    gap: spacing.xs,
-  },
-  liveRateLabel: {
-    fontSize: fontSize.sm,
-    color: colors.textPrimary,
-    marginLeft: spacing.xs,
-  },
-  liveRateValue: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    color: colors.textPrimary,
-  },
-  card: {
-    backgroundColor: colors.card,
-    borderRadius: spacing.sm,
-    padding: spacing.lg,
-    marginVertical: spacing.sm,
-    marginHorizontal: spacing.md,
-    ...shadows.md,
-  },
-  cardTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.md,
-  },
-  confidenceRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  confidenceInfo: {
-    marginRight: spacing.lg,
-  },
-  confidenceValue: {
-    fontSize: 36,
-    fontWeight: fontWeight.bold,
-    color: colors.textDark,
-  },
-  confidenceLevel: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.semibold,
-    marginTop: spacing.xs,
-  },
-  confidenceBarContainer: {
-    flex: 1,
-  },
-  confidenceBarBg: {
-    height: 12,
-    backgroundColor: colors.borderDark,
-    borderRadius: 6,
-    overflow: "hidden",
-  },
-  confidenceBarFill: {
-    height: "100%",
-    borderRadius: 6,
-  },
-  adviceContainer: {
-    backgroundColor: "#E3F2FD",
-    borderLeftWidth: 4,
-    borderLeftColor: colors.info,
-    padding: spacing.md,
-    borderRadius: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  adviceText: {
-    fontSize: fontSize.md,
-    color: "#1565C0",
-    fontWeight: fontWeight.semibold,
-  },
-  tipsContainer: {
-    backgroundColor: "#FFF9C4",
-    borderRadius: spacing.sm,
-    padding: spacing.sm,
-  },
-  tipTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.bold,
-    color: "#F57F17",
-    marginBottom: 6,
-  },
-  tipText: {
-    fontSize: fontSize.xs,
-    color: colors.textDark,
-    lineHeight: 20,
-  },
-  infoRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background,
-  },
-  infoLabel: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: fontSize.sm,
-    color: colors.textDark,
-    fontWeight: fontWeight.semibold,
-    flex: 1,
-    textAlign: "right",
-  },
-  refreshButton: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    borderRadius: spacing.sm,
-    overflow: "hidden",
-    ...shadows.md,
-  },
-  refreshGradient: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.md,
-  },
-  refreshIcon: {
-    fontSize: fontSize.xl,
-    marginRight: spacing.sm,
-  },
-  refreshText: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    color: colors.textPrimary,
-  },
-});
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.background,
+    },
+    errorText: {
+      fontSize: fontSize.lg,
+      color: colors.error,
+    },
+    // Live Rate Card
+    rateCard: {
+      backgroundColor: colors.card,
+      marginHorizontal: spacing.md,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
+      borderRadius: 16,
+      padding: spacing.lg,
+      ...shadows.md,
+    },
+    rateHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.md,
+    },
+    pairName: {
+      fontSize: 22,
+      fontWeight: fontWeight.bold,
+      color: colors.textDark,
+    },
+    updateBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.input,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: 12,
+      gap: 4,
+    },
+    updateTime: {
+      fontSize: 11,
+      color: colors.textLabel,
+    },
+    rateDisplay: {
+      alignItems: "center",
+      paddingVertical: spacing.md,
+    },
+    rateLabel: {
+      fontSize: fontSize.sm,
+      color: colors.textLabel,
+      marginBottom: spacing.xs,
+    },
+    rateValue: {
+      fontSize: 32,
+      fontWeight: fontWeight.bold,
+      color: colors.primary,
+    },
+    // Card Styles
+    card: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: spacing.lg,
+      marginVertical: spacing.sm,
+      marginHorizontal: spacing.md,
+      ...shadows.md,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: spacing.md,
+      gap: spacing.sm,
+    },
+    sectionTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: colors.textDark,
+    },
+    chartNote: {
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+      textAlign: "center",
+      marginTop: spacing.sm,
+      fontStyle: "italic",
+    },
+    // Info Grid
+    infoGrid: {
+      flexDirection: "row",
+      gap: spacing.md,
+      marginBottom: spacing.md,
+    },
+    infoItem: {
+      flex: 1,
+      backgroundColor: colors.background,
+      padding: spacing.md,
+      borderRadius: spacing.sm,
+      alignItems: "center",
+    },
+    infoLabel: {
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+      marginBottom: 4,
+    },
+    infoValue: {
+      fontSize: fontSize.md,
+      color: colors.textDark,
+      fontWeight: fontWeight.bold,
+    },
+    // Features
+    featuresList: {
+      backgroundColor: colors.background,
+      padding: spacing.md,
+      borderRadius: spacing.sm,
+    },
+    featuresTitle: {
+      fontSize: fontSize.sm,
+      color: colors.textLabel,
+      marginBottom: spacing.sm,
+    },
+    featureTags: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing.xs,
+    },
+    featureTag: {
+      backgroundColor: colors.primary + "20",
+      color: colors.primary,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: 12,
+      fontSize: fontSize.xs,
+      fontWeight: fontWeight.semibold,
+    },
+  });
 
 export default SignalScreen;

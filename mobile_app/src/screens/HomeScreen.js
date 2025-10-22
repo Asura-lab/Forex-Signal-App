@@ -12,26 +12,32 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import CurrencyCard from "../components/CurrencyCard";
-import { CURRENCY_PAIRS, getTimeBasedGreeting } from "../utils/helpers";
+import { useTheme } from "../context/ThemeContext";
+import {
+  getColors,
+  getGradients,
+  spacing,
+  fontSize,
+  fontWeight,
+} from "../config/theme";
+import CurrencyList from "../components/CurrencyList";
+import { getTimeBasedGreeting } from "../utils/helpers";
 import {
   checkApiStatus,
   getAllPredictions,
   getLiveRates,
   getMT5Status,
 } from "../services/api";
-import {
-  colors,
-  gradients,
-  spacing,
-  fontSize,
-  fontWeight,
-} from "../config/theme";
 
 /**
  * Үндсэн дэлгэц - Валютын хослолууд
  */
 const HomeScreen = ({ navigation }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const gradients = getGradients(isDark);
+  const styles = createStyles(colors, gradients);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [apiConnected, setApiConnected] = useState(false);
@@ -79,7 +85,15 @@ const HomeScreen = ({ navigation }) => {
       // MT5-аас авах (хэрэв холбогдсон бол)
       const result = await getLiveRates(null, "mt5");
       if (result.success) {
-        setLiveRates(result.data.rates || {});
+        // Convert EUR_USD to EUR/USD format
+        const ratesMap = {};
+        const rates = result.data.rates || {};
+        Object.keys(rates).forEach((key) => {
+          const pairName = key.replace("_", "/");
+          ratesMap[pairName] = rates[key];
+        });
+        console.log("💱 Live rates loaded:", ratesMap);
+        setLiveRates(ratesMap);
         setLastUpdateTime(
           result.data.timestamp || new Date().toLocaleTimeString()
         );
@@ -132,7 +146,9 @@ const HomeScreen = ({ navigation }) => {
         if (item.success && item.data) {
           // Backend-ийн response format-г mobile app format руу хөрвүүлэх
           const predictionData = item.data;
-          predictionsMap[item.pair] = {
+          // Convert EUR_USD to EUR/USD format
+          const pairName = item.pair.replace("_", "/");
+          predictionsMap[pairName] = {
             latest_prediction: {
               label: predictionData.signal, // signal -> label
               confidence: predictionData.confidence * 100, // 0.9 -> 90
@@ -143,6 +159,7 @@ const HomeScreen = ({ navigation }) => {
           };
         }
       });
+      console.log("Predictions loaded:", predictionsMap);
       setPredictions(predictionsMap);
     } else {
       console.error("Таамаглал авах алдаа:", result.error);
@@ -153,7 +170,37 @@ const HomeScreen = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+
+    // Force refresh - кэшийг давж шинээр тооцоолох
+    console.log("🔄 Pull-to-refresh: Force refreshing predictions...");
+
+    // Бодит цагийн ханш авах
+    await fetchLiveRates();
+
+    // Бүх таамаглалуудыг ШИНЭЭР тооцоолох (force=true)
+    const result = await getAllPredictions(true); // ← force_refresh=true
+
+    if (result.success) {
+      const predictionsMap = {};
+      result.data.forEach((item) => {
+        if (item.success && item.data) {
+          const predictionData = item.data;
+          const pairName = item.pair.replace("_", "/");
+          predictionsMap[pairName] = {
+            latest_prediction: {
+              label: predictionData.signal,
+              confidence: predictionData.confidence * 100,
+            },
+            signal_name: predictionData.signal_name,
+            historical_accuracy: predictionData.historical_accuracy,
+            timestamp: predictionData.timestamp,
+          };
+        }
+      });
+      setPredictions(predictionsMap);
+      console.log("✓ Predictions force refreshed!");
+    }
+
     setRefreshing(false);
   };
 
@@ -287,39 +334,26 @@ const HomeScreen = ({ navigation }) => {
                     Хослол сонгож дэлгэрэнгүй таамаглал үзнэ үү
                   </Text>
                 </View>
-                {lastUpdateTime && (
-                  <View style={styles.updateTimeContainer}>
-                    <Ionicons
-                      name="time-outline"
-                      size={12}
-                      color={colors.textMuted}
-                    />
-                    <Text style={styles.updateTimeText}>{lastUpdateTime}</Text>
-                  </View>
-                )}
               </View>
             </View>
 
-            {CURRENCY_PAIRS.map((pair) => (
-              <CurrencyCard
-                key={pair.id}
-                pair={pair}
-                prediction={predictions[pair.name]}
-                liveRate={liveRates[pair.name]}
-                onPress={() => handlePairPress(pair)}
-                loading={false}
-              />
-            ))}
+            {/* Currency List with Header */}
+            <CurrencyList
+              predictions={predictions}
+              liveRates={liveRates}
+              onPairPress={handlePairPress}
+              loading={false}
+            />
 
             {/* Анхааруулга */}
-            <View style={styles.disclaimer}>
+            {/* <View style={styles.disclaimer}>
               <Text style={styles.disclaimerTitle}>⚠️ Анхааруулга</Text>
               <Text style={styles.disclaimerText}>
                 Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн. Бодит
                 худалдаанд ашиглахаас өмнө өөрийн судалгаа хийж, эрсдлийн
                 менежментийг сайн тооцоолоорой.
               </Text>
-            </View>
+            </View> */}
 
             <View style={{ height: 20 }} />
           </>
@@ -329,211 +363,212 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.background,
-  },
-  loadingText: {
-    marginTop: spacing.sm,
-    fontSize: fontSize.md,
-    color: colors.textMuted,
-  },
-  header: {
-    paddingTop: 60,
-    paddingBottom: spacing.xl,
-    paddingHorizontal: spacing.lg,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: spacing.sm,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  greetingContainer: {
-    marginBottom: spacing.sm,
-  },
-  greetingText: {
-    fontSize: fontSize.lg,
-    color: colors.textPrimary,
-    fontWeight: fontWeight.semibold,
-    opacity: 0.95,
-  },
-  headerTitle: {
-    fontSize: fontSize.display,
-    fontWeight: fontWeight.bold,
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  headerSubtitle: {
-    fontSize: fontSize.md,
-    color: colors.textSecondary,
-  },
-  statusContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-  statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: fontSize.xs,
-    color: colors.textPrimary,
-    fontWeight: fontWeight.semibold,
-  },
-  mt5Badge: {
-    backgroundColor: colors.success,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 8,
-  },
-  mt5BadgeText: {
-    fontSize: fontSize.xs,
-    color: colors.textPrimary,
-    fontWeight: fontWeight.bold,
-  },
-  sourceText: {
-    fontSize: fontSize.xs,
-    color: colors.textSecondary,
-    marginLeft: 8,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  section: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.bold,
-    color: colors.textDark,
-    marginBottom: spacing.xs,
-  },
-  sectionSubtitle: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-  },
-  updateTimeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.background,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: spacing.xs,
-    gap: 4,
-  },
-  updateTimeText: {
-    fontSize: fontSize.xs,
-    color: colors.textMuted,
-  },
-  disclaimer: {
-    backgroundColor: "#FFF3E0",
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.lg,
-    borderRadius: spacing.sm,
-  },
-  disclaimerTitle: {
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.bold,
-    color: "#E65100",
-    marginBottom: spacing.sm,
-  },
-  disclaimerText: {
-    fontSize: fontSize.xs,
-    color: colors.textDark,
-    lineHeight: 20,
-  },
-  verificationAlert: {
-    backgroundColor: "#FFF3CD",
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    borderRadius: spacing.sm,
-  },
-  verificationHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: spacing.sm,
-  },
-  verificationTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.bold,
-    color: "#856404",
-    marginLeft: spacing.sm,
-  },
-  verificationText: {
-    fontSize: fontSize.sm,
-    color: "#856404",
-    lineHeight: 20,
-    marginBottom: spacing.md,
-  },
-  verificationButton: {
-    backgroundColor: colors.warning,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: spacing.sm,
-    gap: spacing.xs,
-  },
-  verificationButtonText: {
-    color: colors.white,
-    fontSize: fontSize.md,
-    fontWeight: fontWeight.semibold,
-  },
-  lockedSection: {
-    marginTop: spacing.xl,
-    padding: spacing.xl,
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: spacing.md,
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
-    borderStyle: "dashed",
-  },
-  lockIcon: {
-    marginBottom: spacing.md,
-    opacity: 0.5,
-  },
-  lockedTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.bold,
-    color: colors.textMuted,
-    marginBottom: spacing.sm,
-  },
-  lockedText: {
-    fontSize: fontSize.sm,
-    color: colors.textMuted,
-    textAlign: "center",
-    lineHeight: 20,
-  },
-});
+const createStyles = (colors, gradients) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: "center",
+      alignItems: "center",
+      backgroundColor: colors.background,
+    },
+    loadingText: {
+      marginTop: spacing.sm,
+      fontSize: fontSize.md,
+      color: colors.textLabel,
+    },
+    header: {
+      paddingTop: 60,
+      paddingBottom: spacing.xl,
+      paddingHorizontal: spacing.lg,
+    },
+    headerTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: spacing.sm,
+    },
+    headerContent: {
+      flex: 1,
+    },
+    greetingContainer: {
+      marginBottom: spacing.sm,
+    },
+    greetingText: {
+      fontSize: fontSize.lg,
+      color: colors.textPrimary,
+      fontWeight: fontWeight.semibold,
+      opacity: 0.95,
+    },
+    headerTitle: {
+      fontSize: fontSize.display,
+      fontWeight: fontWeight.bold,
+      color: colors.textPrimary,
+      marginBottom: spacing.xs,
+    },
+    headerSubtitle: {
+      fontSize: fontSize.md,
+      color: colors.textSecondary,
+    },
+    statusContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+    },
+    statusDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 6,
+    },
+    statusText: {
+      fontSize: fontSize.xs,
+      color: colors.textPrimary,
+      fontWeight: fontWeight.semibold,
+    },
+    mt5Badge: {
+      backgroundColor: colors.success,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+      marginLeft: 8,
+    },
+    mt5BadgeText: {
+      fontSize: fontSize.xs,
+      color: colors.textPrimary,
+      fontWeight: fontWeight.bold,
+    },
+    sourceText: {
+      fontSize: fontSize.xs,
+      color: colors.textSecondary,
+      marginLeft: 8,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    section: {
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.sm,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    sectionTitle: {
+      fontSize: fontSize.xxl,
+      fontWeight: fontWeight.bold,
+      color: colors.textDark,
+      marginBottom: spacing.xs,
+    },
+    sectionSubtitle: {
+      fontSize: fontSize.sm,
+      color: colors.textLabel,
+    },
+    updateTimeContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.background,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: spacing.xs,
+      gap: 4,
+    },
+    updateTimeText: {
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+    },
+    disclaimer: {
+      backgroundColor: "#FFF3E0",
+      borderLeftWidth: 4,
+      borderLeftColor: colors.warning,
+      padding: spacing.md,
+      marginHorizontal: spacing.md,
+      marginTop: spacing.lg,
+      borderRadius: spacing.sm,
+    },
+    disclaimerTitle: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+      color: "#E65100",
+      marginBottom: spacing.sm,
+    },
+    disclaimerText: {
+      fontSize: fontSize.xs,
+      color: colors.textDark,
+      lineHeight: 20,
+    },
+    verificationAlert: {
+      backgroundColor: "#FFF3CD",
+      borderLeftWidth: 4,
+      borderLeftColor: colors.warning,
+      padding: spacing.md,
+      marginHorizontal: spacing.md,
+      marginTop: spacing.md,
+      borderRadius: spacing.sm,
+    },
+    verificationHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: spacing.sm,
+    },
+    verificationTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: "#856404",
+      marginLeft: spacing.sm,
+    },
+    verificationText: {
+      fontSize: fontSize.sm,
+      color: "#856404",
+      lineHeight: 20,
+      marginBottom: spacing.md,
+    },
+    verificationButton: {
+      backgroundColor: colors.warning,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: spacing.sm,
+      gap: spacing.xs,
+    },
+    verificationButtonText: {
+      color: colors.white,
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.semibold,
+    },
+    lockedSection: {
+      marginTop: spacing.xl,
+      padding: spacing.xl,
+      alignItems: "center",
+      backgroundColor: "#F5F5F5",
+      borderRadius: spacing.md,
+      borderWidth: 2,
+      borderColor: "#E0E0E0",
+      borderStyle: "dashed",
+    },
+    lockIcon: {
+      marginBottom: spacing.md,
+      opacity: 0.5,
+    },
+    lockedTitle: {
+      fontSize: fontSize.xl,
+      fontWeight: fontWeight.bold,
+      color: colors.textLabel,
+      marginBottom: spacing.sm,
+    },
+    lockedText: {
+      fontSize: fontSize.sm,
+      color: colors.textLabel,
+      textAlign: "center",
+      lineHeight: 20,
+    },
+  });
 
 export default HomeScreen;

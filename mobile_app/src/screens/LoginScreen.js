@@ -12,12 +12,19 @@ import {
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../context/ThemeContext";
+import { getColors, getGradients } from "../config/theme";
 import { loginUser } from "../services/api";
+import { API_BASE_URL } from "../config/api";
 
 /**
  * Login Screen - Нэвтрэх дэлгэц
  */
 const LoginScreen = ({ navigation }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const gradients = getGradients(isDark);
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -67,7 +74,18 @@ const LoginScreen = ({ navigation }) => {
         }
       }
     } catch (error) {
-      Alert.alert("Алдаа", "Нэвтрэх явцад алдаа гарлаа. Дахин оролдоно уу.");
+      console.error("Login error:", error);
+      let errorMessage = "Нэвтрэх явцад алдаа гарлаа.";
+
+      if (error.message === "Network Error") {
+        errorMessage =
+          "Сүлжээний алдаа! Backend server холбогдохгүй байна.\nТа WiFi холболтоо шалгана уу.";
+      } else if (error.code === "ECONNABORTED") {
+        errorMessage =
+          "Хүлээх хугацаа дууслаа. Backend server-тэй холбогдож чадсангүй.";
+      }
+
+      Alert.alert("Алдаа", errorMessage + "\n\nДахин оролдоно уу.");
     } finally {
       setLoading(false);
     }
@@ -77,13 +95,15 @@ const LoginScreen = ({ navigation }) => {
     navigation.navigate("SignUp");
   };
 
+  const styles = createStyles(colors, gradients);
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
+        colors={gradients.primary}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
@@ -91,9 +111,10 @@ const LoginScreen = ({ navigation }) => {
         <View style={styles.content}>
           {/* Logo/Title */}
           <View style={styles.headerContainer}>
-            <Ionicons name="trending-up" size={60} color="#FFFFFF" />
+            <Ionicons name="trending-up" size={60} color={colors.textPrimary} />
             <Text style={styles.title}>Форекс Сигнал</Text>
             <Text style={styles.subtitle}>AI-аар хөтлөгддөг таамаглал</Text>
+            <Text style={styles.apiDebug}>API: {API_BASE_URL}</Text>
           </View>
 
           {/* Login Form */}
@@ -102,13 +123,13 @@ const LoginScreen = ({ navigation }) => {
               <Ionicons
                 name="mail-outline"
                 size={20}
-                color="#666"
+                color={colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={styles.input}
                 placeholder="Имэйл хаяг"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.placeholderText}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -121,13 +142,13 @@ const LoginScreen = ({ navigation }) => {
               <Ionicons
                 name="lock-closed-outline"
                 size={20}
-                color="#666"
+                color={colors.icon}
                 style={styles.inputIcon}
               />
               <TextInput
                 style={[styles.input, styles.passwordInput]}
                 placeholder="Нууц үг"
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.placeholderText}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -140,7 +161,7 @@ const LoginScreen = ({ navigation }) => {
                 <Ionicons
                   name={showPassword ? "eye-outline" : "eye-off-outline"}
                   size={20}
-                  color="#666"
+                  color={colors.icon}
                 />
               </TouchableOpacity>
             </View>
@@ -152,7 +173,7 @@ const LoginScreen = ({ navigation }) => {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={colors.textPrimary} />
               ) : (
                 <Text style={styles.loginButtonText}>Нэвтрэх</Text>
               )}
@@ -189,129 +210,138 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 24,
-  },
-  headerContainer: {
-    alignItems: "center",
-    marginBottom: 48,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginTop: 16,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: "#B0BEC5",
-    marginTop: 8,
-  },
-  formContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
+const createStyles = (colors, gradients) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    marginBottom: 16,
-    paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-  },
-  passwordInput: {
-    paddingRight: 40,
-  },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
-    padding: 8,
-  },
-  loginButton: {
-    backgroundColor: "#2196F3",
-    borderRadius: 12,
-    height: 56,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 8,
-    shadowColor: "#2196F3",
-    shadowOffset: {
-      width: 0,
-      height: 4,
+    gradient: {
+      flex: 1,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  loginButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  forgotPassword: {
-    alignItems: "center",
-    marginTop: 16,
-  },
-  forgotPasswordText: {
-    color: "#2196F3",
-    fontSize: 14,
-  },
-  signupContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 24,
-    paddingTop: 24,
-    borderTopWidth: 1,
-    borderTopColor: "#E0E0E0",
-  },
-  signupText: {
-    color: "#666",
-    fontSize: 14,
-  },
-  signupLink: {
-    color: "#2196F3",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  footer: {
-    marginTop: 32,
-    alignItems: "center",
-  },
-  footerText: {
-    color: "#B0BEC5",
-    fontSize: 12,
-    textAlign: "center",
-  },
-});
+    content: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 24,
+    },
+    headerContainer: {
+      alignItems: "center",
+      marginBottom: 48,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: "bold",
+      color: colors.textPrimary,
+      marginTop: 16,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 8,
+    },
+    apiDebug: {
+      fontSize: 10,
+      color: colors.warning,
+      marginTop: 4,
+      fontFamily: "monospace",
+    },
+    formContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 4.65,
+      elevation: 8,
+    },
+    inputContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.input,
+      borderRadius: 12,
+      marginBottom: 16,
+      paddingHorizontal: 16,
+      height: 56,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    inputIcon: {
+      marginRight: 12,
+    },
+    input: {
+      flex: 1,
+      fontSize: 16,
+      color: colors.textInput,
+    },
+    passwordInput: {
+      paddingRight: 40,
+    },
+    eyeIcon: {
+      position: "absolute",
+      right: 16,
+      padding: 8,
+    },
+    loginButton: {
+      backgroundColor: colors.secondary,
+      borderRadius: 12,
+      height: 56,
+      justifyContent: "center",
+      alignItems: "center",
+      marginTop: 8,
+      shadowColor: colors.secondary,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      shadowOpacity: 0.3,
+      shadowRadius: 4.65,
+      elevation: 8,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    loginButtonText: {
+      color: colors.textPrimary,
+      fontSize: 18,
+      fontWeight: "bold",
+    },
+    forgotPassword: {
+      alignItems: "center",
+      marginTop: 16,
+    },
+    forgotPasswordText: {
+      color: colors.info,
+      fontSize: 14,
+    },
+    signupContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      marginTop: 24,
+      paddingTop: 24,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDark,
+    },
+    signupText: {
+      color: colors.textDark,
+      fontSize: 14,
+    },
+    signupLink: {
+      color: colors.info,
+      fontSize: 14,
+      fontWeight: "bold",
+    },
+    footer: {
+      marginTop: 32,
+      alignItems: "center",
+    },
+    footerText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: "center",
+    },
+  });
 
 export default LoginScreen;
