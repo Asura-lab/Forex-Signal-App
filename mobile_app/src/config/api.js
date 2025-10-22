@@ -26,7 +26,7 @@ const getApiUrl = () => {
   }
 
   // Production - Physical Device with WiFi IP
-  return "http://192.168.20.22:5000";
+  return "http://192.168.60.49:5000";
 };
 
 export const API_BASE_URL = getApiUrl();

@@ -3,7 +3,7 @@
     "name": "Predictrix",
     "slug": "predictrix",
     "version": "1.1.0",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon.jpg",
     "orientation": "portrait",
     "platforms": ["ios", "android"],
     "userInterfaceStyle": "automatic",
@@ -12,7 +12,7 @@
       "fallbackToCacheTimeout": 0
     },
     "splash": {
-      "image": "./assets/icon.png",
+      "image": "./assets/icon.jpg",
       "resizeMode": "contain",
       "backgroundColor": "#1a237e"
     },
@@ -24,7 +24,7 @@
     "android": {
       "package": "com.asuralab.predictrix",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/icon.jpg",
         "backgroundColor": "#1a237e"
       }
     },
