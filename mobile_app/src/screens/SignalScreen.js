@@ -26,10 +26,18 @@ import {
   getSpecificRate,
   getMT5HistoricalRates,
 } from "../services/api";
+import {
+  getMultiTimeframePrediction,
+  getSignalNameMongolian,
+  getSignalColor,
+  getSignalIcon,
+  getConfidenceLevel,
+  getTimeframeName,
+} from "../services/predictionService";
 import { Ionicons } from "@expo/vector-icons";
 
 /**
- * Сигнал дэлгэц - Дэлгэрэнгүй таамаглал
+ * Сигнал дэлгэц - Multi-timeframe таамаглал
  */
 const SignalScreen = ({ route, navigation }) => {
   const { isDark } = useTheme();
@@ -38,6 +46,8 @@ const SignalScreen = ({ route, navigation }) => {
 
   const { pair, prediction: initialPrediction } = route.params;
   const [prediction, setPrediction] = useState(initialPrediction);
+  const [multiTimeframePredictions, setMultiTimeframePredictions] =
+    useState(null);
   const [loading, setLoading] = useState(false);
   const [liveRate, setLiveRate] = useState(null);
   const [rateLoading, setRateLoading] = useState(true);
@@ -53,6 +63,8 @@ const SignalScreen = ({ route, navigation }) => {
       headerTintColor: colors.textDark,
     });
 
+    // Fetch multi-timeframe predictions
+    fetchMultiTimeframePredictions();
     // Fetch live rate
     fetchLiveRate();
     // Fetch historical data
@@ -62,6 +74,25 @@ const SignalScreen = ({ route, navigation }) => {
     const interval = setInterval(fetchLiveRate, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchMultiTimeframePredictions = async () => {
+    try {
+      setLoading(true);
+      const result = await getMultiTimeframePrediction(pair.name, false);
+      console.log("📊 Multi-timeframe predictions:", result);
+
+      if (result.success) {
+        setMultiTimeframePredictions(result.predictions);
+      } else {
+        Alert.alert("Алдаа", result.error || "Таамаглал авахад алдаа гарлаа");
+      }
+    } catch (error) {
+      console.error("Multi-timeframe prediction error:", error);
+      Alert.alert("Алдаа", "Серверт холбогдож чадсангүй");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchLiveRate = async () => {
     try {
@@ -116,25 +147,17 @@ const SignalScreen = ({ route, navigation }) => {
     setLoading(true);
 
     try {
-      // Fetch both prediction and live rate
-      const [predResult, rateResult] = await Promise.all([
-        getPrediction(pair.name),
-        getSpecificRate(pair.name),
-      ]);
+      // Fetch multi-timeframe predictions with force refresh
+      const result = await getMultiTimeframePrediction(pair.name, true);
 
-      console.log("🔄 Refresh result:", predResult);
-
-      if (predResult.success && predResult.data) {
-        // Ensure we have the correct structure
-        if (predResult.data.latest_prediction) {
-          setPrediction(predResult.data);
-        } else {
-          Alert.alert("Алдаа", "Таамаглалын өгөгдөл олдсонгүй");
-        }
+      if (result.success) {
+        setMultiTimeframePredictions(result.predictions);
       } else {
-        Alert.alert("Алдаа", predResult.message || "Шинэчлэхэд алдаа гарлаа");
+        Alert.alert("Алдаа", result.error || "Шинэчлэхэд алдаа гарлаа");
       }
 
+      // Also fetch live rate
+      const rateResult = await getSpecificRate(pair.name);
       if (rateResult.success && rateResult.data) {
         setLiveRate(rateResult.data.rate);
       }
@@ -179,20 +202,104 @@ const SignalScreen = ({ route, navigation }) => {
     };
   };
 
-  if (
-    !prediction ||
-    !prediction.latest_prediction ||
-    prediction.latest_prediction.label == null ||
-    prediction.latest_prediction.confidence == null
-  ) {
+  if (!multiTimeframePredictions && !loading) {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Таамаглал олдсонгүй</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={fetchMultiTimeframePredictions}
+        >
+          <Text style={styles.retryButtonText}>Дахин оролдох</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
-  const { label, trend, confidence } = prediction.latest_prediction;
+  const renderTimeframeCard = (timeframe, data) => {
+    if (!data || !data.success) {
+      return (
+        <View key={timeframe} style={styles.timeframeCard}>
+          <Text style={styles.timeframeTitle}>
+            {getTimeframeName(timeframe)}
+          </Text>
+          <Text style={styles.errorSmall}>
+            {data?.error || "Таамаглал олдсонгүй"}
+          </Text>
+        </View>
+      );
+    }
+
+    const { signal_name, confidence, current_price, price_change_percent } =
+      data;
+    const signalColor = getSignalColor(signal_name);
+    const iconName = getSignalIcon(signal_name);
+
+    return (
+      <View key={timeframe} style={styles.timeframeCard}>
+        <View style={styles.timeframeHeader}>
+          <Text style={styles.timeframeTitle}>
+            {getTimeframeName(timeframe)}
+          </Text>
+          <View style={[styles.signalBadge, { backgroundColor: signalColor }]}>
+            <Ionicons name={iconName} size={16} color="#FFF" />
+          </View>
+        </View>
+
+        <Text style={[styles.signalText, { color: signalColor }]}>
+          {getSignalNameMongolian(signal_name)}
+        </Text>
+
+        <View style={styles.metricsRow}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Итгэлцэл</Text>
+            <Text style={styles.metricValue}>
+              {(confidence * 100).toFixed(1)}%
+            </Text>
+            <Text style={styles.metricSubtext}>
+              {getConfidenceLevel(confidence)}
+            </Text>
+          </View>
+
+          <View style={styles.metricDivider} />
+
+          <View style={styles.metricItem}>
+            <Text style={styles.metricLabel}>Өөрчлөлт</Text>
+            <Text
+              style={[
+                styles.metricValue,
+                {
+                  color:
+                    price_change_percent > 0
+                      ? colors.success
+                      : price_change_percent < 0
+                      ? colors.error
+                      : colors.textLabel,
+                },
+              ]}
+            >
+              {price_change_percent > 0 ? "+" : ""}
+              {price_change_percent.toFixed(4)}%
+            </Text>
+            <Text style={styles.metricSubtext}>Сүүлийн үеийн</Text>
+          </View>
+        </View>
+
+        {data.accuracy && (
+          <View style={styles.accuracyBadge}>
+            <Ionicons
+              name="checkmark-circle"
+              size={14}
+              color={colors.success}
+            />
+            <Text style={styles.accuracyText}>
+              Нарийвчлал: {(data.accuracy * 100).toFixed(1)}%
+            </Text>
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -224,8 +331,37 @@ const SignalScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      {/* Prediction Signal */}
-      <SignalCard prediction={prediction} />
+      {/* Multi-Timeframe Predictions */}
+      <View style={styles.card}>
+        <View style={styles.sectionHeader}>
+          <Ionicons name="analytics" size={24} color={colors.primary} />
+          <Text style={styles.sectionTitle}>Олон хугацааны таамаглал</Text>
+        </View>
+
+        {loading && !multiTimeframePredictions ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Таамаглал тооцоолж байна...</Text>
+          </View>
+        ) : (
+          <View style={styles.timeframeContainer}>
+            {renderTimeframeCard("15min", multiTimeframePredictions?.["15min"])}
+            {renderTimeframeCard("30min", multiTimeframePredictions?.["30min"])}
+            {renderTimeframeCard("60min", multiTimeframePredictions?.["60min"])}
+          </View>
+        )}
+
+        <View style={styles.noteContainer}>
+          <Ionicons
+            name="information-circle-outline"
+            size={16}
+            color={colors.textLabel}
+          />
+          <Text style={styles.noteText}>
+            Deep Learning моделуудын таамаглал (Transformer + LSTM)
+          </Text>
+        </View>
+      </View>
 
       {/* Price Chart */}
       <View style={styles.card}>
@@ -298,26 +434,26 @@ const SignalScreen = ({ route, navigation }) => {
 
         <View style={styles.infoGrid}>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Модель</Text>
-            <Text style={styles.infoValue}>HMM Gaussian</Text>
+            <Text style={styles.infoLabel}>Архитектур</Text>
+            <Text style={styles.infoValue}>Transformer + LSTM</Text>
           </View>
           <View style={styles.infoItem}>
-            <Text style={styles.infoLabel}>Нийт дата</Text>
-            <Text style={styles.infoValue}>
-              {prediction.total_predictions?.toLocaleString() || "—"}
-            </Text>
+            <Text style={styles.infoLabel}>Таамаглал</Text>
+            <Text style={styles.infoValue}>3 хугацаа</Text>
           </View>
         </View>
 
         <View style={styles.featuresList}>
           <Text style={styles.featuresTitle}>Шинж чанарууд:</Text>
           <View style={styles.featureTags}>
-            <Text style={styles.featureTag}>Returns</Text>
-            <Text style={styles.featureTag}>Volatility</Text>
-            <Text style={styles.featureTag}>ATR</Text>
-            <Text style={styles.featureTag}>MA Cross</Text>
+            <Text style={styles.featureTag}>SMA/EMA</Text>
             <Text style={styles.featureTag}>RSI</Text>
+            <Text style={styles.featureTag}>MACD</Text>
+            <Text style={styles.featureTag}>Bollinger Bands</Text>
+            <Text style={styles.featureTag}>ATR</Text>
+            <Text style={styles.featureTag}>Stochastic</Text>
             <Text style={styles.featureTag}>Volume</Text>
+            <Text style={styles.featureTag}>Momentum</Text>
           </View>
         </View>
       </View>
@@ -338,10 +474,30 @@ const createStyles = (colors) =>
       justifyContent: "center",
       alignItems: "center",
       backgroundColor: colors.background,
+      padding: spacing.xl,
     },
     errorText: {
       fontSize: fontSize.lg,
       color: colors.error,
+      marginBottom: spacing.md,
+      textAlign: "center",
+    },
+    errorSmall: {
+      fontSize: fontSize.xs,
+      color: colors.error,
+      marginTop: spacing.xs,
+    },
+    retryButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderRadius: 8,
+      marginTop: spacing.md,
+    },
+    retryButtonText: {
+      color: "#FFF",
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.semibold,
     },
     // Live Rate Card
     rateCard: {
@@ -363,19 +519,6 @@ const createStyles = (colors) =>
       fontSize: 22,
       fontWeight: fontWeight.bold,
       color: colors.textDark,
-    },
-    updateBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.input,
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-      borderRadius: 12,
-      gap: 4,
-    },
-    updateTime: {
-      fontSize: 11,
-      color: colors.textLabel,
     },
     rateDisplay: {
       alignItems: "center",
@@ -410,6 +553,110 @@ const createStyles = (colors) =>
       fontSize: fontSize.lg,
       fontWeight: fontWeight.bold,
       color: colors.textDark,
+    },
+    loadingContainer: {
+      paddingVertical: spacing.xl,
+      alignItems: "center",
+    },
+    loadingText: {
+      marginTop: spacing.md,
+      fontSize: fontSize.sm,
+      color: colors.textLabel,
+    },
+    // Timeframe Cards
+    timeframeContainer: {
+      gap: spacing.md,
+    },
+    timeframeCard: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.borderDark,
+    },
+    timeframeHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: spacing.sm,
+    },
+    timeframeTitle: {
+      fontSize: fontSize.md,
+      fontWeight: fontWeight.bold,
+      color: colors.textDark,
+    },
+    signalBadge: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    signalText: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      marginBottom: spacing.md,
+    },
+    metricsRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: spacing.sm,
+    },
+    metricItem: {
+      flex: 1,
+      alignItems: "center",
+    },
+    metricLabel: {
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+      marginBottom: 4,
+    },
+    metricValue: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.bold,
+      color: colors.textDark,
+    },
+    metricSubtext: {
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+      marginTop: 2,
+    },
+    metricDivider: {
+      width: 1,
+      height: 40,
+      backgroundColor: colors.borderDark,
+      marginHorizontal: spacing.sm,
+    },
+    accuracyBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: spacing.sm,
+      paddingVertical: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      backgroundColor: colors.success + "20",
+      borderRadius: 8,
+      gap: 4,
+    },
+    accuracyText: {
+      fontSize: fontSize.xs,
+      color: colors.success,
+      fontWeight: fontWeight.semibold,
+    },
+    noteContainer: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginTop: spacing.md,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderDark,
+      gap: spacing.xs,
+    },
+    noteText: {
+      flex: 1,
+      fontSize: fontSize.xs,
+      color: colors.textLabel,
+      fontStyle: "italic",
     },
     chartNote: {
       fontSize: fontSize.xs,
