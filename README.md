@@ -15,8 +15,8 @@ MongoDB + JWT Authentication | React Native | HMM Machine Learning
 5. [Суулгах](#суулгах)
 6. [Ашиглах](#ашиглах)
 7. [Архитектур](#архитектур)
-
-8. [API Documentation](#-api-documentation)
+8. [Azure ML Training](#-azure-ml-training)
+9. [API Documentation](#-api-documentation)
 
 ## 🎯 Тойм
 
@@ -626,7 +626,7 @@ MIT License - Чөлөөтэй ашиглаж болно│   📈 Medium volati
 
 3. **atr** - Average True Range (14 period)
 
-### Version 1.0.04. **ma_cross** - MA(5) - MA(20) / Close
+### Version 1.1.1 **ma_cross** - MA(5) - MA(20) / Close
 
 - ✅ HMM Machine Learning model5. **rsi** - Relative Strength Index (14 period)
 
@@ -711,7 +711,51 @@ npm install
 - **Walking Forward**: Овerfitting-ээс зайлсхийх, илүү бодитой үр дүн гаргах арга
 - **Feature Engineering**: Техникийн шинжилгээний үзүүлэлтүүд (MA, RSI, ATR) ашигладаг
 
-## � Бодлогууд ба Баримт бичиг
+---
+
+## ☁️ Azure ML Training
+
+### 🚀 Quick Start
+
+3 өөр архитектур бүхий моделуудыг Azure дээр GPU ашиглан сургах:
+
+```powershell
+# 1. Azure SDK суулгах
+pip install -r requirements-azure.txt
+
+# 2. Data upload хийх
+python azure_upload_data.py \
+  --workspace_name forex-ml-workspace \
+  --resource_group forex-training-rg \
+  --subscription_id YOUR_SUBSCRIPTION_ID
+
+# 3. Training ажиллуулах (3 model)
+python azure_submit_job.py --timeframe 15min --workspace_name forex-ml-workspace ...
+python azure_submit_job.py --timeframe 30min --workspace_name forex-ml-workspace ...
+python azure_submit_job.py --timeframe 60min --workspace_name forex-ml-workspace ...
+```
+
+### 📖 Дэлгэрэнгүй заавар
+
+- 🇲🇳 **[Azure Quick Start (Монгол)](docs/AZURE_QUICK_START_MN.md)** - 5 алхамт хичээл
+- 📘 **[Azure Training Guide](docs/AZURE_TRAINING_GUIDE.md)** - Бүрэн техникийн заавар
+- 🏗️ **[Architecture Guide](ml_models/ARCHITECTURE_GUIDE.md)** - 3 model архитектур
+
+### 💰 Өртөг
+
+- **GPU (Standard_NC6)**: ~$0.90/цаг
+- **3 model сургах**: ~$5-6
+- **Free trial**: $200 credit (эхний 30 хоног)
+
+### 🎯 Гурван архитектур
+
+1. **15-min**: Transformer + LSTM (scalping, 88% зорилт)
+2. **30-min**: Bi-LSTM + Attention (swing trading, 85% зорилт)
+3. **60-min**: CNN-LSTM Hybrid (trend following, 82% зорилт)
+
+---
+
+## ⚖️ Бодлогууд ба Баримт бичиг
 
 ### Хууль эрх зүйн баримтууд:
 

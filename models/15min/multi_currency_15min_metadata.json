@@ -1,0 +1,100 @@
+{
+  "timeframe": "15min",
+  "architecture": "transformer_lstm",
+  "strategy": "Transformer + LSTM for quick scalping",
+  "training_mode": "multi_currency",
+  "pairs": [
+    "EUR/USD",
+    "GBP/USD",
+    "USD/CAD",
+    "USD/CHF",
+    "USD/JPY",
+    "XAU/USD"
+  ],
+  "n_features": 33,
+  "sequence_length": 60,
+  "feature_columns": [
+    "returns",
+    "log_returns",
+    "hl_ratio",
+    "co_ratio",
+    "sma_5",
+    "ema_5",
+    "sma_10",
+    "ema_10",
+    "sma_20",
+    "ema_20",
+    "sma_50",
+    "ema_50",
+    "rsi",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_middle",
+    "bb_upper",
+    "bb_lower",
+    "bb_width",
+    "atr",
+    "stoch_k",
+    "stoch_d",
+    "volume_sma",
+    "volume_ratio",
+    "momentum",
+    "roc",
+    "pair_0",
+    "pair_1",
+    "pair_2",
+    "pair_3",
+    "pair_4",
+    "pair_5"
+  ],
+  "train_samples": 593012,
+  "test_samples": 117677,
+  "simple_accuracy": 0.7299727219422657,
+  "weighted_accuracy": 0.8639963629256354,
+  "accuracy_breakdown": {
+    "correct": 85901,
+    "opposite_errors": 233,
+    "neutral_misses": 31385,
+    "false_signals": 158
+  },
+  "per_pair_results": [
+    {
+      "Pair": "EUR/USD",
+      "Samples": 19777,
+      "Simple_Accuracy": "76.43%",
+      "Weighted_Accuracy": "88.12%"
+    },
+    {
+      "Pair": "GBP/USD",
+      "Samples": 19777,
+      "Simple_Accuracy": "78.60%",
+      "Weighted_Accuracy": "89.19%"
+    },
+    {
+      "Pair": "USD/CAD",
+      "Samples": 19777,
+      "Simple_Accuracy": "86.15%",
+      "Weighted_Accuracy": "93.01%"
+    },
+    {
+      "Pair": "USD/CHF",
+      "Samples": 19776,
+      "Simple_Accuracy": "75.66%",
+      "Weighted_Accuracy": "87.77%"
+    },
+    {
+      "Pair": "USD/JPY",
+      "Samples": 19776,
+      "Simple_Accuracy": "69.51%",
+      "Weighted_Accuracy": "84.68%"
+    },
+    {
+      "Pair": "XAU/USD",
+      "Samples": 18794,
+      "Simple_Accuracy": "50.52%",
+      "Weighted_Accuracy": "75.06%"
+    }
+  ],
+  "training_date": "2025-10-25T11:09:21.814024"
+}

@@ -1,0 +1,100 @@
+{
+  "timeframe": "60min",
+  "architecture": "cnn_lstm",
+  "strategy": "CNN-LSTM for trend following",
+  "training_mode": "multi_currency",
+  "pairs": [
+    "EUR/USD",
+    "GBP/USD",
+    "USD/CAD",
+    "USD/CHF",
+    "USD/JPY",
+    "XAU/USD"
+  ],
+  "n_features": 33,
+  "sequence_length": 48,
+  "feature_columns": [
+    "returns",
+    "log_returns",
+    "hl_ratio",
+    "co_ratio",
+    "sma_5",
+    "ema_5",
+    "sma_10",
+    "ema_10",
+    "sma_20",
+    "ema_20",
+    "sma_50",
+    "ema_50",
+    "rsi",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_middle",
+    "bb_upper",
+    "bb_lower",
+    "bb_width",
+    "atr",
+    "stoch_k",
+    "stoch_d",
+    "volume_sma",
+    "volume_ratio",
+    "momentum",
+    "roc",
+    "pair_0",
+    "pair_1",
+    "pair_2",
+    "pair_3",
+    "pair_4",
+    "pair_5"
+  ],
+  "train_samples": 148084,
+  "test_samples": 29168,
+  "simple_accuracy": 0.48906335710367527,
+  "weighted_accuracy": 0.7292752331321997,
+  "accuracy_breakdown": {
+    "correct": 14265,
+    "opposite_errors": 890,
+    "neutral_misses": 13434,
+    "false_signals": 579
+  },
+  "per_pair_results": [
+    {
+      "Pair": "EUR/USD",
+      "Samples": 4902,
+      "Simple_Accuracy": "52.63%",
+      "Weighted_Accuracy": "75.03%"
+    },
+    {
+      "Pair": "GBP/USD",
+      "Samples": 4902,
+      "Simple_Accuracy": "53.33%",
+      "Weighted_Accuracy": "75.13%"
+    },
+    {
+      "Pair": "USD/CAD",
+      "Samples": 4901,
+      "Simple_Accuracy": "63.86%",
+      "Weighted_Accuracy": "80.79%"
+    },
+    {
+      "Pair": "USD/CHF",
+      "Samples": 4901,
+      "Simple_Accuracy": "50.91%",
+      "Weighted_Accuracy": "74.36%"
+    },
+    {
+      "Pair": "USD/JPY",
+      "Samples": 4901,
+      "Simple_Accuracy": "42.66%",
+      "Weighted_Accuracy": "69.87%"
+    },
+    {
+      "Pair": "XAU/USD",
+      "Samples": 4661,
+      "Simple_Accuracy": "29.07%",
+      "Weighted_Accuracy": "61.83%"
+    }
+  ],
+  "training_date": "2025-10-25T13:11:06.307712"
+}

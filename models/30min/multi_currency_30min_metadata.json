@@ -1,0 +1,100 @@
+{
+  "timeframe": "30min",
+  "architecture": "bilstm_attention",
+  "strategy": "Bi-LSTM + Attention for swing trades",
+  "training_mode": "multi_currency",
+  "pairs": [
+    "EUR/USD",
+    "GBP/USD",
+    "USD/CAD",
+    "USD/CHF",
+    "USD/JPY",
+    "XAU/USD"
+  ],
+  "n_features": 33,
+  "sequence_length": 48,
+  "feature_columns": [
+    "returns",
+    "log_returns",
+    "hl_ratio",
+    "co_ratio",
+    "sma_5",
+    "ema_5",
+    "sma_10",
+    "ema_10",
+    "sma_20",
+    "ema_20",
+    "sma_50",
+    "ema_50",
+    "rsi",
+    "macd",
+    "macd_signal",
+    "macd_hist",
+    "bb_middle",
+    "bb_upper",
+    "bb_lower",
+    "bb_width",
+    "atr",
+    "stoch_k",
+    "stoch_d",
+    "volume_sma",
+    "volume_ratio",
+    "momentum",
+    "roc",
+    "pair_0",
+    "pair_1",
+    "pair_2",
+    "pair_3",
+    "pair_4",
+    "pair_5"
+  ],
+  "train_samples": 296403,
+  "test_samples": 58673,
+  "simple_accuracy": 0.6064118078162016,
+  "weighted_accuracy": 0.7998227464080582,
+  "accuracy_breakdown": {
+    "correct": 35580,
+    "opposite_errors": 397,
+    "neutral_misses": 22481,
+    "false_signals": 215
+  },
+  "per_pair_results": [
+    {
+      "Pair": "EUR/USD",
+      "Samples": 9860,
+      "Simple_Accuracy": "64.55%",
+      "Weighted_Accuracy": "82.06%"
+    },
+    {
+      "Pair": "GBP/USD",
+      "Samples": 9860,
+      "Simple_Accuracy": "66.21%",
+      "Weighted_Accuracy": "82.78%"
+    },
+    {
+      "Pair": "USD/CAD",
+      "Samples": 9861,
+      "Simple_Accuracy": "76.00%",
+      "Weighted_Accuracy": "87.80%"
+    },
+    {
+      "Pair": "USD/CHF",
+      "Samples": 9861,
+      "Simple_Accuracy": "62.38%",
+      "Weighted_Accuracy": "80.87%"
+    },
+    {
+      "Pair": "USD/JPY",
+      "Samples": 9861,
+      "Simple_Accuracy": "55.06%",
+      "Weighted_Accuracy": "77.20%"
+    },
+    {
+      "Pair": "XAU/USD",
+      "Samples": 9370,
+      "Simple_Accuracy": "38.56%",
+      "Weighted_Accuracy": "68.62%"
+    }
+  ],
+  "training_date": "2025-10-25T13:01:58.969682"
+}

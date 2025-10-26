@@ -369,7 +369,7 @@ const ProfileScreen = ({ navigation }) => {
         title: "Апп-ын тухай",
         content: `ℹ️ ФОРЕКС СИГНАЛ АПП
 
-Хувилбар: 1.0.1
+Хувилбар: 1.1.1
 Шинэчилсэн: 2025.10.18
 
 🎯 Зорилго:
@@ -723,7 +723,7 @@ GitHub: github.com/Asura-lab/Predictrix
               </View>
               <Text style={styles.menuItemText}>Хувилбар</Text>
             </View>
-            <Text style={styles.versionText}>1.0.0</Text>
+            <Text style={styles.versionText}>1.1.0</Text>
           </View>
         </View>
 
