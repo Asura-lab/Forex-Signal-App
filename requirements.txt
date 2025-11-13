@@ -8,6 +8,8 @@ numpy>=1.24.0
 # === МАШИН СУРГАЛТ ===
 scikit-learn>=1.3.0
 hmmlearn>=0.3.0
+tensorflow>=2.13.0
+ta>=0.11.0
 
 # === DATABASE & AUTHENTICATION ===
 pymongo>=4.6.0
