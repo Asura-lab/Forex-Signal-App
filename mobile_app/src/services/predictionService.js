@@ -77,7 +77,8 @@ export const getSignalIcon = (signalName) => {
   const icons = {
     STRONG_BUY: "trending-up",
     BUY: "arrow-up",
-    NEUTRAL: "minus",
+    // 'minus' is not a valid Ionicons name; use 'remove-outline' which is available
+    NEUTRAL: "remove-outline",
     SELL: "arrow-down",
     STRONG_SELL: "trending-down",
   };

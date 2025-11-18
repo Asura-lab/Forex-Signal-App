@@ -1,0 +1,277 @@
+// Forex Signal App Database Schema
+// DBML format for dbdiagram.io
+// MongoDB collections represented as tables
+// Date: November 2, 2025
+// Database: users_db
+
+// ==================== AUTHENTICATION & USER MANAGEMENT ====================
+
+// Main users collection
+Table users {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  name varchar [not null, note: 'User full name']
+  email varchar [unique, not null, note: 'User email address']
+  password varchar [not null, note: 'Bcrypt hashed password']
+  email_verified boolean [default: false, note: 'Email verification status']
+  created_at timestamp [not null, note: 'Account creation timestamp']
+  verified_at timestamp [note: 'Email verification timestamp']
+  updated_at timestamp [note: 'Last profile update timestamp']
+  last_login timestamp [note: 'Last login timestamp']
+  
+  Indexes {
+    email [unique, name: 'idx_email']
+    created_at [name: 'idx_created_at']
+  }
+}
+
+// Email verification codes (temporary, auto-delete after 10 min)
+Table verification_codes {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  email varchar [not null, note: 'User email for verification']
+  name varchar [not null, note: 'User name from registration']
+  password varchar [not null, note: 'Hashed password (temporary storage)']
+  code varchar(6) [not null, note: '6-digit verification code']
+  expires_at timestamp [not null, note: 'Code expiration time (10 min)']
+  created_at timestamp [not null, note: 'Code generation timestamp']
+  is_existing_user boolean [default: false, note: 'Flag for existing user re-verification']
+  
+  Indexes {
+    email [name: 'idx_email']
+    (expires_at) [name: 'idx_ttl', note: 'TTL index - auto delete expired codes']
+  }
+}
+
+// Password reset codes (temporary, auto-delete after 10 min)
+Table reset_codes {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  email varchar [not null, note: 'User email for password reset']
+  code varchar(6) [not null, note: '6-digit reset code']
+  expires_at timestamp [not null, note: 'Code expiration time (10 min)']
+  created_at timestamp [not null, note: 'Code generation timestamp']
+  
+  Indexes {
+    email [name: 'idx_email']
+    (expires_at) [name: 'idx_ttl', note: 'TTL index - auto delete expired codes']
+  }
+}
+
+// ==================== PREDICTIONS & SIGNALS ====================
+
+// ML model predictions history
+Table predictions {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [not null, note: 'Reference to users._id']
+  currency_pair varchar(10) [not null, note: 'EUR_USD, GBP_USD, etc.']
+  timeframe varchar(10) [not null, note: '15min, 30min, 60min']
+  prediction varchar(10) [not null, note: 'UP, DOWN, NEUTRAL']
+  confidence float [not null, note: 'Prediction confidence (0-1)']
+  probabilities json [note: 'Class probabilities {UP: 0.6, DOWN: 0.2, NEUTRAL: 0.2}']
+  current_price float [not null, note: 'Price at prediction time']
+  predicted_price float [note: 'Expected price after timeframe']
+  model_version varchar [note: 'Model version used']
+  created_at timestamp [not null, note: 'Prediction timestamp']
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    currency_pair [name: 'idx_currency_pair']
+    (user_id, created_at) [name: 'idx_user_history']
+    created_at [name: 'idx_created_at']
+  }
+}
+
+// Trading signals generated from predictions
+Table signals {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [not null, note: 'Reference to users._id']
+  currency_pair varchar(10) [not null, note: 'Trading pair']
+  signal_type varchar(10) [not null, note: 'BUY, SELL, HOLD']
+  entry_price float [not null, note: 'Recommended entry price']
+  stop_loss float [note: 'Stop loss price']
+  take_profit float [note: 'Take profit price']
+  risk_reward_ratio float [note: 'Risk/Reward ratio']
+  confidence float [not null, note: 'Signal confidence']
+  timeframe varchar(10) [not null, note: '15min, 30min, 60min']
+  status varchar(20) [default: 'active', note: 'active, executed, expired, cancelled']
+  created_at timestamp [not null, note: 'Signal generation time']
+  expires_at timestamp [note: 'Signal expiration time']
+  executed_at timestamp [note: 'Signal execution time']
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    (user_id, status) [name: 'idx_user_status']
+    currency_pair [name: 'idx_currency_pair']
+    created_at [name: 'idx_created_at']
+  }
+}
+
+// ==================== USER PREFERENCES & SETTINGS ====================
+
+// User watchlist for currency pairs
+Table watchlist {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [not null, note: 'Reference to users._id']
+  currency_pair varchar(10) [not null, note: 'Watched currency pair']
+  added_at timestamp [not null, note: 'When pair was added to watchlist']
+  notes varchar [note: 'User notes about this pair']
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    (user_id, currency_pair) [unique, name: 'idx_user_pair']
+  }
+}
+
+// User notification preferences
+Table notification_settings {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [unique, not null, note: 'Reference to users._id']
+  email_notifications boolean [default: true, note: 'Enable email notifications']
+  push_notifications boolean [default: true, note: 'Enable push notifications']
+  signal_alerts boolean [default: true, note: 'Alert on new signals']
+  price_alerts boolean [default: true, note: 'Alert on price thresholds']
+  prediction_alerts boolean [default: true, note: 'Alert on new predictions']
+  min_confidence float [default: 0.7, note: 'Minimum confidence for alerts (0-1)']
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  
+  Indexes {
+    user_id [unique, name: 'idx_user_id']
+  }
+}
+
+// User custom price alerts
+Table price_alerts {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [not null, note: 'Reference to users._id']
+  currency_pair varchar(10) [not null, note: 'Currency pair']
+  alert_type varchar(20) [not null, note: 'above, below, crosses']
+  target_price float [not null, note: 'Alert trigger price']
+  current_price float [note: 'Price when alert was created']
+  status varchar(20) [default: 'active', note: 'active, triggered, cancelled']
+  triggered_at timestamp [note: 'When alert was triggered']
+  created_at timestamp [not null]
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    (user_id, status) [name: 'idx_user_status']
+    currency_pair [name: 'idx_currency_pair']
+  }
+}
+
+// ==================== TRADING HISTORY & ANALYTICS ====================
+
+// User trading history
+Table trades {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [not null, note: 'Reference to users._id']
+  signal_id varchar [note: 'Reference to signals._id if from signal']
+  currency_pair varchar(10) [not null, note: 'Trading pair']
+  trade_type varchar(10) [not null, note: 'BUY, SELL']
+  entry_price float [not null, note: 'Entry price']
+  exit_price float [note: 'Exit price']
+  volume float [not null, note: 'Trade volume/lot size']
+  stop_loss float [note: 'Stop loss price']
+  take_profit float [note: 'Take profit price']
+  profit_loss float [note: 'Profit/Loss amount']
+  profit_loss_pips float [note: 'Profit/Loss in pips']
+  status varchar(20) [default: 'open', note: 'open, closed, cancelled']
+  opened_at timestamp [not null, note: 'Trade open time']
+  closed_at timestamp [note: 'Trade close time']
+  notes varchar [note: 'User notes']
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    (user_id, status) [name: 'idx_user_status']
+    signal_id [name: 'idx_signal_id']
+    opened_at [name: 'idx_opened_at']
+  }
+}
+
+// User portfolio summary
+Table portfolio {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [unique, not null, note: 'Reference to users._id']
+  total_trades integer [default: 0, note: 'Total number of trades']
+  winning_trades integer [default: 0, note: 'Number of winning trades']
+  losing_trades integer [default: 0, note: 'Number of losing trades']
+  total_profit_loss float [default: 0, note: 'Total P/L']
+  win_rate float [default: 0, note: 'Win rate percentage']
+  average_profit float [default: 0, note: 'Average profit per trade']
+  average_loss float [default: 0, note: 'Average loss per trade']
+  best_trade float [default: 0, note: 'Best trade profit']
+  worst_trade float [default: 0, note: 'Worst trade loss']
+  total_pips float [default: 0, note: 'Total pips gained/lost']
+  last_updated timestamp [not null, note: 'Last calculation time']
+  
+  Indexes {
+    user_id [unique, name: 'idx_user_id']
+  }
+}
+
+// ==================== MARKET DATA & CACHE ====================
+
+// Cached market rates
+Table market_rates {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  currency_pair varchar(10) [unique, not null, note: 'Currency pair']
+  bid float [not null, note: 'Bid price']
+  ask float [not null, note: 'Ask price']
+  last float [not null, note: 'Last traded price']
+  spread float [note: 'Bid-Ask spread']
+  change_24h float [note: '24h price change']
+  change_percent_24h float [note: '24h change percentage']
+  volume_24h float [note: '24h trading volume']
+  high_24h float [note: '24h high']
+  low_24h float [note: '24h low']
+  data_source varchar [note: 'MT5, API, etc.']
+  updated_at timestamp [not null, note: 'Last update time']
+  
+  Indexes {
+    currency_pair [unique, name: 'idx_currency_pair']
+    updated_at [name: 'idx_updated_at']
+  }
+}
+
+// ==================== ADMIN & MONITORING ====================
+
+// System audit logs
+Table audit_logs {
+  _id varchar [primary key, note: 'MongoDB ObjectId']
+  user_id varchar [note: 'Reference to users._id']
+  action varchar [not null, note: 'login, register, predict, trade, etc.']
+  resource varchar [note: 'Resource accessed']
+  ip_address varchar [note: 'User IP address']
+  user_agent varchar [note: 'Browser/App user agent']
+  status varchar(20) [not null, note: 'success, failed']
+  error_message varchar [note: 'Error details if failed']
+  created_at timestamp [not null, note: 'Action timestamp']
+  
+  Indexes {
+    user_id [name: 'idx_user_id']
+    action [name: 'idx_action']
+    created_at [name: 'idx_created_at']
+    (created_at) [name: 'idx_ttl', note: 'Optional: auto-delete old logs']
+  }
+}
+
+// ==================== RELATIONSHIPS ====================
+
+// Authentication relationships
+Ref: verification_codes.email > users.email [note: 'User requests email verification']
+Ref: reset_codes.email > users.email [note: 'User requests password reset']
+
+// Predictions & Signals relationships
+Ref: predictions.user_id > users._id [note: 'User owns predictions']
+Ref: signals.user_id > users._id [note: 'User receives signals']
+
+// User Preferences relationships
+Ref: watchlist.user_id > users._id [note: 'User creates watchlist']
+Ref: notification_settings.user_id - users._id [note: 'User has notification settings (1:1)']
+Ref: price_alerts.user_id > users._id [note: 'User sets price alerts']
+
+// Trading & Portfolio relationships
+Ref: trades.user_id > users._id [note: 'User executes trades']
+Ref: trades.signal_id > signals._id [note: 'Trade based on signal']
+Ref: portfolio.user_id - users._id [note: 'User has portfolio (1:1)']
+
+// Admin relationships
+Ref: audit_logs.user_id > users._id [note: 'User actions are logged']

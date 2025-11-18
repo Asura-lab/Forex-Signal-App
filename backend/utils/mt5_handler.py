@@ -265,6 +265,7 @@ class MT5Handler:
                         'ask': data.get('ask'),
                         'spread': data.get('spread'),
                         'time': data.get('time'),
+                        'chg': data.get('chg'),
                         'source': 'MT5'
                     }
             # XAUUSD -> XAU_USD (Алт)
@@ -283,6 +284,7 @@ class MT5Handler:
                         'ask': data.get('ask'),
                         'spread': data.get('spread'),
                         'time': data.get('time'),
+                        'chg': data.get('chg'),
                         'source': 'MT5'
                     }
         

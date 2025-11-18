@@ -21,6 +21,7 @@ import numpy as np
 import pickle
 import os
 import random
+import re
 
 # Import configuration
 from config.settings import (
@@ -32,8 +33,12 @@ from config.settings import (
     MT5_ENABLED, MT5_LOGIN, MT5_PASSWORD, MT5_SERVER
 )
 
-# Import MT5 handler
-from utils.mt5_handler import initialize_mt5, get_mt5_live_rates, shutdown_mt5, mt5_handler
+# Import UniRate handler (PRIMARY - EUR/USD only)
+from utils.unirate_handler import get_unirate_live_rate, get_unirate_historical
+
+# MT5 handler (DISABLED - not used)
+# from utils.mt5_handler import initialize_mt5, get_mt5_live_rates, shutdown_mt5, mt5_handler
+mt5_handler = None  # Placeholder
 
 app = Flask(__name__)
 CORS(app)
@@ -256,14 +261,8 @@ load_multi_timeframe_models()
 
 # ==================== MT5 INITIALIZATION ====================
 
-if MT5_ENABLED:
-    print("🔄 MT5 холболт эхлүүлж байна...")
-    if initialize_mt5(MT5_LOGIN, MT5_PASSWORD, MT5_SERVER):
-        print("✓ MT5 бэлэн болсон")
-    else:
-        print("⚠ MT5 холболт амжилтгүй")
-else:
-    print("ℹ MT5 идэвхгүй байна")
+# MT5 DISABLED - Using UniRate API only
+print("ℹ️  MT5 disabled - using UniRate API for EUR/USD")
 
 # ==================== AUTH HELPER FUNCTIONS ====================
 
@@ -1059,11 +1058,29 @@ def predict():
                         df[col] = 0.0
 
                 # Ensure pair one-hot columns reflect the current currency_pair
+                # Clear any existing pair_* columns then set the correct one
                 try:
-                    if metadata and 'pairs' in metadata and currency_pair in metadata['pairs']:
-                        pair_idx = metadata['pairs'].index(currency_pair)
-                        pair_col_name = f'pair_{pair_idx}'
-                        df[pair_col_name] = 1.0
+                    if metadata and 'pairs' in metadata and isinstance(metadata['pairs'], (list, tuple)):
+                        # Normalize both sides to use UNDERSCORE and uppercase
+                        norm_pairs = [p.replace('/', '_').upper() for p in metadata['pairs']]
+                        target = currency_pair.replace('/', '_').upper()
+
+                        # Clear all pair_* columns that may exist
+                        for i, _ in enumerate(norm_pairs):
+                            col = f'pair_{i}'
+                            if col in df.columns:
+                                df[col] = 0.0
+
+                        if target in norm_pairs:
+                            pair_idx = norm_pairs.index(target)
+                            pair_col_name = f'pair_{pair_idx}'
+                            df[pair_col_name] = 1.0
+                        # Debug: print mapping information so we can verify which pair column is set
+                        try:
+                            set_cols = {c: df[c].iloc[-1] for c in df.columns if c.startswith('pair_')}
+                        except Exception:
+                            set_cols = None
+                        print(f"   Debug - timeframe={timeframe}, norm_pairs={norm_pairs}, target={target}, pair_idx={locals().get('pair_idx', None)}, set_pair_cols={set_cols}")
                 except Exception:
                     pass
 
@@ -1113,6 +1130,12 @@ def predict():
 
                         predicted_class = int(np.argmax(probs))
 
+                        # Debug: print raw prediction outputs for inspection
+                        try:
+                            print(f"   Debug - timeframe={timeframe}, y_pred_shape={getattr(y_pred, 'shape', None)}, probs={np.array2string(np.array(probs), precision=4, separator=',')}, predicted_class={predicted_class}")
+                        except Exception:
+                            pass
+
                         if conf_out is not None:
                             if conf_out.ndim == 2 and conf_out.shape[0] == 1:
                                 confidence = float(conf_out[0][0])
@@ -1129,14 +1152,36 @@ def predict():
                             predicted_class = int(np.argmax(y_pred))
                             confidence = float(np.array(y_pred).ravel()[predicted_class])
                     
-                    # Decode signal
+                    # Decode signal - some encoders in model metadata actually contain currency pair names
+                    # Detect if encoder.classes_ looks like signal labels (no '/' or '_' present). If not, fall back.
+                    default_labels = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY']
+                    signal_name = None
                     if encoder:
                         try:
-                            signal_name = encoder.inverse_transform([predicted_class])[0]
-                        except:
-                            signal_name = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY'][predicted_class % 5]
+                            classes = getattr(encoder, 'classes_', None)
+                            use_encoder = False
+                            if isinstance(classes, (list, tuple, np.ndarray)) and len(classes) > 0:
+                                # If classes look like currency pairs, avoid using encoder to decode signals
+                                all_str = all(isinstance(c, str) for c in classes)
+                                if all_str:
+                                    # Normalize classes (remove non-alnum) and compare to known currency pairs
+                                    norm_classes = [re.sub(r'[^A-Z0-9]', '', str(c).upper()) for c in classes]
+                                    norm_known = [re.sub(r'[^A-Z0-9]', '', str(p).upper()) for p in CURRENCY_PAIRS]
+                                    # If any normalized class matches a known pair, treat encoder as pair-encoder
+                                    if any(nc in norm_known for nc in norm_classes):
+                                        use_encoder = False
+                                    else:
+                                        # If none look like pairs and none contain slash/underscore, assume signal labels
+                                        if not any(('/' in c or '_' in c) for c in classes):
+                                            use_encoder = True
+                            if use_encoder:
+                                signal_name = encoder.inverse_transform([predicted_class])[0]
+                            else:
+                                signal_name = default_labels[predicted_class % len(default_labels)]
+                        except Exception:
+                            signal_name = default_labels[predicted_class % len(default_labels)]
                     else:
-                        signal_name = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY'][predicted_class % 5]
+                        signal_name = default_labels[predicted_class % len(default_labels)]
                     
                     # Get current price
                     last_close = float(recent_df['close'].iloc[-1])
@@ -1260,11 +1305,22 @@ def predict_file():
                         df[col] = 0.0
 
                 # Ensure pair one-hot columns reflect the current currency_pair (if available)
+                # Ensure pair one-hot columns reflect the current currency_pair (if available)
                 try:
-                    if metadata and 'pairs' in metadata and currency_pair in metadata['pairs']:
-                        pair_idx = metadata['pairs'].index(currency_pair)
-                        pair_col_name = f'pair_{pair_idx}'
-                        df[pair_col_name] = 1.0
+                    if metadata and 'pairs' in metadata and isinstance(metadata['pairs'], (list, tuple)):
+                        norm_pairs = [p.replace('/', '_').upper() for p in metadata['pairs']]
+                        target = currency_pair.replace('/', '_').upper()
+
+                        # Clear existing pair flags
+                        for i, _ in enumerate(norm_pairs):
+                            col = f'pair_{i}'
+                            if col in df.columns:
+                                df[col] = 0.0
+
+                        if target in norm_pairs:
+                            pair_idx = norm_pairs.index(target)
+                            pair_col_name = f'pair_{pair_idx}'
+                            df[pair_col_name] = 1.0
                 except Exception:
                     pass
 
@@ -1321,13 +1377,26 @@ def predict_file():
                         predicted_class = int(np.argmax(dir_probs))
                         confidence = float(dir_probs[predicted_class])
 
+                    # Decode signal safely: some encoders actually encode currency pairs
+                    default_labels = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY']
+                    signal_name = None
                     if encoder:
                         try:
-                            signal_name = encoder.inverse_transform([predicted_class])[0]
+                            classes = getattr(encoder, 'classes_', None)
+                            use_encoder = False
+                            if isinstance(classes, (list, tuple, np.ndarray)) and len(classes) > 0:
+                                all_str = all(isinstance(c, str) for c in classes)
+                                if all_str and not any(('/' in c or '_' in c) for c in classes):
+                                    use_encoder = True
+                            if use_encoder:
+                                signal_name = encoder.inverse_transform([predicted_class])[0]
+                            else:
+                                signal_name = default_labels[predicted_class % len(default_labels)]
                         except Exception:
-                            signal_name = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY'][predicted_class % 5]
+                            signal_name = default_labels[predicted_class % len(default_labels)]
                     else:
-                        signal_name = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY'][predicted_class % 5]
+                        signal_name = default_labels[predicted_class % len(default_labels)]
+                
 
                     last_close = float(recent_df['close'].iloc[-1]) if 'close' in recent_df.columns else float(recent_df.iloc[-1][available_features.index(available_features[0])])
                     prev_close = float(recent_df['close'].iloc[-2]) if 'close' in recent_df.columns else last_close
@@ -1379,19 +1448,57 @@ def get_currencies():
 @app.route('/rates/live', methods=['GET'])
 def get_live_rates():
     """
-    Бодит цагийн валютын ханш авах (MT5)
+    Бодит цагийн валютын ханш авах (UniRate API for EUR/USD)
     
     Query params:
         currencies: Optional comma-separated list
-        source: 'mt5' (default)
+        source: 'unirate' or 'mt5'
     """
     try:
         currencies_param = request.args.get('currencies')
+        source_param = request.args.get('source', 'unirate').lower()
         
         currencies = None
         if currencies_param:
             currencies = [c.strip().upper() for c in currencies_param.split(',')]
         
+        # ⭐ Priority: UniRate API for EUR/USD
+        if source_param == 'unirate' or not MT5_ENABLED:
+            print("📊 Using UniRate API for EUR/USD...")
+            
+            try:
+                result = get_unirate_live_rate()
+                
+                if result['success']:
+                    return jsonify({
+                        'success': True,
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'source': 'UniRate API',
+                        'rates': {
+                            'EUR_USD': {
+                                'rate': result['rate'],
+                                'bid': result['bid'],
+                                'ask': result['ask'],
+                                'spread': result['spread'],
+                                'time': result['time']
+                            }
+                        },
+                        'count': 1
+                    }), 200
+                else:
+                    return jsonify({
+                        'success': False,
+                        'error': f"UniRate API error: {result.get('error')}"
+                    }), 503
+            
+            except Exception as e:
+                print(f"❌ UniRate error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'UniRate API failed: {str(e)}'
+                }), 503
+        
+        # Fallback to MT5
         use_mt5 = MT5_ENABLED
         
         print(f"🔍 /rates/live: MT5_ENABLED={MT5_ENABLED}, connected={mt5_handler.connected if MT5_ENABLED else 'N/A'}")
@@ -1411,22 +1518,76 @@ def get_live_rates():
                 else:
                     mt5_symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCAD', 'USDCHF', 'XAUUSD']
                 
-                mt5_rates = get_mt5_live_rates(mt5_symbols)
-                
-                if mt5_rates:
+                # Get raw MT5 ticks first so we can compute 24h pip change (chg)
+                raw_rates = mt5_handler.get_live_rates(mt5_symbols)
+
+                enhanced = {}
+                for symbol, data in (raw_rates or {}).items():
+                    try:
+                        # Compute current rate (mid) or last
+                        if 'bid' in data and 'ask' in data:
+                            current_rate = (data['bid'] + data['ask']) / 2.0
+                        elif 'last' in data:
+                            current_rate = float(data['last'])
+                        else:
+                            continue
+
+                        item = {
+                            'rate': current_rate,
+                            'bid': data.get('bid'),
+                            'ask': data.get('ask'),
+                            'spread': data.get('spread'),
+                            'time': data.get('time'),
+                            'source': 'MT5'
+                        }
+
+                        # Try to compute 24h ago price using M1 bars; prefer bulk fetch then date-range
+                        try:
+                            hist = mt5_handler.get_historical_data(symbol, 'M1', count=1441)
+                            rows = len(hist) if hist is not None else 0
+                            if hist is None or rows < 2:
+                                # Fallback: use date-range for last 24 hours
+                                try:
+                                    start_dt = datetime.utcnow() - timedelta(days=1)
+                                    end_dt = datetime.utcnow()
+                                    hist = mt5_handler.get_historical_data(symbol, 'M1', start_date=start_dt, end_date=end_dt)
+                                except Exception:
+                                    hist = None
+
+                            if hist is not None and len(hist) >= 1:
+                                old_close = float(hist['close'].iloc[0])
+                                s_info = mt5_handler.get_symbol_info(symbol)
+                                if s_info and s_info.get('point'):
+                                    point = float(s_info['point'])
+                                    pip_change = (current_rate - old_close) / point
+                                    item['chg'] = float(f"{pip_change:.1f}")
+                                else:
+                                    item['chg'] = float(current_rate - old_close)
+                            else:
+                                item['chg'] = None
+                                print(f"   Debug: insufficient historical bars for {symbol} (rows={rows})")
+                        except Exception as hist_err:
+                            print(f"   Warning: could not compute 24h change for {symbol}: {hist_err}")
+                            item['chg'] = None
+
+                        enhanced[symbol] = item
+                    except Exception as item_err:
+                        print(f"   Warning processing symbol {symbol}: {item_err}")
+
+                if enhanced:
+                    converted = mt5_handler.convert_to_pair_format(enhanced)
                     timestamp = datetime.now()
-                    if mt5_rates:
-                        first_rate = next(iter(mt5_rates.values()))
-                        if 'time' in first_rate:
-                            timestamp = first_rate['time']
-                    
-                    print(f"   ✓ MT5-аас {len(mt5_rates)} ханш татагдлаа")
+                    first_rate = next(iter(converted.values())) if converted else None
+                    if first_rate and 'time' in first_rate:
+                        timestamp = first_rate['time']
+
+                    print(f"   ✓ MT5-аас {len(converted)} ханш татагдлаа")
                     return jsonify({
                         'success': True,
                         'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
                         'source': 'MT5',
-                        'rates': mt5_rates,
-                        'count': len(mt5_rates)
+                        'rates': converted,
+                        'count': len(converted)
                     })
                 else:
                     print("   ⚠ MT5 өгөгдөл хоосон")
@@ -1447,14 +1608,15 @@ def get_live_rates():
 @app.route('/rates/specific', methods=['GET'])
 def get_specific_rate():
     """
-    Тодорхой валютын хослолын ханш авах
+    Тодорхой валютын хослолын ханш авах (UniRate API for EUR/USD)
     
     Query params:
         pair: Currency pair (e.g., ?pair=EUR_USD or ?pair=EUR/USD)
-        source: 'mt5' (default)
+        source: 'unirate' or 'mt5'
     """
     try:
         pair = request.args.get('pair', '').upper()
+        source_param = request.args.get('source', 'unirate').lower()
         
         print(f"💱 Get specific rate хүсэлт: {pair}")
         
@@ -1463,54 +1625,51 @@ def get_specific_rate():
         
         normalized_pair = pair.replace('/', '_')
         
-        if normalized_pair not in CURRENCY_PAIRS:
-            return jsonify({'success': False, 'error': f'"{pair}" дэмжигдэхгүй'}), 400
+        # Only EUR_USD supported
+        if normalized_pair != 'EUR_USD':
+            return jsonify({
+                'success': False,
+                'error': f'Only EUR_USD is supported. Got: {pair}'
+            }), 400
         
         pair = normalized_pair
-        use_mt5 = MT5_ENABLED
         
-        if use_mt5:
+        # ⭐ Priority: UniRate API for EUR/USD
+        if source_param == 'unirate' or not MT5_ENABLED:
+            print("📊 Using UniRate API for EUR/USD...")
+            
             try:
-                print(f"📊 MT5-аас {pair} ханш татаж байна...")
+                result = get_unirate_live_rate()
                 
-                mt5_symbol = pair.replace('_', '')
-                if pair == 'EUR_USD':
-                    mt5_symbol = 'EURUSD'
-                elif pair == 'GBP_USD':
-                    mt5_symbol = 'GBPUSD'
-                elif pair == 'USD_JPY':
-                    mt5_symbol = 'USDJPY'
-                elif pair == 'USD_CAD':
-                    mt5_symbol = 'USDCAD'
-                elif pair == 'USD_CHF':
-                    mt5_symbol = 'USDCHF'
-                elif pair == 'XAU_USD':
-                    mt5_symbol = 'XAUUSD'
-                
-                mt5_rates = get_mt5_live_rates([mt5_symbol])
-                
-                if mt5_rates and pair in mt5_rates:
-                    rate_data = mt5_rates[pair]
-                    timestamp = rate_data.get('time', datetime.now())
-                    
-                    print(f"   ✓ MT5-аас {pair} ханш татагдлаа")
+                if result['success']:
                     return jsonify({
                         'success': True,
-                        'pair': pair,
-                        'rate': rate_data.get('bid', rate_data.get('rate', 0)),
-                        'bid': rate_data.get('bid'),
-                        'ask': rate_data.get('ask'),
-                        'spread': rate_data.get('spread'),
-                        'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S') if isinstance(timestamp, datetime) else str(timestamp),
-                        'source': 'MT5'
-                    })
+                        'pair': 'EUR_USD',
+                        'rate': result['rate'],
+                        'bid': result['bid'],
+                        'ask': result['ask'],
+                        'spread': result['spread'],
+                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'source': 'UniRate API'
+                    }), 200
                 else:
-                    print(f"   ⚠ MT5 {pair} ханш олдсонгүй")
-                    
-            except Exception as mt5_error:
-                print(f"   ⚠ MT5 алдаа: {mt5_error}")
+                    return jsonify({
+                        'success': False,
+                        'error': f"UniRate API error: {result.get('error')}"
+                    }), 503
+            
+            except Exception as e:
+                print(f"❌ UniRate error: {e}")
+                return jsonify({
+                    'success': False,
+                    'error': f'UniRate API failed: {str(e)}'
+                }), 503
         
-        return jsonify({'success': False, 'error': 'MT5 идэвхгүй байна'}), 503
+        # MT5 fallback disabled
+        return jsonify({
+            'success': False,
+            'error': 'Only EUR/USD supported via UniRate API. MT5 disabled.'
+        }), 503
         
     except Exception as e:
         print(f"❌ Get specific rate error: {e}")

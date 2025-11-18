@@ -235,6 +235,21 @@ const SignalScreen = ({ route, navigation }) => {
     const signalColor = getSignalColor(signal_name);
     const iconName = getSignalIcon(signal_name);
 
+    // Simple direction detection: BUY -> up, SELL -> down, otherwise neutral
+    const direction = /BUY/i.test(signal_name)
+      ? 1
+      : /SELL/i.test(signal_name)
+      ? -1
+      : 0;
+    const directionLabel =
+      direction > 0 ? "Өснө" : direction < 0 ? "Буурна" : "Тогтвортой";
+    const directionIcon =
+      direction > 0
+        ? "arrow-up"
+        : direction < 0
+        ? "arrow-down"
+        : "remove-outline";
+
     return (
       <View key={timeframe} style={styles.timeframeCard}>
         <View style={styles.timeframeHeader}>
@@ -264,24 +279,18 @@ const SignalScreen = ({ route, navigation }) => {
           <View style={styles.metricDivider} />
 
           <View style={styles.metricItem}>
-            <Text style={styles.metricLabel}>Өөрчлөлт</Text>
-            <Text
-              style={[
-                styles.metricValue,
-                {
-                  color:
-                    price_change_percent > 0
-                      ? colors.success
-                      : price_change_percent < 0
-                      ? colors.error
-                      : colors.textLabel,
-                },
-              ]}
-            >
-              {price_change_percent > 0 ? "+" : ""}
-              {price_change_percent.toFixed(4)}%
-            </Text>
-            <Text style={styles.metricSubtext}>Сүүлийн үеийн</Text>
+            <Text style={styles.metricLabel}>Таамаглал</Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Ionicons name={directionIcon} size={16} color={signalColor} />
+              <Text
+                style={[
+                  styles.metricValue,
+                  { color: signalColor, marginLeft: 8 },
+                ]}
+              >
+                {directionLabel}
+              </Text>
+            </View>
           </View>
         </View>
 

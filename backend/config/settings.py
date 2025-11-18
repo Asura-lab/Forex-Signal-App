@@ -58,12 +58,10 @@ MODELS_DIR = BASE_DIR / 'models'
 
 # Supported currency pairs
 CURRENCY_PAIRS = [
-    'EUR_USD',
-    'GBP_USD',
-    'USD_CAD',
-    'USD_CHF',
-    'USD_JPY',
-    'XAU_USD'
+    'EUR_USD'  # Single pair focus for optimal model training
 ]
 
+# Disable MT5 (using UniRate API only)
+MT5_ENABLED = False
 print(f"✓ Configuration loaded from: {ENV_PATH}")
+print(f"ℹ️  MT5 disabled - Using UniRate API for EUR/USD")

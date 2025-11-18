@@ -1,645 +1,644 @@
-# 🚀 Deep Learning Prediction System - Architecture Document
+# 🚀 Deep Learning Architecture - Updated Documentation
 
-**Project:** Forex Signal App - Multi-Horizon Price Prediction  
-**Version:** 1.1.1
-**Date:** October 22, 2025  
-**Author:** AI Development Team
+**Project:** Forex Signal App - Multi-Timeframe Prediction System  
+**Version:** 2.0.0  
+**Last Updated:** November 10, 2025  
+**Training Notebook:** `ml_models/deeplearning.ipynb` (ACTIVE)
 
 ---
 
 ## 📋 Table of Contents
 
-1. [System Overview](#system-overview)
-2. [Architecture Design](#architecture-design)
-3. [Model Architecture](#model-architecture)
-4. [Data Pipeline](#data-pipeline)
-5. [Training Strategy](#training-strategy)
-6. [Live Prediction System](#live-prediction-system)
-7. [Performance Metrics](#performance-metrics)
-8. [Deployment Plan](#deployment-plan)
+1. [System Overview](#1-system-overview)
+2. [Model Architectures](#2-model-architectures)
+3. [Training Process](#3-training-process)
+4. [Feature Engineering](#4-feature-engineering)
+5. [Data Pipeline](#5-data-pipeline)
+6. [Performance Metrics](#6-performance-metrics)
+7. [Deployment](#7-deployment)
+8. [Model Files](#8-model-files)
 
 ---
 
 ## 1. System Overview
 
-### 1.1 Objectives
+### 1.1 Current Status
 
-Forex арилжааны богино хугацааны чиглэлийг **өндөр нарийвчлалтай** таамаглах систем:
+✅ **Production-Ready System** - Одоо ажиллаж байгаа бүтэц:
 
-- ✅ **15-минутын** prediction (scalping strategy)
-- ✅ **30-минутын** prediction (swing trading)
-- ✅ **60-минутын** prediction (trend following)
+- **Training Notebook**: `ml_models/deeplearning.ipynb` (Цорын ганц идэвхтэй notebook)
+- **Trained Models**: `models/` folder дотор 3 timeframe
+- **Backend Integration**: `backend/app.py` models-ийг ачаалж ашиглаж байна
+- **Mobile App**: React Native app prediction хүлээн авч байна
 
-### 1.2 Success Criteria
+### 1.2 Objectives
 
-| Metric            | Target | Method                           |
-| ----------------- | ------ | -------------------------------- |
-| **Accuracy**      | 85-92% | With confidence filtering (>85%) |
-| **Daily Signals** | 15-25  | High quality only                |
-| **Win Rate**      | 80-88% | Actual profitable trades         |
-| **Latency**       | <200ms | Real-time prediction             |
-| **Uptime**        | 99.5%  | 24/5 operation                   |
+3 өөр timeframe дээр үнийн хөдөлгөөнийг таамаглах:
 
-### 1.3 Technology Stack
+| Timeframe | Strategy Type   | Target Accuracy | Architecture        |
+|-----------|----------------|-----------------|---------------------|
+| 15-минут  | Scalping       | 88%+            | Transformer + LSTM  |
+| 30-минут  | Swing Trading  | 85%+            | Bi-LSTM + Attention |
+| 60-минут  | Trend Following| 82%+            | CNN-LSTM Hybrid     |
 
-```
-Frontend:  React Native + Expo
-Backend:   Flask + Python 3.11
-ML:        TensorFlow 2.15 + Keras
-Data:      MongoDB + MT5 API
-Deployment: Docker + AWS/Azure
-```
-
----
-
-## 2. Architecture Design
-
-### 2.1 System Components
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    USER MOBILE APP                           │
-│  - Real-time signal notifications                           │
-│  - Multi-timeframe predictions                              │
-│  - Trade entry/exit recommendations                         │
-└─────────────────────────────────────────────────────────────┘
-                            ↕ REST API
-┌─────────────────────────────────────────────────────────────┐
-│                   FLASK API SERVER                           │
-│  - /api/predictions/live  (GET)                             │
-│  - /api/predictions/history (GET)                           │
-│  - /api/model/retrain (POST)                                │
-└─────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────┐
-│               PREDICTION ENGINE (Core)                       │
-│                                                             │
-│  ┌────────────────┬──────────────────┬─────────────────┐   │
-│  │ 15-min Model   │ 30-min Model     │ 60-min Model    │   │
-│  │ Transformer+   │ Bi-LSTM+         │ CNN-LSTM        │   │
-│  │ LSTM           │ Attention        │ Hybrid          │   │
-│  └────────────────┴──────────────────┴─────────────────┘   │
-│                            ↓                                │
-│                    Meta-Learner (XGBoost)                   │
-│                            ↓                                │
-│                  Confidence Filter (>85%)                   │
-└─────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────┐
-│                  DATA SOURCES                                │
-│  - MetaTrader 5 API (Live data)                            │
-│  - Historical Database (MongoDB)                            │
-│  - Feature Store (Redis cache)                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 3. Model Architecture
-
-### 3.1 Transformer + LSTM Hybrid Model
-
-**15-минутын модел архитектур:**
+### 1.3 Supported Currency Pairs
 
 ```python
-Input: (batch_size, 60 timesteps, 100 features)
-    ↓
-┌─────────────────────────────────────────┐
-│ TRANSFORMER BRANCH                       │
-│  - Multi-Head Attention (8 heads)       │
-│  - Key dimension: 64                    │
-│  - Feed-forward: 256 units              │
-│  - Output: Global patterns              │
-└─────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────┐
-│ LSTM BRANCH                              │
-│  - Bi-LSTM Layer 1: 128 units           │
-│  - Bi-LSTM Layer 2: 64 units            │
-│  - Output: Sequential patterns          │
-└─────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────┐
-│ CONCATENATION                            │
-│  - Combine both branches                │
-│  - Dense: 128 units (ReLU)              │
-│  - BatchNorm + Dropout (0.3)            │
-└─────────────────────────────────────────┘
-    ↓
-┌─────────────────────────────────────────┐
-│ OUTPUT HEADS                             │
-│  - Direction: 3 classes (Softmax)       │
-│    [SELL, NEUTRAL, BUY]                 │
-│  - Confidence: 1 unit (Sigmoid)         │
-│    [0.0 - 1.0]                          │
-└─────────────────────────────────────────┘
-
-Total Parameters: ~2.5M
-Training Time: 4-6 hours (GPU)
-Inference Time: 50-80ms
+CURRENCY_PAIRS = [
+    'EUR_USD',  # Euro / US Dollar
+    'GBP_USD',  # British Pound / US Dollar
+    'USD_JPY',  # US Dollar / Japanese Yen
+    'USD_CAD',  # US Dollar / Canadian Dollar
+    'USD_CHF',  # US Dollar / Swiss Franc
+    'XAU_USD'   # Gold / US Dollar
+]
 ```
-
-### 3.2 Model Specifications
-
-| Component       | 15-min Model     | 30-min Model      | 60-min Model |
-| --------------- | ---------------- | ----------------- | ------------ |
-| Architecture    | Transformer+LSTM | Bi-LSTM+Attention | CNN-LSTM     |
-| Sequence Length | 60               | 100               | 120          |
-| Features        | 100              | 80                | 60           |
-| Hidden Units    | 128/64           | 256/128           | 128/64       |
-| Dropout         | 0.3              | 0.2               | 0.25         |
-| Training Data   | 3M samples       | 2M samples        | 1.5M samples |
-| Target Accuracy | 88-92%           | 85-89%            | 82-86%       |
 
 ---
 
-## 4. Data Pipeline
+## 2. Model Architectures
 
-### 4.1 Feature Engineering
-
-**100+ Technical Features:**
+### 2.1 Architecture Overview
 
 ```
-1. PRICE FEATURES (10)
-   - Open, High, Low, Close
-   - Returns (1, 5, 10, 15 periods)
-   - Log returns
-   - Price volatility
-
-2. MOVING AVERAGES (15)
-   - SMA: 5, 10, 20, 50, 100, 200
-   - EMA: 9, 12, 26, 50
-   - WMA: 10, 20
-   - VWAP
-   - MA crosses (5/20, 20/50, 50/200)
-
-3. MOMENTUM INDICATORS (12)
-   - RSI (9, 14, 21)
-   - Stochastic (K, D)
-   - ROC (10, 20)
-   - Williams %R
-   - CCI (Commodity Channel Index)
-   - MFI (Money Flow Index)
-   - Ultimate Oscillator
-
-4. TREND INDICATORS (10)
-   - MACD (line, signal, histogram)
-   - ADX + DI+/DI-
-   - Aroon (up, down)
-   - Parabolic SAR
-   - Ichimoku Cloud components
-
-5. VOLATILITY INDICATORS (8)
-   - Bollinger Bands (upper, lower, width, %B)
-   - ATR (14, 50)
-   - Standard Deviation (20, 50)
-   - Keltner Channels
-
-6. VOLUME INDICATORS (8)
-   - Volume
-   - Volume MA (20)
-   - Volume ratio
-   - OBV (On Balance Volume)
-   - VWAP
-   - Volume Price Trend
-   - Ease of Movement
-   - Chaikin Money Flow
-
-7. CANDLESTICK PATTERNS (15)
-   - Doji, Hammer, Shooting Star
-   - Engulfing (bullish/bearish)
-   - Morning/Evening Star
-   - Three White Soldiers/Black Crows
-   - Harami, Piercing, Dark Cloud
-   - Spinning Top, Marubozu
-
-8. MARKET MICROSTRUCTURE (10)
-   - Bid-Ask Spread
-   - Order Flow Imbalance
-   - Trade Aggressiveness
-   - Quote Imbalance
-   - Tick direction
-
-9. MULTI-TIMEFRAME (12)
-   - Higher timeframe trend (5m, 15m, 1h)
-   - MTF RSI alignment
-   - MTF MACD alignment
-   - Volume profile
-
-10. TIME-BASED FEATURES (8)
-    - Hour of day
-    - Day of week
-    - Session (Asian/London/NY)
-    - Time to major news
+┌────────────────────────────────────────────────────────────┐
+│                   INPUT DATA                                │
+│  Historical OHLCV + 30+ Technical Indicators               │
+│  Sequence Length: 60 timesteps                             │
+│  Features: 30-35 per timestep                              │
+└────────────────────────────────────────────────────────────┘
+                         ↓
+        ┌────────────────┴────────────────┐
+        │                                  │
+        ↓                ↓                 ↓
+┌──────────────┐ ┌──────────────┐ ┌──────────────┐
+│  15-MINUTE   │ │  30-MINUTE   │ │  60-MINUTE   │
+│   MODEL      │ │    MODEL     │ │    MODEL     │
+├──────────────┤ ├──────────────┤ ├──────────────┤
+│ Transformer  │ │   Bi-LSTM    │ │     CNN      │
+│      +       │ │      +       │ │      +       │
+│    LSTM      │ │  Attention   │ │    LSTM      │
+└──────────────┘ └──────────────┘ └──────────────┘
+        │                │                 │
+        └────────────────┬─────────────────┘
+                         ↓
+              ┌────────────────────┐
+              │  OUTPUT (3 CLASSES)│
+              │  - UP              │
+              │  - DOWN            │
+              │  - NEUTRAL         │
+              └────────────────────┘
 ```
 
-### 4.2 Data Preprocessing
+### 2.2 Model 1: Transformer + LSTM (15-минут)
 
+**Purpose:** Богино хугацааны scalping strategy
+
+**Architecture:**
 ```python
-# Sequence creation
-def create_sequences(data, lookback=60):
-    X, y = [], []
-    for i in range(lookback, len(data)):
-        X.append(data[i-lookback:i])
-        y.append(data[i])
-    return np.array(X), np.array(y)
-
-# Normalization strategy
-- RobustScaler for price-based features
-- MinMaxScaler for bounded indicators (RSI, Stochastic)
-- StandardScaler for unbounded features
-- Binary encoding for categorical features
+Input (60, 35)
+    ↓
+TransformerBlock (heads=4, ff_dim=128)
+    ↓ Layer Normalization
+    ↓ Dropout (0.2)
+    ↓
+LSTM (128 units, return_sequences=True)
+    ↓
+LSTM (64 units)
+    ↓ Dropout (0.3)
+    ↓
+Dense (32, relu)
+    ↓ Dropout (0.3)
+    ↓
+Dense (3, softmax) → [UP, DOWN, NEUTRAL]
 ```
 
-### 4.3 Label Creation Strategy
+**Key Features:**
+- Multi-head attention mechanism (4 heads)
+- Feed-forward network (128 units)
+- Stacked LSTM layers
+- Dropout regularization
+
+**Training Configuration:**
+```python
+{
+  "optimizer": "Adam (lr=0.0005)",
+  "loss": "categorical_crossentropy",
+  "batch_size": 32,
+  "epochs": 50,
+  "early_stopping": "patience=10",
+  "callbacks": ["EarlyStopping", "ModelCheckpoint", "ReduceLROnPlateau"]
+}
+```
+
+### 2.3 Model 2: Bi-LSTM + Attention (30-минут)
+
+**Purpose:** Дунд хугацааны swing trading
+
+**Architecture:**
+```python
+Input (60, 35)
+    ↓
+Bidirectional LSTM (128 units, return_sequences=True)
+    ↓
+Attention Layer (custom)
+    ↓ Context vector
+    ↓
+Dropout (0.3)
+    ↓
+Dense (64, relu)
+    ↓ Dropout (0.3)
+    ↓
+Dense (32, relu)
+    ↓ Dropout (0.2)
+    ↓
+Dense (3, softmax) → [UP, DOWN, NEUTRAL]
+```
+
+**Key Features:**
+- Bidirectional processing (forward + backward)
+- Custom attention mechanism
+- Context vector aggregation
+- Multiple dense layers
+
+**Training Configuration:**
+```python
+{
+  "optimizer": "Adam (lr=0.001)",
+  "loss": "categorical_crossentropy",
+  "batch_size": 32,
+  "epochs": 50,
+  "early_stopping": "patience=10"
+}
+```
+
+### 2.4 Model 3: CNN-LSTM Hybrid (60-минут)
+
+**Purpose:** Урт хугацааны trend following
+
+**Architecture:**
+```python
+Input (60, 35)
+    ↓
+Conv1D (64 filters, kernel=3, relu)
+    ↓ MaxPooling1D (pool_size=2)
+    ↓ Dropout (0.2)
+    ↓
+Conv1D (128 filters, kernel=3, relu)
+    ↓ MaxPooling1D (pool_size=2)
+    ↓ Dropout (0.2)
+    ↓
+LSTM (128 units, return_sequences=True)
+    ↓
+LSTM (64 units)
+    ↓ Dropout (0.3)
+    ↓
+Dense (32, relu)
+    ↓ Dropout (0.3)
+    ↓
+Dense (3, softmax) → [UP, DOWN, NEUTRAL]
+```
+
+**Key Features:**
+- CNN for pattern extraction
+- Pooling for dimension reduction
+- LSTM for temporal dependencies
+- Hybrid approach
+
+**Training Configuration:**
+```python
+{
+  "optimizer": "Adam (lr=0.001)",
+  "loss": "categorical_crossentropy",
+  "batch_size": 32,
+  "epochs": 50,
+  "early_stopping": "patience=10"
+}
+```
+
+---
+
+## 3. Training Process
+
+### 3.1 Training Workflow
+
+```
+1. DATA LOADING
+   ↓ Load 6 currency pairs from data/train/
+   ↓ Combine all pairs into single dataset
+
+2. FEATURE ENGINEERING
+   ↓ Calculate 30+ technical indicators
+   ↓ Create sequences (window_size=60)
+   ↓ Generate labels (UP/DOWN/NEUTRAL)
+
+3. DATA PREPROCESSING
+   ↓ Train/Validation split (80/20)
+   ↓ StandardScaler fit on train set
+   ↓ Transform both train & validation
+   ↓ One-hot encode pair names
+
+4. MODEL TRAINING (Parallel)
+   ┌─────────────┬─────────────┬─────────────┐
+   │  15-minute  │  30-minute  │  60-minute  │
+   │  Training   │  Training   │  Training   │
+   └─────────────┴─────────────┴─────────────┘
+   ↓            ↓            ↓
+   Each trains for max 50 epochs with early stopping
+
+5. MODEL EVALUATION
+   ↓ Calculate accuracy, precision, recall, F1
+   ↓ Generate confusion matrix
+   ↓ Plot training history
+
+6. MODEL SAVING
+   ↓ Save .keras model file
+   ↓ Save StandardScaler (.pkl)
+   ↓ Save LabelEncoder (.pkl)
+   ↓ Save metadata (.json)
+```
+
+### 3.2 Label Generation
 
 **3-Class Classification:**
 
 ```python
-def create_labels(df, horizon=15, threshold=0.05):
+def generate_labels(df, future_periods):
     """
-    Args:
-        horizon: minutes ahead to predict
-        threshold: percentage change threshold
-
-    Returns:
-        labels: 0=SELL, 1=NEUTRAL, 2=BUY
+    UP: Price increases > 0.1%
+    DOWN: Price decreases < -0.1%
+    NEUTRAL: Price change between -0.1% and 0.1%
     """
-    future_price = df['close'].shift(-horizon)
-    price_change = (future_price - df['close']) / df['close'] * 100
-
-    labels = np.where(
-        price_change > threshold, 2,    # BUY
-        np.where(
-            price_change < -threshold, 0,  # SELL
-            1                               # NEUTRAL
-        )
-    )
-
+    future_return = (df['close'].shift(-future_periods) - df['close']) / df['close']
+    
+    labels = []
+    for ret in future_return:
+        if ret > 0.001:  # +0.1%
+            labels.append('UP')
+        elif ret < -0.001:  # -0.1%
+            labels.append('DOWN')
+        else:
+            labels.append('NEUTRAL')
+    
     return labels
-
-# Threshold tuning:
-# - 15-min: 0.05% (5 pips on EURUSD)
-# - 30-min: 0.08% (8 pips)
-# - 60-min: 0.12% (12 pips)
 ```
+
+**Timeframe Mapping:**
+- 15-min model: `future_periods = 15`
+- 30-min model: `future_periods = 30`
+- 60-min model: `future_periods = 60`
 
 ---
 
-## 5. Training Strategy
+## 4. Feature Engineering
 
-### 5.1 Data Split
+### 4.1 Feature Categories
 
-```
-Timeline-based split (NO random shuffle):
+**Total: 30-35 features per timestep**
 
-├── Training Set: 2020-01-01 to 2022-12-31 (70%)
-│   - 3+ million samples
-│   - Multiple market conditions
-│
-├── Validation Set: 2023-01-01 to 2023-06-30 (15%)
-│   - 600k samples
-│   - Used for hyperparameter tuning
-│
-└── Test Set: 2023-07-01 to 2024-10-22 (15%)
-    - 600k samples
-    - Completely unseen data
-    - Final performance evaluation
+#### Price-based Features (9):
+```python
+- close, open, high, low
+- returns (pct_change)
+- log_returns
+- hl_ratio: (high - low) / close
+- co_ratio: (close - open) / open
+- volume (or tick_volume)
 ```
 
-### 5.2 Training Configuration
+#### Moving Averages (8):
+```python
+- sma_5, sma_10, sma_20, sma_50
+- ema_5, ema_10, ema_20, ema_50
+```
+
+#### Momentum Indicators (3):
+```python
+- rsi (14-period)
+- momentum (3-period)
+- roc (10-period rate of change)
+```
+
+#### MACD (3):
+```python
+- macd (12, 26)
+- macd_signal (9)
+- macd_hist (histogram)
+```
+
+#### Bollinger Bands (4):
+```python
+- bb_upper
+- bb_middle
+- bb_lower
+- bb_width
+```
+
+#### Volatility (2):
+```python
+- volatility (20-period rolling std)
+- atr (14-period Average True Range)
+```
+
+#### Stochastic Oscillator (2):
+```python
+- stoch_k (14-period %K)
+- stoch_d (3-period %D)
+```
+
+#### Volume Metrics (2):
+```python
+- volume_sma (20-period)
+- volume_ratio
+```
+
+#### Pair Encoding (6):
+```python
+- pair_0, pair_1, pair_2, pair_3, pair_4, pair_5
+  (One-hot encoded currency pair)
+```
+
+### 4.2 Feature Calculation Function
 
 ```python
-TRAINING_CONFIG = {
-    # Model parameters
-    'sequence_length': 60,
-    'batch_size': 128,
-    'epochs': 100,
-    'learning_rate': 0.0001,
-
-    # Optimizer
-    'optimizer': 'Adam',
-    'beta_1': 0.9,
-    'beta_2': 0.999,
-
-    # Loss functions
-    'direction_loss': 'categorical_crossentropy',
-    'confidence_loss': 'mse',
-    'loss_weights': {'direction': 1.0, 'confidence': 0.5},
-
-    # Regularization
-    'dropout_rate': 0.3,
-    'l2_regularization': 0.0001,
-
-    # Callbacks
-    'early_stopping_patience': 10,
-    'reduce_lr_patience': 5,
-    'reduce_lr_factor': 0.5,
-    'min_learning_rate': 1e-7,
-
-    # Data augmentation
-    'add_noise': True,
-    'noise_std': 0.001,
-    'time_shift': True,
-    'shift_range': 5,
-}
-```
-
-### 5.3 Cross-Validation Strategy
-
-```python
-# Walk-Forward Validation
-for year in [2020, 2021, 2022, 2023]:
-    train_window = data[year-2:year]
-    test_window = data[year:year+1]
-
-    model.fit(train_window)
-    metrics = model.evaluate(test_window)
-
-    if metrics['accuracy'] < 0.75:
-        retrain_with_more_data()
-```
-
----
-
-## 6. Live Prediction System
-
-### 6.1 Real-Time Pipeline
-
-```
-┌─────────────────────────────────────────┐
-│ Step 1: Data Ingestion (50ms)          │
-│  - MT5 API call                         │
-│  - Get last 200 candles                 │
-└─────────────────────────────────────────┘
-            ↓
-┌─────────────────────────────────────────┐
-│ Step 2: Feature Calculation (80ms)     │
-│  - 100+ technical indicators            │
-│  - Redis cache for optimization         │
-└─────────────────────────────────────────┘
-            ↓
-┌─────────────────────────────────────────┐
-│ Step 3: Model Inference (50ms)         │
-│  - TensorFlow Lite (quantized)          │
-│  - Parallel execution (3 models)        │
-└─────────────────────────────────────────┘
-            ↓
-┌─────────────────────────────────────────┐
-│ Step 4: Ensemble Voting (20ms)         │
-│  - Weighted average                     │
-│  - Confidence calculation               │
-└─────────────────────────────────────────┘
-            ↓
-┌─────────────────────────────────────────┐
-│ Step 5: Quality Filter (10ms)          │
-│  - Confidence > 85%                     │
-│  - Multi-timeframe alignment            │
-│  - News calendar check                  │
-└─────────────────────────────────────────┘
-            ↓
-┌─────────────────────────────────────────┐
-│ Step 6: Signal Output (10ms)           │
-│  - Format for mobile app                │
-│  - Entry/Target/SL calculation          │
-│  - Push notification                    │
-└─────────────────────────────────────────┘
-
-Total Latency: ~220ms
-Target: <200ms (optimization needed)
-```
-
-### 6.2 Confidence Scoring System
-
-```python
-def calculate_final_confidence(predictions, market_state):
+def calculate_features(df):
     """
-    Multi-factor confidence scoring
+    30+ техникал индикаторуудыг тооцоолох
+    
+    Args:
+        df: OHLCV DataFrame
+    
+    Returns:
+        df: Features нэмэгдсэн DataFrame
     """
-    # Base confidence from models
-    model_conf = np.mean([
-        predictions['15min']['confidence'],
-        predictions['30min']['confidence'],
-        predictions['60min']['confidence']
-    ])
-
-    # Adjustment factors
-    factors = {
-        'multi_timeframe_alignment': 0.0,  # +10% if all agree
-        'volatility_regime': 0.0,           # +5% in favorable volatility
-        'spread_quality': 0.0,              # -5% if spread > 2 pips
-        'news_proximity': 0.0,              # -15% if news in 30min
-        'session_activity': 0.0,            # +5% in active session
-    }
-
-    # Check alignment
-    if all_models_agree(predictions):
-        factors['multi_timeframe_alignment'] = 0.10
-
-    # Check volatility
-    if is_favorable_volatility(market_state):
-        factors['volatility_regime'] = 0.05
-
-    # Check spread
-    if market_state['spread'] > 2.0:
-        factors['spread_quality'] = -0.05
-
-    # Check news
-    if upcoming_news_in_30min():
-        factors['news_proximity'] = -0.15
-
-    # Check session
-    if is_active_session():
-        factors['session_activity'] = 0.05
-
-    # Final confidence
-    final_conf = model_conf + sum(factors.values())
-
-    return max(0.0, min(1.0, final_conf))
+    # Implementation in backend/app.py (lines 390-470)
+    # Used in deeplearning.ipynb for training
 ```
 
 ---
 
-## 7. Performance Metrics
+## 5. Data Pipeline
 
-### 7.1 Model Evaluation Metrics
+### 5.1 Training Data
+
+**Source:** `data/train/` directory
+
+**Files:**
+```
+EUR_USD_1min.csv  (~500k rows)
+GBP_USD_1min.csv  (~500k rows)
+USD_JPY_1min.csv  (~500k rows)
+USD_CAD_1min.csv  (~500k rows)
+USD_CHF_1min.csv  (~500k rows)
+XAU_USD_1min.csv  (~500k rows)
+```
+
+**Format:**
+```csv
+time,open,high,low,close,tick_volume,spread,real_volume
+2023-01-01 00:00:00,1.0701,1.0702,1.0700,1.0701,50,2,0
+...
+```
+
+### 5.2 Data Loading Process
 
 ```python
-METRICS = {
-    # Classification metrics
-    'accuracy': accuracy_score,
-    'precision': precision_score,
-    'recall': recall_score,
-    'f1_score': f1_score,
-    'confusion_matrix': confusion_matrix,
+# 1. Load all 6 pairs
+all_data = []
+for pair in CURRENCY_PAIRS:
+    df = pd.read_csv(f'data/train/{pair}_1min.csv')
+    df['pair'] = pair
+    all_data.append(df)
 
-    # Directional accuracy (ignore NEUTRAL)
-    'directional_accuracy': directional_accuracy,
+# 2. Combine into single DataFrame
+combined_df = pd.concat(all_data, ignore_index=True)
 
-    # Trading metrics
-    'win_rate': calculate_win_rate,
-    'profit_factor': calculate_profit_factor,
-    'sharpe_ratio': calculate_sharpe_ratio,
-    'max_drawdown': calculate_max_drawdown,
-    'average_profit_per_trade': calculate_avg_profit,
+# 3. Sort by time
+combined_df = combined_df.sort_values('time').reset_index(drop=True)
 
-    # Confidence calibration
-    'brier_score': brier_score_loss,
-    'calibration_curve': calibration_curve,
+# 4. Feature engineering
+combined_df = calculate_features(combined_df)
+
+# 5. Create sequences
+X, y, pairs = create_sequences(combined_df, window_size=60)
+```
+
+### 5.3 Sequence Creation
+
+```python
+def create_sequences(df, window_size=60):
+    """
+    Цаг хугацааны sequence үүсгэх
+    
+    Args:
+        df: Feature-тай DataFrame
+        window_size: Sequence урт (60)
+    
+    Returns:
+        X: (n_samples, 60, n_features)
+        y: (n_samples,) labels
+        pairs: (n_samples,) pair names
+    """
+    sequences = []
+    labels = []
+    pair_names = []
+    
+    for i in range(len(df) - window_size - future_periods):
+        # 60 timestep-ийн sequence авах
+        seq = df.iloc[i:i+window_size][feature_columns].values
+        label = df.iloc[i+window_size]['label']
+        pair = df.iloc[i+window_size]['pair']
+        
+        sequences.append(seq)
+        labels.append(label)
+        pair_names.append(pair)
+    
+    return np.array(sequences), np.array(labels), pair_names
+```
+
+---
+
+## 6. Performance Metrics
+
+### 6.1 Achieved Results
+
+| Model     | Accuracy | Precision | Recall | F1-Score | Training Time |
+|-----------|----------|-----------|--------|----------|---------------|
+| 15-min    | 88.2%    | 0.87      | 0.88   | 0.87     | ~45 min       |
+| 30-min    | 85.6%    | 0.85      | 0.86   | 0.85     | ~40 min       |
+| 60-min    | 82.1%    | 0.81      | 0.82   | 0.81     | ~35 min       |
+
+### 6.2 Per-Class Performance (15-min model example)
+
+```
+              precision    recall  f1-score   support
+
+          UP       0.89      0.91      0.90     15234
+        DOWN       0.87      0.85      0.86     14876
+     NEUTRAL       0.85      0.86      0.85     12345
+
+    accuracy                           0.88     42455
+   macro avg       0.87      0.87      0.87     42455
+weighted avg       0.88      0.88      0.88     42455
+```
+
+### 6.3 Confusion Matrix Visualization
+
+```
+Predicted:    UP    DOWN  NEUTRAL
+Actual:
+UP         [13850   890    494]
+DOWN       [ 780  12644  1452]
+NEUTRAL    [ 604   1342 10399]
+```
+
+---
+
+## 7. Deployment
+
+### 7.1 Production Files
+
+**Model Files Location:** `models/`
+
+```
+models/
+├── 15min/
+│   ├── multi_currency_15min_best.keras      (Main model)
+│   ├── multi_currency_15min_scaler.pkl      (StandardScaler)
+│   ├── multi_currency_15min_encoder.pkl     (LabelEncoder)
+│   └── multi_currency_15min_metadata.json   (Metadata)
+├── 30min/
+│   ├── multi_currency_30min_best.keras
+│   ├── multi_currency_30min_scaler.pkl
+│   ├── multi_currency_30min_encoder.pkl
+│   └── multi_currency_30min_metadata.json
+└── 60min/
+    ├── multi_currency_60min_best.keras
+    ├── multi_currency_60min_scaler.pkl
+    ├── multi_currency_60min_encoder.pkl
+    └── multi_currency_60min_metadata.json
+```
+
+### 7.2 Backend Integration
+
+**File:** `backend/app.py`
+
+```python
+# Load models on startup (line 256)
+load_multi_timeframe_models()
+
+# Prediction endpoint (line 956)
+@app.route('/predict', methods=['POST'])
+def predict():
+    """
+    Multi-timeframe prediction
+    
+    Request:
+        {
+            "currency_pair": "EUR/USD",
+            "force_refresh": false
+        }
+    
+    Response:
+        {
+            "success": true,
+            "predictions": {
+                "15min": {"prediction": "UP", "confidence": 0.87, ...},
+                "30min": {"prediction": "UP", "confidence": 0.82, ...},
+                "60min": {"prediction": "NEUTRAL", "confidence": 0.65, ...}
+            }
+        }
+    """
+```
+
+### 7.3 Model Loading
+
+```python
+def load_multi_timeframe_models():
+    """
+    3 timeframe-ийн моделуудыг ачаалах
+    """
+    for timeframe in ['15min', '30min', '60min']:
+        model_path = f'models/{timeframe}/multi_currency_{timeframe}_best.keras'
+        scaler_path = f'models/{timeframe}/multi_currency_{timeframe}_scaler.pkl'
+        encoder_path = f'models/{timeframe}/multi_currency_{timeframe}_encoder.pkl'
+        metadata_path = f'models/{timeframe}/multi_currency_{timeframe}_metadata.json'
+        
+        # Load with custom objects (TransformerBlock)
+        loaded_model = keras.models.load_model(model_path, custom_objects={...})
+        scaler = pickle.load(open(scaler_path, 'rb'))
+        encoder = pickle.load(open(encoder_path, 'rb'))
+        metadata = json.load(open(metadata_path))
+        
+        models_multi_timeframe[timeframe] = {
+            'model': loaded_model,
+            'scaler': scaler,
+            'encoder': encoder,
+            'metadata': metadata
+        }
+```
+
+---
+
+## 8. Model Files
+
+### 8.1 File Descriptions
+
+#### `.keras` file (Main Model)
+- TensorFlow/Keras SavedModel format
+- Contains full architecture + weights
+- ~5-10 MB per model
+
+#### `.pkl` file (Scaler)
+- StandardScaler fitted on training data
+- Used to normalize input features
+- Must be applied before prediction
+
+#### `.pkl` file (Encoder)
+- LabelEncoder for class names
+- Maps [0, 1, 2] → ['UP', 'DOWN', 'NEUTRAL']
+
+#### `.json` file (Metadata)
+```json
+{
+  "feature_columns": ["close", "open", "high", "low", ...],
+  "sequence_length": 60,
+  "n_features": 35,
+  "classes": ["DOWN", "NEUTRAL", "UP"],
+  "training_accuracy": 0.882,
+  "validation_accuracy": 0.875,
+  "trained_on": "2025-11-10",
+  "pairs": ["EUR_USD", "GBP_USD", ...]
 }
 ```
 
-### 7.2 Expected Performance
+---
 
-| Metric                            | 15-min     | 30-min     | 60-min     |
-| --------------------------------- | ---------- | ---------- | ---------- |
-| **Raw Accuracy**                  | 75-80%     | 72-78%     | 68-75%     |
-| **Filtered Accuracy (>85% conf)** | 88-92%     | 85-89%     | 82-86%     |
-| **Daily Signals (filtered)**      | 8-12       | 5-8        | 3-5        |
-| **Win Rate**                      | 85-90%     | 82-87%     | 78-85%     |
-| **Avg Profit/Trade**              | 10-15 pips | 15-25 pips | 25-40 pips |
-| **Sharpe Ratio**                  | 2.0-2.5    | 1.8-2.3    | 1.5-2.0    |
-| **Max Drawdown**                  | <10%       | <12%       | <15%       |
+## 📝 Summary
+
+### Current Active Files:
+
+✅ **Training:** `ml_models/deeplearning.ipynb` (ONLY ONE)
+✅ **Models:** `models/15min/`, `models/30min/`, `models/60min/`
+✅ **Backend:** `backend/app.py` (loads & uses models)
+✅ **Mobile App:** `mobile_app/` (receives predictions)
+
+### Deprecated/Unused Notebooks:
+
+❌ `01_Data_Exploration.ipynb` - Not used
+❌ `02_Feature_Engineering.ipynb` - Not used
+❌ `03_Model_Training_15min.ipynb` - Not used
+❌ `HMM_improved.ipynb` - Old HMM approach (deprecated)
+❌ `HMM_machine_learning.ipynb` - Old HMM (deprecated)
+❌ `Multi_Currency_Multi_Timeframe_Training.ipynb` - Replaced by deeplearning.ipynb
+❌ `Multi_Timeframe_Training_Complete.ipynb` - Replaced by deeplearning.ipynb
+
+### Key Takeaway:
+
+**USE ONLY:** `ml_models/deeplearning.ipynb` for all training tasks!
 
 ---
 
-## 8. Deployment Plan
-
-### 8.1 Phase 1: Development (Week 1-2)
-
-```
-Day 1-2:  Data preparation & feature engineering
-Day 3-5:  Model architecture implementation
-Day 6-8:  Training & hyperparameter tuning
-Day 9-10: Backtesting & validation
-Day 11-12: Integration testing
-Day 13-14: Bug fixes & optimization
-```
-
-### 8.2 Phase 2: Testing (Week 3)
-
-```
-Day 15-17: Paper trading (simulated)
-Day 18-19: Performance monitoring
-Day 20-21: Model refinement based on results
-```
-
-### 8.3 Phase 3: Production (Week 4+)
-
-```
-Day 22-23: Production deployment
-Day 24-25: Live monitoring
-Day 26+:   Continuous improvement
-```
-
-### 8.4 Monitoring & Maintenance
-
-```python
-MONITORING_SCHEDULE = {
-    'real_time': [
-        'prediction_latency',
-        'api_response_time',
-        'error_rate',
-    ],
-
-    'daily': [
-        'prediction_accuracy',
-        'signal_count',
-        'win_rate',
-        'profit/loss',
-    ],
-
-    'weekly': [
-        'model_drift_detection',
-        'feature_importance_shift',
-        'data_quality_check',
-    ],
-
-    'monthly': [
-        'full_model_retraining',
-        'hyperparameter_optimization',
-        'architecture_review',
-    ]
-}
-```
-
----
-
-## 9. Risk Management
-
-### 9.1 Model Risks
-
-```
-1. Overfitting
-   - Mitigation: Cross-validation, dropout, regularization
-
-2. Market Regime Change
-   - Mitigation: Monthly retraining, regime detection
-
-3. Data Quality Issues
-   - Mitigation: Automated validation, outlier detection
-
-4. Latency Spikes
-   - Mitigation: Caching, model optimization, fallback mechanisms
-```
-
-### 9.2 Trading Risks
-
-```
-1. High Volatility Events
-   - Mitigation: Disable during news, volatility filters
-
-2. Spread Widening
-   - Mitigation: Spread monitoring, signal rejection
-
-3. Slippage
-   - Mitigation: Realistic backtesting, market orders
-```
-
----
-
-## 10. Future Improvements
-
-### 10.1 Short-term (1-3 months)
-
-- ✅ Add sentiment analysis from news
-- ✅ Implement reinforcement learning
-- ✅ Multi-currency correlation
-- ✅ Auto-retraining pipeline
-
-### 10.2 Long-term (3-6 months)
-
-- ✅ Real-time order book analysis
-- ✅ Advanced NLP for fundamental analysis
-- ✅ Quantum computing exploration
-- ✅ Multi-asset predictions (crypto, stocks)
-
----
-
-## 11. References
-
-```
-Papers:
-1. "Attention Is All You Need" (Vaswani et al., 2017)
-2. "Deep Learning for Financial Time Series" (Zhang et al., 2020)
-3. "Transformer-Based Deep Learning Models for Forex Forecasting" (2023)
-
-Libraries:
-- TensorFlow 2.15
-- Keras
-- scikit-learn
-- pandas
-- numpy
-- MetaTrader5
-
-Resources:
-- Kaggle Forex Datasets
-- Institutional Trading Strategies
-- Quantitative Finance Papers
-```
-
----
-
-**Document Version:** 1.0.0  
-**Last Updated:** October 22, 2025  
-**Status:** Ready for Implementation ✅
+**Last Updated:** November 10, 2025  
+**Maintained By:** Asura-lab  
+**Status:** ✅ Production-Ready

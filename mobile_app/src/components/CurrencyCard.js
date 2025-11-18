@@ -71,26 +71,27 @@ const CurrencyCard = ({
       changeDirection = 1;
     }
 
-    // Calculate change from MT5 data
+    // Compute 24h pip change if backend provided it as liveRate.chg
     let changeValue = "—";
     let changePercent = "—";
     let isChangePositive = null;
 
-    if (liveRate && typeof liveRate === "object" && liveRate.rate) {
-      // If we have previous_close, calculate real change
-      if (liveRate.previous_close && liveRate.previous_close > 0) {
+    if (liveRate && typeof liveRate === "object") {
+      // Backend now returns 'chg' as pip difference over last 24h when available
+      if (liveRate.chg !== undefined && liveRate.chg !== null) {
+        const pip = Number(liveRate.chg);
+        if (!isNaN(pip)) {
+          // Show pip change as integer or one decimal
+          changeValue = pip % 1 === 0 ? pip.toFixed(0) : pip.toFixed(1);
+          isChangePositive = pip > 0 ? true : pip < 0 ? false : null;
+        }
+      } else if (liveRate.rate && liveRate.previous_close) {
+        // Fallback: compute from previous_close if backend supplies it
         const change = liveRate.rate - liveRate.previous_close;
+        const s_info = null; // cannot compute pips without point info on mobile
         changeValue = change.toFixed(pair.name.includes("JPY") ? 3 : 5);
         changePercent = ((change / liveRate.previous_close) * 100).toFixed(2);
         isChangePositive = change >= 0;
-      }
-      // Otherwise use spread as fallback
-      else if (liveRate.spread) {
-        const spread = liveRate.spread;
-        changeValue = spread.toFixed(pair.name.includes("JPY") ? 3 : 5);
-        changePercent = ((spread / liveRate.rate) * 100).toFixed(2);
-        // Spread is typically shown as positive change
-        isChangePositive = true;
       }
     }
 
@@ -138,17 +139,7 @@ const CurrencyCard = ({
         </View>
       )}
 
-      {/* Change % Column */}
-      <View style={styles.column}>
-        <Text
-          style={[styles.changePercent, change.isNeutral && styles.neutralText]}
-        >
-          {change.percent !== "—" &&
-            change.isPositive !== null &&
-            (change.isPositive ? "+" : "")}
-          {change.percent}
-        </Text>
-      </View>
+      {/* Note: chg% column removed. We display pip change in the Chg column. */}
 
       {/* Signal Column */}
       <View style={styles.signalColumn}>

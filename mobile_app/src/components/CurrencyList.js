@@ -14,7 +14,7 @@ const CurrencyList = ({ predictions, liveRates, onPairPress, loading }) => {
 
   // Check screen width
   const screenWidth = Dimensions.get("window").width;
-  const showChangeColumn = screenWidth > 520; // Hide CHG on small/medium screens
+  const showChangeColumn = screenWidth > 0; // Hide CHG on small/medium screens
 
   const styles = createStyles(colors, showChangeColumn);
 
@@ -37,9 +37,6 @@ const CurrencyList = ({ predictions, liveRates, onPairPress, loading }) => {
             <Text style={styles.headerText}>Chg</Text>
           </View>
         )}
-        <View style={styles.dataColumn}>
-          <Text style={styles.headerText}>Chg%</Text>
-        </View>
         <View style={styles.signalColumn}>
           <Text style={styles.headerText}>Signal</Text>
         </View>
