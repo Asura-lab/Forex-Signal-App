@@ -1,99 +1,32 @@
-# 🤖 Forex Signal App - Reinforcement Learning Trading System
+# 📈 Forex Signal App
 
-**Deep Reinforcement Learning** | **DQN Agent** | **React Native** | **MongoDB + JWT**
+**EUR/USD BUY Signal Generator** | **Ensemble ML** | **React Native** | **MongoDB + JWT**
 
-> **⚠️ UPDATED STRATEGY**: Supervised Learning-ээс **Reinforcement Learning** руу шилжсэн. Agent өөрөө арилжаа сурна!
-
----
-
-## 📋 Агуулга
-
-1. [Тойм](#-тойм)
-2. [Why Reinforcement Learning?](#-why-reinforcement-learning)
-3. [Архитектур](#️-архитектур)
-4. [Технологи](#️-технологи)
-5. [Файлын бүтэц](#-файлын-бүтэц)
-6. [Суулгах](#-суулгах)
-7. [Модель сургалт](#-модель-сургалт)
+> XGBoost + LightGBM + Random Forest ensemble ашиглан EUR/USD валютын хосын BUY дохио таамаглах систем
 
 ---
 
 ## 🎯 Тойм
 
-Энэ систем нь **Deep Q-Network (DQN)** ашиглан Forex зах зээл дээр автомат арилжаа хийдэg agent сургадаг production-level аппликейшн юм.
+Энэ систем нь **Ensemble Machine Learning** ашиглан Forex зах зээл дээр BUY дохио таамаглах production-level аппликейшн юм.
 
-### 🎯 Зорилго:
+### Гол үзүүлэлтүүд:
 
-- 🤖 **Reinforcement Learning**: Agent өөрөө арилжаа сурна
-- 📊 **Real-time decisions**: BUY, SELL, HOLD, CLOSE
-- 💰 **Profit maximization**: Ашгийг максимумчлах сурна
-- 📈 **EUR/USD Trading**: Single pair, высокая ликвидность
-- 🔐 **Secure Authentication**: MongoDB + JWT token-based auth
-- 📱 **Cross-platform Mobile**: React Native (iOS + Android)
-- ⚡ **Real-time Data**: UniRate API integration
+| Confidence | Signals | Win Rate | Total Pips | Profit Factor |
+|------------|---------|----------|------------|---------------|
+| ≥75% | 279 | 48.4% | +937 | 1.76 |
+| ≥80% | 105 | **61.9%** | +671 | **3.10** |
+| ≥85% | 48 | 68.8% | +387 | 4.82 |
+| ≥90% | 9 | 100.0% | +120 | ∞ |
 
----
+### Онцлог:
 
-## 🤖 Why Reinforcement Learning?
-
-### Хуучин арга (Supervised Learning):
-
-- ❌ Manual labeling шаардлагатай (BUY/SELL/HOLD)
-- ❌ Зах зээлийн өөрчлөлтөд дасан зохицохгүй
-- ❌ Risk management суралцдаггүй
-- ❌ Static decision boundaries
-
-### Шинэ арга (Reinforcement Learning):
-
-- ✅ **Өөрөө сурдаг**: Labeling шаардлагагүй
-- ✅ **Adaptive**: Зах зээлтэй хамт хөгжинө
-- ✅ **Risk-aware**: Алдагдлаас зайлсхийх сурна
-- ✅ **Optimal policy**: Хамгийн сайн арилжааны стратеги олно
-
----
-
-## ✨ Онцлог шинж чанарууд
-
-### 🤖 Reinforcement Learning Core:
-
-- ✅ **DQN Agent (Deep Q-Network)**
-
-  - State: Technical indicators + Portfolio state
-  - Actions: HOLD, BUY, SELL, CLOSE
-  - Reward: Realized PnL - trading costs
-
-- ✅ **Trading Environment**
-
-  - Бодит зах зээлийн симуляци
-  - Хураамж ба spread тооцоолол
-  - Risk management constraints
-
-- ✅ **Experience Replay**
-  - Mini-batch learning (64)
-  - Target network stabilization
-
-### 🔐 Authentication & User Management:
-
-- ✅ **JWT Authentication** - Secure token-based auth
-- ✅ **Email Verification** - 6-digit code with 10-min expiry
-- ✅ **Password Reset** - Secure password recovery flow
-- ✅ **Profile Management** - Update name, change password
-- ✅ **MongoDB Backend** - Scalable NoSQL database
-
-### 📱 Mobile Application:
-
-- ✅ **React Native + Expo** - Cross-platform development
-- ✅ **Real-time Predictions** - Live market analysis
-- ✅ **Multi-currency Support** - 6 major pairs + Gold
-- ✅ **Beautiful UI/UX** - Modern gradient design
-- ✅ **Push Notifications** - Signal alerts (planned)
-
-### 📊 Data & Analytics:
-
-- ✅ **MetaTrader 5 Integration** - Real-time market data
-- ✅ **Historical Data** - Training on 1-minute OHLCV data
-- ✅ **Technical Indicators** - 30+ features (RSI, MACD, Bollinger Bands, etc.)
-- ✅ **Performance Tracking** - Model accuracy monitoring
+- 🎯 **BUY-Only Strategy**: SELL сигнал хассан (28% accuracy), зөвхөн BUY (80% accuracy)
+- 📊 **Ensemble Model**: XGBoost (40%) + LightGBM (35%) + Random Forest (25%)
+- 📈 **70 Technical Indicators**: RSI, MACD, Bollinger, ATR, SMA, EMA гэх мэт
+- 🔐 **JWT Authentication**: MongoDB + secure token-based auth
+- 📱 **Mobile App**: React Native + Expo (iOS & Android)
+- ⚡ **Real-time Data**: Twelve Data API integration
 
 ---
 
@@ -103,38 +36,37 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                 📱 REACT NATIVE MOBILE APP                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Login/     │  │  Predictions │  │   Profile    │      │
+│  │   Login/     │  │    Signal    │  │   Profile    │      │
 │  │   Register   │  │    Screen    │  │   Settings   │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
                             ↕ REST API (JWT)
 ┌─────────────────────────────────────────────────────────────┐
-│                    🐍 FLASK BACKEND API                      │
+│              🐍 FLASK + WAITRESS BACKEND                     │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │  Authentication      Predictions       Currency      │   │
-│  │  - /auth/register    - /predict        - /rates/live│   │
-│  │  - /auth/login       - /predict/file   - /currencies│   │
-│  │  - /auth/verify      - /health                      │   │
+│  │  Authentication      Signal V2         Market Data   │   │
+│  │  - /auth/register    - /signal/v2      - /rates/live │   │
+│  │  - /auth/login       - /signal/save    - /health     │   │
+│  │  - /auth/me          - /signals/stats                │   │
 │  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
-│                  🤖 DEEP LEARNING ENGINE                     │
+│                  🤖 ENSEMBLE ML ENGINE                       │
 │  ┌─────────────┬─────────────────┬──────────────────┐      │
-│  │  15-minute  │   30-minute     │    60-minute     │      │
-│  │ Transformer │   Bi-LSTM +     │   CNN-LSTM       │      │
-│  │  + LSTM     │   Attention     │    Hybrid        │      │
+│  │   XGBoost   │    LightGBM     │  Random Forest   │      │
+│  │    (40%)    │      (35%)      │      (25%)       │      │
 │  └─────────────┴─────────────────┴──────────────────┘      │
-│              (TensorFlow 2.15 + Keras 3.0)                  │
+│              70 Technical Indicators                        │
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
 │                      💾 DATA LAYER                           │
 │  ┌──────────────────┐  ┌──────────────────┐                │
-│  │  MongoDB Atlas   │  │  MetaTrader 5    │                │
+│  │  MongoDB Atlas   │  │  Twelve Data API │                │
 │  │  - users         │  │  - Live rates    │                │
-│  │  - predictions   │  │  - OHLCV data    │                │
-│  │  - codes         │  │  - Real-time     │                │
+│  │  - signals       │  │  - OHLCV data    │                │
+│  │  - verification  │  │  - Real-time     │                │
 │  └──────────────────┘  └──────────────────┘                │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -143,173 +75,109 @@
 
 ## 🛠️ Технологи
 
-### Backend & Machine Learning:
-
+### Backend:
 - **Python 3.11+**
-- **TensorFlow 2.15+** / **Keras 3.0+** - Deep Learning models
-- **Flask 3.0+** - REST API backend
-- **Flask-CORS** - Cross-origin support
-- **Flask-Mail** - Email verification
-- **pandas & numpy** - Data processing
-- **scikit-learn** - Feature scaling & metrics
-- **MetaTrader5** - Live market data
-- **bcrypt** - Password hashing
-- **PyJWT** - JWT authentication
-- **python-dotenv** - Environment variables
+- **Flask 3.0+** - REST API
+- **Waitress** - Production WSGI server
+- **XGBoost, LightGBM, scikit-learn** - ML models
+- **pandas, numpy** - Data processing
+- **PyJWT, bcrypt** - Authentication
+- **pymongo** - MongoDB driver
 
 ### Mobile App:
-
-- **React Native + Expo** - Cross-platform framework
-- **React Navigation** - Navigation system
+- **React Native + Expo**
+- **React Navigation**
 - **Axios** - HTTP client
 - **AsyncStorage** - Local storage
-- **React Native Paper** - UI components
-- **Expo Linear Gradient** - Beautiful gradients
 
-### Database & Infrastructure:
-
-- **MongoDB Atlas** - Cloud NoSQL database
-- **Git & GitHub** - Version control
-- **VS Code** - Development environment
+### Database & APIs:
+- **MongoDB Atlas** - User data, signals
+- **Twelve Data API** - Real-time forex data
 
 ---
 
 ## 📁 Файлын бүтэц
 
 ```
-Forex_signal_app/
+Forex-Signal-App/
 │
-├── 📂 backend/                      # Flask Backend API
-│   ├── app.py                       # Main Flask application
+├── 📂 backend/                    # Flask Backend API
+│   ├── app.py                     # Main application (17 endpoints)
 │   ├── config/
-│   │   ├── .env                     # Environment variables
-│   │   └── settings.py              # Configuration settings
-│   ├── utils/
-│   │   └── mt5_handler.py           # MetaTrader 5 integration
-│   └── ml/
-│       ├── models/                  # Model architecture definitions
-│       │   ├── transformer_lstm.py  # 15-min model architecture
-│       │   ├── bilstm_attention.py  # 30-min model architecture
-│       │   └── cnn_lstm.py          # 60-min model architecture
-│       ├── features/                # Feature engineering
-│       └── preprocessing/           # Data preprocessing
+│   │   ├── .env                   # Environment variables
+│   │   └── settings.py            # Configuration
+│   ├── ml/
+│   │   └── signal_generator_v2.py # V2 Signal Generator class
+│   └── utils/
+│       └── twelvedata_handler.py  # Twelve Data API integration
 │
-├── 📂 mobile_app/                   # React Native Mobile App
-│   ├── App.js                       # Main app entry
-│   ├── app.json                     # Expo configuration
-│   ├── package.json                 # Dependencies
+├── 📂 mobile_app/                 # React Native Mobile App
+│   ├── App.js                     # Main entry
 │   ├── src/
-│   │   ├── screens/                 # Screen components
-│   │   │   ├── LoginScreen.js
-│   │   │   ├── RegisterScreen.js
-│   │   │   ├── HomeScreen.js
-│   │   │   ├── PredictionScreen.js
-│   │   │   └── ProfileScreen.js
-│   │   ├── components/              # Reusable components
-│   │   ├── services/
-│   │   │   └── api.js               # API integration
-│   │   ├── context/
-│   │   │   └── AuthContext.js       # Auth state management
-│   │   └── navigation/
-│   │       └── AppNavigator.js      # Navigation setup
-│   └── android/                     # Android build files
+│   │   ├── screens/               # LoginScreen, SignalScreen, etc.
+│   │   ├── components/            # Reusable UI components
+│   │   ├── services/api.js        # API integration
+│   │   └── context/AuthContext.js # Auth state management
+│   └── android/                   # Android build files
 │
-├── 📂 models/                       # Trained ML Models
-│   ├── 15min/
-│   │   ├── multi_currency_15min_best.keras
-│   │   ├── multi_currency_15min_scaler.pkl
-│   │   └── multi_currency_15min_metadata.json
-│   ├── 30min/
-│   │   ├── multi_currency_30min_best.keras
-│   │   ├── multi_currency_30min_scaler.pkl
-│   │   └── multi_currency_30min_metadata.json
-│   └── 60min/
-│       ├── multi_currency_60min_best.keras
-│       ├── multi_currency_60min_scaler.pkl
-│       └── multi_currency_60min_metadata.json
+├── 📂 models/                     # Trained ML Models
+│   └── signal_generator_v2/
+│       ├── xgboost_v2.joblib      # XGBoost model
+│       ├── lightgbm_v2.joblib     # LightGBM model
+│       ├── rf_v2.joblib           # Random Forest model
+│       ├── scaler_v2.joblib       # StandardScaler
+│       └── feature_cols_v2.joblib # Feature columns
 │
-├── 📂 ml_models/                    # Model Training Notebooks
-│   └── deeplearning.ipynb           # 🔥 MAIN TRAINING NOTEBOOK
+├── 📂 data/                       # Training Data
+│   ├── EUR_USD_1min.csv           # Train: 1,859,492 rows (2019-2024)
+│   └── EUR_USD_test.csv           # Test: 296,778 rows (2024-2025)
 │
-├── 📂 data/                         # Training & Test Data
-│   ├── train/                       # Historical 1-min OHLCV data
-│   │   ├── EUR_USD_1min.csv
-│   │   ├── GBP_USD_1min.csv
-│   │   ├── USD_JPY_1min.csv
-│   │   ├── USD_CAD_1min.csv
-│   │   ├── USD_CHF_1min.csv
-│   │   └── XAU_USD_1min.csv
-│   └── test/                        # Test datasets
+├── 📂 docs/                       # Documentation
+│   └── *.md                       # Various docs
 │
-├── 📂 docs/                         # Documentation
-│   ├── ER_DIAGRAM_GUIDE.md          # Database ER diagram guide
-│   ├── database_schema.dbml         # DBML schema for dbdiagram.io
-│   ├── DEEP_LEARNING_ARCHITECTURE.md
-│   ├── IMPLEMENTATION_GUIDE.md
-│   ├── PRIVACY_POLICY.md
-│   └── TERMS_OF_SERVICE.md
+├── 📂 diplom/                     # Diploma thesis (LaTeX)
 │
-├── 📂 scripts/                      # Utility scripts
-│   ├── download_data.py             # Download MT5 data
-│   └── call_predict.py              # Test prediction API
-│
-├── requirements.txt                 # Python dependencies
-└── README.md                        # This file
+├── forex_signal_v2.ipynb          # 🔥 Model training notebook
+├── requirements.txt               # Python dependencies
+└── README.md                      # This file
 ```
 
 ---
 
 ## 🚀 Суулгах
 
-### Prerequisites:
-
-- Python 3.11+
-- Node.js 18+
-- MongoDB Atlas account
-- MetaTrader 5 (optional, for live data)
-- Expo CLI (`npm install -g expo-cli`)
-
-### Backend суулгах:
+### Backend:
 
 ```bash
-# 1. Clone repository
+# 1. Clone
 git clone https://github.com/Asura-lab/Forex-Signal-App.git
 cd Forex-Signal-App
 
-# 2. Python virtual environment үүсгэх
+# 2. Virtual environment
 python -m venv .venv
 .venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
 
-# 3. Dependencies суулгах
+# 3. Dependencies
 pip install -r requirements.txt
 
-# 4. Environment variables тохируулах
-cd backend/config
-cp .env.example .env
-# .env файлд MONGO_URI, SECRET_KEY, MT5 credentials оруулах
+# 4. Environment variables
+# backend/config/.env файлд:
+# MONGO_URI=mongodb+srv://...
+# SECRET_KEY=your-secret-key
+# TWELVEDATA_API_KEY=your-api-key
 
-# 5. Backend ажиллуулах
-cd ../..
+# 5. Run
 python backend/app.py
 ```
 
 Backend: `http://localhost:5000`
 
-### Mobile App суулгах:
+### Mobile App:
 
 ```bash
-# 1. Mobile app folder руу шилжих
 cd mobile_app
-
-# 2. Dependencies суулгах
 npm install
-
-# 3. Expo ажиллуулах
 npx expo start
-
-# 4. Expo Go app-аар QR code scan хийх (утсанд)
-#    эсвэл Android emulator дээр ажиллуулах
 ```
 
 ---
@@ -317,44 +185,34 @@ npx expo start
 ## 📡 API Endpoints
 
 ### Authentication:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/auth/register` | Бүртгүүлэх |
+| POST | `/auth/verify-email` | Имэйл баталгаажуулах |
+| POST | `/auth/login` | Нэвтрэх |
+| GET | `/auth/me` | Хэрэглэгчийн мэдээлэл |
+| POST | `/auth/forgot-password` | Нууц үг мартсан |
+| POST | `/auth/reset-password` | Нууц үг сэргээх |
 
-```
-POST   /auth/register           - Шинэ хэрэглэгч бүртгэх
-POST   /auth/verify-email       - Имэйл баталгаажуулах
-POST   /auth/login              - Нэвтрэх
-POST   /auth/verify             - Token шалгах
-GET    /auth/me                 - Хэрэглэгчийн мэдээлэл
-PUT    /auth/update             - Profile шинэчлэх
-PUT    /auth/change-password    - Нууц үг солих
-POST   /auth/forgot-password    - Нууц үг мартсан
-POST   /auth/reset-password     - Нууц үг сэргээх
-```
-
-### Predictions:
-
-```
-POST   /predict                 - Multi-timeframe prediction
-POST   /predict/file            - CSV файлаас prediction
-GET    /health                  - Health check
-```
+### Signal:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/signal/v2` | BUY сигнал авах |
+| GET | `/signal/v2/demo` | Demo сигнал |
+| POST | `/signal/save` | Сигнал хадгалах |
+| GET | `/signals/history` | Сигналын түүх |
+| GET | `/signals/stats` | Статистик |
 
 ### Market Data:
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/rates/live` | Бодит цагийн ханш |
+| GET | `/health` | Health check |
 
-```
-GET    /currencies              - Дэмжигдсэн валютын жагсаалт
-GET    /rates/live              - Бодит цагийн ханш
-GET    /rates/specific          - Тодорхой хослолын ханш
-```
-
-### Example Prediction Request:
+### Example Request:
 
 ```bash
-curl -X POST http://localhost:5000/predict \
-  -H "Content-Type: application/json" \
-  -d '{
-    "currency_pair": "EUR/USD",
-    "force_refresh": false
-  }'
+curl "http://localhost:5000/signal/v2?min_confidence=80"
 ```
 
 ### Example Response:
@@ -362,210 +220,83 @@ curl -X POST http://localhost:5000/predict \
 ```json
 {
   "success": true,
-  "currency_pair": "EUR/USD",
-  "predictions": {
-    "15min": {
-      "prediction": "UP",
-      "confidence": 0.87,
-      "probabilities": {
-        "UP": 0.87,
-        "DOWN": 0.08,
-        "NEUTRAL": 0.05
-      }
-    },
-    "30min": {
-      "prediction": "UP",
-      "confidence": 0.82,
-      "probabilities": {
-        "UP": 0.82,
-        "DOWN": 0.1,
-        "NEUTRAL": 0.08
-      }
-    },
-    "60min": {
-      "prediction": "NEUTRAL",
-      "confidence": 0.65,
-      "probabilities": {
-        "UP": 0.35,
-        "DOWN": 0.2,
-        "NEUTRAL": 0.45
-      }
-    }
-  },
-  "current_rate": 1.0856,
-  "timestamp": "2025-11-10T12:34:56.789Z"
+  "signal": "BUY",
+  "confidence": 85.2,
+  "entry_price": 1.08234,
+  "stop_loss": 1.08134,
+  "take_profit": 1.08434,
+  "sl_pips": 10.0,
+  "tp_pips": 20.0,
+  "risk_reward": "1:2.0",
+  "atr_pips": 8.5,
+  "models_agree": true,
+  "model_probs": {
+    "xgboost": 87.3,
+    "lightgbm": 84.1,
+    "random_forest": 82.5
+  }
 }
 ```
 
 ---
 
-## 🤖 Модель сургалт
+## 🤖 Model Training
 
-### Үндсэн сургалтын notebook:
-
-**`ml_models/deeplearning.ipynb`** - Энэ бол одоо ашиглагдаж байгаа цорын ганц сургалтын notebook юм.
-
-### Сургалтын процесс:
+### Notebook: `forex_signal_v2.ipynb`
 
 ```python
-# 1. Data татах ба боловсруулах
-# 2. Technical indicators тооцоолох (30+ features)
-# 3. 3 өөр архитектураар модель сургах:
-#    - 15min: Transformer + LSTM
-#    - 30min: Bi-LSTM + Attention
-#    - 60min: CNN-LSTM Hybrid
-# 4. Моделуудыг хадгалах (.keras format)
-# 5. Scaler ба metadata хадгалах (.pkl, .json)
+# 1. Data: 2+ million rows EUR/USD 1-min
+# 2. Features: 70 technical indicators
+# 3. Labels: BUY vs NOT_BUY (binary)
+# 4. Models: XGBoost, LightGBM, Random Forest
+# 5. Ensemble: Weighted average (40%, 35%, 25%)
+# 6. Backtest: 61.9% WR at 80% confidence
 ```
 
-### Model Architecture Overview:
-
-#### 1. 15-минут: Transformer + LSTM
-
-```
-Input → Transformer Block → LSTM → Dense → Output (3 classes)
-- Sequence length: 60
-- Transformer heads: 4
-- LSTM units: 128
-- Target accuracy: 88%+
-```
-
-#### 2. 30-минут: Bi-LSTM + Attention
-
-```
-Input → Bi-LSTM → Attention → Dense → Output (3 classes)
-- Sequence length: 60
-- Bi-LSTM units: 128
-- Attention mechanism
-- Target accuracy: 85%+
-```
-
-#### 3. 60-минут: CNN-LSTM Hybrid
-
-```
-Input → Conv1D → LSTM → Dense → Output (3 classes)
-- Sequence length: 60
-- CNN filters: 64
-- LSTM units: 128
-- Target accuracy: 82%+
-```
-
-### Training Command:
-
-Notebook-ийг дараалан ажиллуулж, моделуудыг сургах:
-
-1. Jupyter/VS Code-оор `ml_models/deeplearning.ipynb` нээх
-2. Cell бүрийг дараалан ажиллуулах
-3. Сургасан моделууд `models/` folder-т хадгалагдана
+### Dynamic SL/TP (ATR-based):
+- **Stop Loss**: 1.5 × ATR (10-20 pips)
+- **Take Profit**: 2.5 × ATR (20-40 pips)
+- **Risk:Reward**: 1:1.5 - 1:2
 
 ---
 
-## 💾 Database Schema
+## 📊 Performance
 
-MongoDB collections:
-
-### 1. **users** - Хэрэглэгчдийн мэдээлэл
-
-```javascript
-{
-  _id: ObjectId,
-  name: String,
-  email: String (unique),
-  password: String (hashed),
-  email_verified: Boolean,
-  created_at: DateTime,
-  last_login: DateTime
-}
-```
-
-### 2. **verification_codes** - Имэйл баталгаажуулалт
-
-```javascript
-{
-  _id: ObjectId,
-  email: String,
-  code: String (6 digits),
-  expires_at: DateTime,  // TTL: 10 minutes
-  created_at: DateTime
-}
-```
-
-### 3. **reset_codes** - Нууц үг сэргээх
-
-```javascript
-{
-  _id: ObjectId,
-  email: String,
-  code: String (6 digits),
-  expires_at: DateTime,  // TTL: 10 minutes
-  created_at: DateTime
-}
-```
-
-**ER Diagram:** `docs/database_schema.dbml` (dbdiagram.io форматаар)
+| Metric | Value |
+|--------|-------|
+| Training Data | 1,859,492 rows |
+| Test Data | 296,778 rows |
+| Features | 70 |
+| Win Rate (80%+ conf) | 61.9% |
+| Profit Factor | 3.10 |
+| Signals/day | ~1.9 |
 
 ---
 
-## 📊 Model Performance
+## 🔒 Security
 
-| Timeframe | Architecture        | Accuracy | Precision | Recall | F1-Score |
-| --------- | ------------------- | -------- | --------- | ------ | -------- |
-| 15-min    | Transformer + LSTM  | 88.2%    | 0.87      | 0.88   | 0.87     |
-| 30-min    | Bi-LSTM + Attention | 85.6%    | 0.85      | 0.86   | 0.85     |
-| 60-min    | CNN-LSTM Hybrid     | 82.1%    | 0.81      | 0.82   | 0.81     |
-
----
-
-## 🔒 Security Features
-
-- ✅ **Bcrypt password hashing** - Нууц үг аюулгүй хадгалах
-- ✅ **JWT token authentication** - Stateless auth
-- ✅ **Email verification** - 6-digit code with expiry
-- ✅ **CORS protection** - Cross-origin requests
-- ✅ **Input validation** - Бүх input validate хийгдэнэ
-- ✅ **Environment variables** - Sensitive data .env-д
-
----
-
-## 🎯 Future Enhancements
-
-- [ ] Push notifications (Expo Notifications)
-- [ ] Trading history tracking
-- [ ] Performance analytics dashboard
-- [ ] Multi-language support (English, Mongolian)
-- [ ] Dark mode
-- [ ] Trade execution via MT5 API
-- [ ] Backtesting module
-- [ ] Portfolio management
+- ✅ Bcrypt password hashing
+- ✅ JWT token authentication
+- ✅ Email verification (6-digit code)
+- ✅ CORS protection
+- ✅ Environment variables for secrets
 
 ---
 
 ## 📄 License
 
-This project is for educational and research purposes.
+Educational and research purposes only.
 
 ---
 
 ## 👨‍💻 Author
 
 **Asura-lab**
-
 - GitHub: [@Asura-lab](https://github.com/Asura-lab)
-- Repository: [Forex-Signal-App](https://github.com/Asura-lab/Forex-Signal-App)
 
 ---
 
-## 🙏 Acknowledgments
-
-- TensorFlow & Keras teams
-- MetaTrader 5 API
-- React Native community
-- MongoDB Atlas
-- Flask community
-
----
-
-**⚠️ Disclaimer**: Энэ систем нь зөвхөн боловсрол, судалгааны зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа анхаарал хандуулна уу!
+**⚠️ Disclaimer**: Энэ систем нь зөвхөн боловсрол, судалгааны зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү!
 
 ---
 
