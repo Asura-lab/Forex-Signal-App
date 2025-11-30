@@ -1,54 +1,128 @@
 /**
- * Валютын хослолын мэдээлэл
+ * Валютын хослолын мэдээлэл - 20 алдартай forex хослол
  */
 export const CURRENCY_PAIRS = [
+  // Major Pairs
   {
     id: "EUR_USD",
     name: "EUR/USD",
-    displayName: "Euro / US Dollar",
-    flag: "🇪🇺🇺🇸",
-    icon: "💶",
-    color: "#2196F3",
+    displayName: "EURUSD",
+    color: "#2962FF",
   },
   {
     id: "GBP_USD",
     name: "GBP/USD",
-    displayName: "British Pound / US Dollar",
-    flag: "🇬🇧🇺🇸",
-    icon: "💷",
-    color: "#4CAF50",
-  },
-  {
-    id: "USD_CAD",
-    name: "USD/CAD",
-    displayName: "US Dollar / Canadian Dollar",
-    flag: "🇺🇸🇨🇦",
-    icon: "🍁",
-    color: "#FF9800",
-  },
-  {
-    id: "USD_CHF",
-    name: "USD/CHF",
-    displayName: "US Dollar / Swiss Franc",
-    flag: "🇺🇸🇨🇭",
-    icon: "🏔️",
-    color: "#9C27B0",
+    displayName: "GBPUSD",
+    color: "#26A69A",
   },
   {
     id: "USD_JPY",
     name: "USD/JPY",
-    displayName: "US Dollar / Japanese Yen",
-    flag: "🇺🇸🇯🇵",
-    icon: "💴",
-    color: "#F44336",
+    displayName: "USDJPY",
+    color: "#EF5350",
   },
   {
-    id: "XAU_USD",
-    name: "XAU/USD",
-    displayName: "Gold / US Dollar",
-    flag: "🏅🇺🇸",
-    icon: "🥇",
-    color: "#FFD700",
+    id: "USD_CHF",
+    name: "USD/CHF",
+    displayName: "USDCHF",
+    color: "#AB47BC",
+  },
+  {
+    id: "AUD_USD",
+    name: "AUD/USD",
+    displayName: "AUDUSD",
+    color: "#FF7043",
+  },
+  {
+    id: "USD_CAD",
+    name: "USD/CAD",
+    displayName: "USDCAD",
+    color: "#EC407A",
+  },
+  {
+    id: "NZD_USD",
+    name: "NZD/USD",
+    displayName: "NZDUSD",
+    color: "#26C6DA",
+  },
+  // Cross Pairs
+  {
+    id: "EUR_GBP",
+    name: "EUR/GBP",
+    displayName: "EURGBP",
+    color: "#7E57C2",
+  },
+  {
+    id: "EUR_JPY",
+    name: "EUR/JPY",
+    displayName: "EURJPY",
+    color: "#5C6BC0",
+  },
+  {
+    id: "GBP_JPY",
+    name: "GBP/JPY",
+    displayName: "GBPJPY",
+    color: "#26A69A",
+  },
+  {
+    id: "EUR_CHF",
+    name: "EUR/CHF",
+    displayName: "EURCHF",
+    color: "#8D6E63",
+  },
+  {
+    id: "EUR_AUD",
+    name: "EUR/AUD",
+    displayName: "EURAUD",
+    color: "#78909C",
+  },
+  {
+    id: "GBP_CHF",
+    name: "GBP/CHF",
+    displayName: "GBPCHF",
+    color: "#FF7043",
+  },
+  {
+    id: "AUD_JPY",
+    name: "AUD/JPY",
+    displayName: "AUDJPY",
+    color: "#9CCC65",
+  },
+  {
+    id: "CHF_JPY",
+    name: "CHF/JPY",
+    displayName: "CHFJPY",
+    color: "#D4E157",
+  },
+  {
+    id: "NZD_JPY",
+    name: "NZD/JPY",
+    displayName: "NZDJPY",
+    color: "#FFCA28",
+  },
+  {
+    id: "AUD_NZD",
+    name: "AUD/NZD",
+    displayName: "AUDNZD",
+    color: "#29B6F6",
+  },
+  {
+    id: "EUR_CAD",
+    name: "EUR/CAD",
+    displayName: "EURCAD",
+    color: "#BDBDBD",
+  },
+  {
+    id: "GBP_AUD",
+    name: "GBP/AUD",
+    displayName: "GBPAUD",
+    color: "#FF4081",
+  },
+  {
+    id: "GBP_CAD",
+    name: "GBP/CAD",
+    displayName: "GBPCAD",
+    color: "#7C4DFF",
   },
 ];
 

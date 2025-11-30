@@ -1,24 +1,28 @@
 {
-  "name": "main",
   "expo": {
     "name": "Predictrix",
     "slug": "predictrix",
     "scheme": "predictrix",
     "version": "1.1.1",
-    "icon": "./assets/icon.jpg",
+    "sdkVersion": "51.0.0",
+    "icon": "./assets/icon.png",
     "orientation": "portrait",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "userInterfaceStyle": "automatic",
-    "sdkVersion": "54.0.0",
     "updates": {
-      "fallbackToCacheTimeout": 0
+      "enabled": false
     },
     "splash": {
-      "image": "./assets/icon.jpg",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#1a237e"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.asuralab.predictrix"
@@ -26,13 +30,8 @@
     "android": {
       "package": "com.asuralab.predictrix",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.jpg",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1a237e"
-      }
-    },
-    "extra": {
-      "eas": {
-        "projectId": "b1fff19c-7b43-49f0-89dc-a3d6f2ed5c33"
       }
     }
   }

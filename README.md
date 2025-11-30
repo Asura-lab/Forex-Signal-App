@@ -69,7 +69,6 @@
   - Risk management constraints
 
 - ✅ **Experience Replay**
-  - 50,000 transition buffer
   - Mini-batch learning (64)
   - Target network stabilization
 

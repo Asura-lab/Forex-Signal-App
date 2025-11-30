@@ -9,21 +9,18 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { getColors, getGradients } from "../config/theme";
+import { getColors } from "../config/theme";
 import { loginUser } from "../services/api";
-import { API_BASE_URL } from "../config/api";
 
 /**
- * Login Screen - Нэвтрэх дэлгэц
+ * Login Screen - Professional minimal design
  */
 const LoginScreen = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
-  const gradients = getGradients(isDark);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -31,7 +28,6 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
 
   const handleLogin = async () => {
-    // Validation
     if (!email.trim() || !password.trim()) {
       Alert.alert("Алдаа", "Имэйл болон нууц үг оруулна уу");
       return;
@@ -45,17 +41,14 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
 
     try {
-      // Use the auth service to login
       const result = await loginUser(email, password);
 
       if (result.success) {
-        // Navigate to Main tabs after successful login
         navigation.reset({
           index: 0,
           routes: [{ name: "Main" }],
         });
       } else {
-        // Имэйл баталгаажаагүй бол
         if (result.requiresVerification) {
           Alert.alert(
             "Имэйл баталгаажуулах",
@@ -78,58 +71,48 @@ const LoginScreen = ({ navigation }) => {
       let errorMessage = "Нэвтрэх явцад алдаа гарлаа.";
 
       if (error.message === "Network Error") {
-        errorMessage =
-          "Сүлжээний алдаа! Backend server холбогдохгүй байна.\nТа WiFi холболтоо шалгана уу.";
+        errorMessage = "Сүлжээний алдаа! Backend server холбогдохгүй байна.";
       } else if (error.code === "ECONNABORTED") {
-        errorMessage =
-          "Хүлээх хугацаа дууслаа. Backend server-тэй холбогдож чадсангүй.";
+        errorMessage = "Хүлээх хугацаа дууслаа.";
       }
 
-      Alert.alert("Алдаа", errorMessage + "\n\nДахин оролдоно уу.");
+      Alert.alert("Алдаа", errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSignUp = () => {
-    navigation.navigate("SignUp");
-  };
-
-  const styles = createStyles(colors, gradients);
+  const styles = createStyles(colors);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <LinearGradient
-        colors={gradients.primary}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <View style={styles.content}>
-          {/* Logo/Title */}
-          <View style={styles.headerContainer}>
-            <Ionicons name="trending-up" size={60} color={colors.textPrimary} />
-            <Text style={styles.title}>Форекс Сигнал</Text>
-            <Text style={styles.subtitle}>AI-аар хөтлөгддөг таамаглал</Text>
-            <Text style={styles.apiDebug}>API: {API_BASE_URL}</Text>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+      
+      <View style={styles.content}>
+        {/* Logo */}
+        <View style={styles.headerContainer}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logoLine} />
+            <View style={[styles.logoLine, styles.logoLine2]} />
+            <View style={[styles.logoLine, styles.logoLine3]} />
           </View>
+          <Text style={styles.title}>FOREX SIGNAL</Text>
+          <Text style={styles.subtitle}>AI Trading Assistant</Text>
+        </View>
 
-          {/* Login Form */}
-          <View style={styles.formContainer}>
+        {/* Form */}
+        <View style={styles.formContainer}>
+          {/* Email */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>EMAIL</Text>
             <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={colors.icon}
-                style={styles.inputIcon}
-              />
               <TextInput
                 style={styles.input}
-                placeholder="Имэйл хаяг"
-                placeholderTextColor={colors.placeholderText}
+                placeholder="your@email.com"
+                placeholderTextColor="#4A5568"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -137,18 +120,16 @@ const LoginScreen = ({ navigation }) => {
                 autoComplete="email"
               />
             </View>
+          </View>
 
+          {/* Password */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>PASSWORD</Text>
             <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color={colors.icon}
-                style={styles.inputIcon}
-              />
               <TextInput
-                style={[styles.input, styles.passwordInput]}
-                placeholder="Нууц үг"
-                placeholderTextColor={colors.placeholderText}
+                style={styles.input}
+                placeholder="Enter password"
+                placeholderTextColor="#4A5568"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
@@ -156,67 +137,66 @@ const LoginScreen = ({ navigation }) => {
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
+                style={styles.toggleButton}
               >
-                <Ionicons
-                  name={showPassword ? "eye-outline" : "eye-off-outline"}
-                  size={20}
-                  color={colors.icon}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Login Button */}
-            <TouchableOpacity
-              style={[styles.loginButton, loading && styles.disabledButton]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color={colors.textPrimary} />
-              ) : (
-                <Text style={styles.loginButtonText}>Нэвтрэх</Text>
-              )}
-            </TouchableOpacity>
-
-            {/* Forgot Password */}
-            <TouchableOpacity
-              style={styles.forgotPassword}
-              onPress={() => navigation.navigate("ForgotPassword")}
-            >
-              <Text style={styles.forgotPasswordText}>
-                Нууц үгээ мартсан уу?
-              </Text>
-            </TouchableOpacity>
-
-            {/* Sign Up Link */}
-            <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Бүртгэлгүй юу? </Text>
-              <TouchableOpacity onPress={handleSignUp}>
-                <Text style={styles.signupLink}>Бүртгүүлэх</Text>
+                <Text style={styles.toggleText}>
+                  {showPassword ? "HIDE" : "SHOW"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Footer */}
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>
-              Энэ аппликейшн нь судалгааны зорилгоор бүтээгдсэн
-            </Text>
+          {/* Forgot Password */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ForgotPassword")}
+            style={styles.forgotButton}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.disabledButton]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
           </View>
+
+          {/* Sign Up */}
+          <TouchableOpacity
+            style={styles.signupButton}
+            onPress={() => navigation.navigate("SignUp")}
+          >
+            <Text style={styles.signupButtonText}>Create Account</Text>
+          </TouchableOpacity>
         </View>
-      </LinearGradient>
+
+        {/* Footer */}
+        <Text style={styles.footerText}>
+          For research purposes only
+        </Text>
+      </View>
     </KeyboardAvoidingView>
   );
 };
 
-const createStyles = (colors, gradients) =>
+const createStyles = (colors) =>
   StyleSheet.create({
     container: {
       flex: 1,
-    },
-    gradient: {
-      flex: 1,
+      backgroundColor: colors.background,
     },
     content: {
       flex: 1,
@@ -227,120 +207,138 @@ const createStyles = (colors, gradients) =>
       alignItems: "center",
       marginBottom: 48,
     },
+    logoContainer: {
+      width: 60,
+      height: 60,
+      justifyContent: 'center',
+      alignItems: 'flex-start',
+      marginBottom: 16,
+    },
+    logoLine: {
+      width: 40,
+      height: 3,
+      backgroundColor: colors.success,
+      marginVertical: 3,
+      borderRadius: 2,
+    },
+    logoLine2: {
+      width: 50,
+      backgroundColor: colors.success,
+      opacity: 0.8,
+    },
+    logoLine3: {
+      width: 30,
+      backgroundColor: colors.success,
+      opacity: 0.6,
+    },
     title: {
-      fontSize: 32,
-      fontWeight: "bold",
+      fontSize: 28,
+      fontWeight: "700",
       color: colors.textPrimary,
-      marginTop: 16,
+      letterSpacing: 3,
     },
     subtitle: {
-      fontSize: 16,
+      fontSize: 13,
       color: colors.textSecondary,
       marginTop: 8,
-    },
-    apiDebug: {
-      fontSize: 10,
-      color: colors.warning,
-      marginTop: 4,
-      fontFamily: "monospace",
+      letterSpacing: 1,
     },
     formContainer: {
       backgroundColor: colors.card,
       borderRadius: 16,
       padding: 24,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 4.65,
-      elevation: 8,
+    },
+    inputWrapper: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 8,
+      letterSpacing: 1,
     },
     inputContainer: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: colors.input,
-      borderRadius: 12,
-      marginBottom: 16,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      height: 50,
       paddingHorizontal: 16,
-      height: 56,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    inputIcon: {
-      marginRight: 12,
-    },
     input: {
       flex: 1,
-      fontSize: 16,
-      color: colors.textInput,
+      fontSize: 15,
+      color: colors.textPrimary,
     },
-    passwordInput: {
-      paddingRight: 40,
+    toggleButton: {
+      paddingHorizontal: 8,
     },
-    eyeIcon: {
-      position: "absolute",
-      right: 16,
-      padding: 8,
+    toggleText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.success,
+      letterSpacing: 1,
+    },
+    forgotButton: {
+      alignSelf: 'flex-end',
+      marginBottom: 24,
+    },
+    forgotText: {
+      fontSize: 13,
+      color: colors.textSecondary,
     },
     loginButton: {
-      backgroundColor: colors.secondary,
-      borderRadius: 12,
-      height: 56,
+      backgroundColor: colors.success,
+      borderRadius: 8,
+      height: 50,
       justifyContent: "center",
       alignItems: "center",
-      marginTop: 8,
-      shadowColor: colors.secondary,
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 4.65,
-      elevation: 8,
     },
     disabledButton: {
       opacity: 0.6,
     },
     loginButtonText: {
-      color: colors.textPrimary,
-      fontSize: 18,
-      fontWeight: "bold",
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: "600",
+      letterSpacing: 1,
     },
-    forgotPassword: {
-      alignItems: "center",
-      marginTop: 16,
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 24,
     },
-    forgotPasswordText: {
-      color: colors.info,
-      fontSize: 14,
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
     },
-    signupContainer: {
-      flexDirection: "row",
+    dividerText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginHorizontal: 16,
+    },
+    signupButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      height: 50,
       justifyContent: "center",
-      marginTop: 24,
-      paddingTop: 24,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderDark,
-    },
-    signupText: {
-      color: colors.textDark,
-      fontSize: 14,
-    },
-    signupLink: {
-      color: colors.info,
-      fontSize: 14,
-      fontWeight: "bold",
-    },
-    footer: {
-      marginTop: 32,
       alignItems: "center",
+    },
+    signupButtonText: {
+      color: colors.textPrimary,
+      fontSize: 15,
+      fontWeight: "500",
     },
     footerText: {
       color: colors.textSecondary,
       fontSize: 12,
       textAlign: "center",
+      marginTop: 32,
     },
   });
 

@@ -3,112 +3,112 @@
  * Light & Dark mode дэмжсэн theme system
  */
 
-// Light Mode Colors
+// Light Mode Colors - Soft gray theme (not pure white)
 export const lightColors = {
   // Primary Colors
-  primary: "#1a237e",
-  primaryLight: "#283593",
-  primaryDark: "#0d1757",
-  primaryGradientStart: "#1a237e",
-  primaryGradientEnd: "#3949ab",
+  primary: "#3B82F6",
+  primaryLight: "#60A5FA",
+  primaryDark: "#2563EB",
+  primaryGradientStart: "#2563EB",
+  primaryGradientEnd: "#3B82F6",
 
   // Secondary Colors
-  secondary: "#4CAF50",
-  secondaryLight: "#81C784",
-  secondaryDark: "#388E3C",
+  secondary: "#10B981",
+  secondaryLight: "#34D399",
+  secondaryDark: "#059669",
 
   // Accent Colors
-  accent: "#FF9800",
-  accentLight: "#FFB74D",
-  accentDark: "#F57C00",
+  accent: "#F59E0B",
+  accentLight: "#FBBF24",
+  accentDark: "#D97706",
 
   // Status Colors
-  success: "#4CAF50",
-  warning: "#FF9800",
-  error: "#F44336",
-  info: "#2196F3",
+  success: "#10B981",
+  warning: "#F59E0B",
+  error: "#EF4444",
+  info: "#3B82F6",
 
   // Text Colors
-  textPrimary: "#FFFFFF",
-  textSecondary: "#E3F2FD",
-  textMuted: "rgba(255,255,255,0.6)",
-  textDark: "#333333",
-  textLabel: "#757575", // Label текст (card дээр харагдах саарал)
-  textInput: "#333333", // Input талбарын текст
-  placeholderText: "#999999", // Placeholder текст
-  icon: "#666666", // Icon өнгө (light mode дээр харанхуй)
+  textPrimary: "#1F2937",
+  textSecondary: "#6B7280",
+  textMuted: "rgba(0,0,0,0.4)",
+  textDark: "#111827",
+  textLabel: "#6B7280",
+  textInput: "#1F2937",
+  placeholderText: "#9CA3AF",
+  icon: "#6B7280",
 
-  // Background Colors
-  background: "#F5F5F5",
-  backgroundDark: "#1a237e",
-  card: "#FFFFFF",
-  cardSecondary: "#F8F9FA",
+  // Background Colors - Soft gray (гэгээлэг харин цагаан биш)
+  background: "#E5E7EB",
+  backgroundDark: "#D1D5DB",
+  card: "#F3F4F6",
+  cardSecondary: "#E5E7EB",
   overlay: "rgba(0,0,0,0.5)",
 
   // UI Elements
-  border: "rgba(255,255,255,0.3)",
-  borderDark: "#E0E0E0",
-  input: "#F5F5F5", // Input background өнгө
-  disabled: "rgba(255,255,255,0.5)",
+  border: "#D1D5DB",
+  borderDark: "#9CA3AF",
+  input: "#F9FAFB",
+  disabled: "rgba(0,0,0,0.3)",
 
   // Trend Colors
-  bullish: "#4CAF50",
-  bearish: "#F44336",
-  neutral: "#9E9E9E",
+  bullish: "#10B981",
+  bearish: "#EF4444",
+  neutral: "#6B7280",
 };
 
 // Dark Mode Colors
 export const darkColors = {
   // Primary Colors
-  primary: "#7C4DFF",
-  primaryLight: "#9575CD",
-  primaryDark: "#5E35B1",
-  primaryGradientStart: "#5E35B1",
-  primaryGradientEnd: "#7C4DFF",
+  primary: "#3B82F6",
+  primaryLight: "#60A5FA",
+  primaryDark: "#2563EB",
+  primaryGradientStart: "#2563EB",
+  primaryGradientEnd: "#3B82F6",
 
   // Secondary Colors
-  secondary: "#66BB6A",
-  secondaryLight: "#81C784",
-  secondaryDark: "#4CAF50",
+  secondary: "#10B981",
+  secondaryLight: "#34D399",
+  secondaryDark: "#059669",
 
   // Accent Colors
-  accent: "#FFB74D",
-  accentLight: "#FFCC80",
-  accentDark: "#FFA726",
+  accent: "#FBBF24",
+  accentLight: "#FCD34D",
+  accentDark: "#F59E0B",
 
   // Status Colors
-  success: "#66BB6A",
-  warning: "#FFB74D",
-  error: "#EF5350",
-  info: "#42A5F5",
+  success: "#10B981",
+  warning: "#F59E0B",
+  error: "#EF4444",
+  info: "#3B82F6",
 
-  // Text Colors
-  textPrimary: "#FFFFFF",
-  textSecondary: "#B0B0B0",
+  // Text Colors - DARK MODE
+  textPrimary: "#F9FAFB",
+  textSecondary: "#9CA3AF",
   textMuted: "rgba(255,255,255,0.5)",
-  textDark: "#FFFFFF", // Dark mode дээр цагаан текст (card дээр)
-  textLabel: "#999999", // Label текст (dark card дээр харагдах цайвар саарал)
-  textInput: "#FFFFFF", // Input талбарын текст
-  placeholderText: "#666666", // Placeholder текст
-  icon: "#B0B0B0", // Icon өнгө (dark mode дээр цайвар)
+  textDark: "#F9FAFB",
+  textLabel: "#9CA3AF",
+  textInput: "#F9FAFB",
+  placeholderText: "#6B7280",
+  icon: "#9CA3AF",
 
-  // Background Colors
-  background: "#121212",
-  backgroundDark: "#1E1E1E",
-  card: "#1E1E1E",
-  cardSecondary: "#2C2C2C",
-  overlay: "rgba(0,0,0,0.7)",
+  // Background Colors - DARK MODE (deep dark blue)
+  background: "#0F172A",
+  backgroundDark: "#020617",
+  card: "#1E293B",
+  cardSecondary: "#334155",
+  overlay: "rgba(0,0,0,0.8)",
 
   // UI Elements
-  border: "rgba(255,255,255,0.12)",
-  borderDark: "#2C2C2C",
-  input: "#2C2C2C", // Input background өнгө
+  border: "#334155",
+  borderDark: "#475569",
+  input: "#1E293B",
   disabled: "rgba(255,255,255,0.3)",
 
   // Trend Colors
-  bullish: "#66BB6A",
-  bearish: "#EF5350",
-  neutral: "#9E9E9E",
+  bullish: "#10B981",
+  bearish: "#EF4444",
+  neutral: "#6B7280",
 };
 
 // Backward compatibility

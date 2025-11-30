@@ -10,21 +10,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Linking,
+  StatusBar,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
-import { getColors, getGradients } from "../config/theme";
+import { getColors } from "../config/theme";
 import { registerUser } from "../services/api";
 
 /**
- * SignUp Screen - Бүртгүүлэх дэлгэц
+ * SignUp Screen - Professional minimal design
  */
 const SignUpScreen = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
-  const gradients = getGradients(isDark);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -36,164 +33,122 @@ const SignUpScreen = ({ navigation }) => {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const handleSignUp = async () => {
-    // Validation
-    if (
-      !name.trim() ||
-      !email.trim() ||
-      !password.trim() ||
-      !confirmPassword.trim()
-    ) {
-      Alert.alert("Алдаа", "Бүх талбаруудыг бөглөнө үү");
+    if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+      Alert.alert("Error", "Please fill all fields");
       return;
     }
 
     if (!acceptedTerms) {
-      Alert.alert(
-        "Анхаар",
-        "Үргэлжлүүлэхийн тулд Үйлчилгээний нөхцөл болон Нууцлалын бодлогыг зөвшөөрөх шаардлагатай"
-      );
+      Alert.alert("Notice", "Please accept Terms of Service and Privacy Policy");
       return;
     }
 
     if (!email.includes("@")) {
-      Alert.alert("Алдаа", "Зөв имэйл хаяг оруулна уу");
+      Alert.alert("Error", "Please enter a valid email");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Алдаа", "Нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+      Alert.alert("Error", "Password must be at least 6 characters");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Алдаа", "Нууц үг таарахгүй байна");
+      Alert.alert("Error", "Passwords do not match");
       return;
     }
 
     setLoading(true);
 
     try {
-      // Бүртгүүлэх - имэйл баталгаажуулалтын код илгээнэ
       const result = await registerUser(name, email, password);
 
       if (result.success) {
-        // Email verification screen рүү шилжих
         navigation.navigate("EmailVerification", {
           email: email,
           name: name,
-          verificationCode: result.data.demo_mode
-            ? result.data.verification_code
-            : null,
+          verificationCode: result.data.demo_mode ? result.data.verification_code : null,
         });
       } else {
-        Alert.alert("Алдаа", result.error || "Бүртгэл үүсгэх амжилтгүй боллоо");
+        Alert.alert("Error", result.error || "Registration failed");
       }
     } catch (error) {
-      Alert.alert(
-        "Алдаа",
-        "Бүртгэл үүсгэх явцад алдаа гарлаа. Дахин оролдоно уу."
-      );
+      Alert.alert("Error", "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogin = () => {
-    navigation.navigate("Login");
-  };
-
   const openTermsOfService = () => {
     Alert.alert(
-      "Үйлчилгээний нөхцөл",
-      "📋 ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ\n\n" +
-        "1. Үйлчилгээний тухай\n" +
-        "Predictrix нь гадаад валютын арилжааны мэдээлэл, аналитик тайлан өгдөг. " +
-        "Энэ нь зөвлөмж бөгөөд хөрөнгө оруулалтын зөвлөгөө БИШ.\n\n" +
-        "2. Эрсдэлийн анхааруулга\n" +
-        "⚠️ Forex арилжаа өндөр эрсдэлтэй. Та хөрөнгөө бүрэн алдаж болзошгүй.\n\n" +
-        "3. Хэрэглэгчийн хариуцлага\n" +
-        "Та өөрийн шийдвэрээ өөрөө гаргаж, эрсдэлээ өөрөө хариуцна.\n\n" +
-        "Дэлгэрэнгүй унших: Профайл → Мэдээлэл → Үйлчилгээний нөхцөл"
+      "Terms of Service",
+      "TERMS OF SERVICE\n\n" +
+      "1. About Service\n" +
+      "Forex Signal provides trading analytics and information. This is NOT investment advice.\n\n" +
+      "2. Risk Warning\n" +
+      "Forex trading involves high risk. You may lose your entire investment.\n\n" +
+      "3. User Responsibility\n" +
+      "You are responsible for your own trading decisions."
     );
   };
 
   const openPrivacyPolicy = () => {
     Alert.alert(
-      "Нууцлалын бодлого",
-      "🔒 НУУЦЛАЛЫН БОДЛОГО\n\n" +
-        "1. Цуглуулах мэдээлэл\n" +
-        "• Нэр, имэйл хаяг\n" +
-        "• Апп ашиглалтын мэдээлэл\n\n" +
-        "2. Мэдээлэл хамгаалалт\n" +
-        "• HTTPS/TLS шифрлэлт\n" +
-        "• Bcrypt нууц үг хадгалалт\n" +
-        "• MongoDB Atlas аюулгүй сервер\n\n" +
-        "3. Таны эрх\n" +
-        "• Мэдээлэл үзэх, засах, устгах эрхтэй\n" +
-        "• Бидэнтэй холбогдох: contact@predictrix.com\n\n" +
-        "Дэлгэрэнгүй унших: Профайл → Мэдээлэл → Нууцлалын бодлого"
+      "Privacy Policy",
+      "PRIVACY POLICY\n\n" +
+      "1. Data Collection\n" +
+      "- Name, email address\n" +
+      "- App usage data\n\n" +
+      "2. Data Protection\n" +
+      "- HTTPS/TLS encryption\n" +
+      "- Bcrypt password hashing\n\n" +
+      "3. Your Rights\n" +
+      "- Access, modify, delete your data"
     );
   };
-
-  const styles = createStyles(colors, gradients);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <LinearGradient
-        colors={gradients.primary}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.content}>
-            {/* Logo/Title */}
-            <View style={styles.headerContainer}>
-              <Ionicons
-                name="trending-up"
-                size={60}
-                color={colors.textPrimary}
-              />
-              <Text style={styles.title}>Бүртгүүлэх</Text>
-              <Text style={styles.subtitle}>Шинэ хэрэглэгч үүсгэх</Text>
-            </View>
+      <StatusBar barStyle="light-content" backgroundColor="#0D1421" />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Text style={styles.backText}>{"<"} Back</Text>
+            </TouchableOpacity>
+            <Text style={styles.title}>CREATE ACCOUNT</Text>
+            <Text style={styles.subtitle}>Join Forex Signal</Text>
+          </View>
 
-            {/* SignUp Form */}
-            <View style={styles.formContainer}>
+          {/* Form */}
+          <View style={styles.formContainer}>
+            {/* Name */}
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>NAME</Text>
               <View style={styles.inputContainer}>
-                <Ionicons
-                  name="person-outline"
-                  size={20}
-                  color={colors.icon}
-                  style={styles.inputIcon}
-                />
                 <TextInput
                   style={styles.input}
-                  placeholder="Нэр"
-                  placeholderTextColor={colors.placeholderText}
+                  placeholder="Your name"
+                  placeholderTextColor="#4A5568"
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
                 />
               </View>
+            </View>
 
+            {/* Email */}
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>EMAIL</Text>
               <View style={styles.inputContainer}>
-                <Ionicons
-                  name="mail-outline"
-                  size={20}
-                  color={colors.icon}
-                  style={styles.inputIcon}
-                />
                 <TextInput
                   style={styles.input}
-                  placeholder="Имэйл хаяг"
-                  placeholderTextColor={colors.placeholderText}
+                  placeholder="your@email.com"
+                  placeholderTextColor="#4A5568"
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -201,295 +156,227 @@ const SignUpScreen = ({ navigation }) => {
                   autoComplete="email"
                 />
               </View>
+            </View>
 
+            {/* Password */}
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>PASSWORD</Text>
               <View style={styles.inputContainer}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={colors.icon}
-                  style={styles.inputIcon}
-                />
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
-                  placeholder="Нууц үг (дор хаяж 6 тэмдэгт)"
-                  placeholderTextColor={colors.placeholderText}
+                  style={styles.input}
+                  placeholder="Min 6 characters"
+                  placeholderTextColor="#4A5568"
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoCapitalize="none"
                 />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-outline" : "eye-off-outline"}
-                    size={20}
-                    color={colors.icon}
-                  />
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.toggleButton}>
+                  <Text style={styles.toggleText}>{showPassword ? "HIDE" : "SHOW"}</Text>
                 </TouchableOpacity>
               </View>
+            </View>
 
+            {/* Confirm Password */}
+            <View style={styles.inputWrapper}>
+              <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
               <View style={styles.inputContainer}>
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={colors.icon}
-                  style={styles.inputIcon}
-                />
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
-                  placeholder="Нууц үг дахин оруулах"
-                  placeholderTextColor={colors.placeholderText}
+                  style={styles.input}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#4A5568"
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
                   autoCapitalize="none"
                 />
-                <TouchableOpacity
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  style={styles.eyeIcon}
-                >
-                  <Ionicons
-                    name={
-                      showConfirmPassword ? "eye-outline" : "eye-off-outline"
-                    }
-                    size={20}
-                    color={colors.icon}
-                  />
-                </TouchableOpacity>
-              </View>
-
-              {/* Terms and Privacy Policy Checkbox */}
-              <View style={styles.termsContainer}>
-                <TouchableOpacity
-                  style={styles.checkboxContainer}
-                  onPress={() => setAcceptedTerms(!acceptedTerms)}
-                >
-                  <View
-                    style={[
-                      styles.checkbox,
-                      acceptedTerms && styles.checkboxChecked,
-                    ]}
-                  >
-                    {acceptedTerms && (
-                      <Ionicons name="checkmark" size={18} color="#FFFFFF" />
-                    )}
-                  </View>
-                  <View style={styles.termsTextContainer}>
-                    <Text style={styles.termsLabel}>
-                      Би{" "}
-                      <Text
-                        style={styles.termsLink}
-                        onPress={openTermsOfService}
-                      >
-                        Үйлчилгээний нөхцөл
-                      </Text>{" "}
-                      болон{" "}
-                      <Text
-                        style={styles.termsLink}
-                        onPress={openPrivacyPolicy}
-                      >
-                        Нууцлалын бодлого
-                      </Text>
-                      -той танилцаж зөвшөөрч байна
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* SignUp Button */}
-              <TouchableOpacity
-                style={[
-                  styles.signupButton,
-                  (loading || !acceptedTerms) && styles.disabledButton,
-                ]}
-                onPress={handleSignUp}
-                disabled={loading || !acceptedTerms}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.signupButtonText}>Бүртгүүлэх</Text>
-                )}
-              </TouchableOpacity>
-
-              {/* Login Link */}
-              <View style={styles.loginContainer}>
-                <Text style={styles.loginText}>Бүртгэлтэй юу? </Text>
-                <TouchableOpacity onPress={handleLogin}>
-                  <Text style={styles.loginLink}>Нэвтрэх</Text>
+                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.toggleButton}>
+                  <Text style={styles.toggleText}>{showConfirmPassword ? "HIDE" : "SHOW"}</Text>
                 </TouchableOpacity>
               </View>
             </View>
+
+            {/* Terms Checkbox */}
+            <TouchableOpacity style={styles.termsContainer} onPress={() => setAcceptedTerms(!acceptedTerms)}>
+              <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
+                {acceptedTerms && <Text style={styles.checkmark}>+</Text>}
+              </View>
+              <Text style={styles.termsText}>
+                I agree to the{" "}
+                <Text style={styles.termsLink} onPress={openTermsOfService}>Terms</Text>
+                {" "}and{" "}
+                <Text style={styles.termsLink} onPress={openPrivacyPolicy}>Privacy Policy</Text>
+              </Text>
+            </TouchableOpacity>
+
+            {/* Sign Up Button */}
+            <TouchableOpacity
+              style={[styles.signupButton, (loading || !acceptedTerms) && styles.disabledButton]}
+              onPress={handleSignUp}
+              disabled={loading || !acceptedTerms}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.signupButtonText}>Create Account</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Login Link */}
+            <View style={styles.loginContainer}>
+              <Text style={styles.loginText}>Already have account? </Text>
+              <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                <Text style={styles.loginLink}>Sign In</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </ScrollView>
-      </LinearGradient>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
-const createStyles = (colors, gradients) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-    },
-    gradient: {
-      flex: 1,
-    },
-    scrollContent: {
-      flexGrow: 1,
-    },
-    content: {
-      flex: 1,
-      justifyContent: "center",
-      padding: 24,
-      paddingTop: 60,
-      paddingBottom: 40,
-    },
-    headerContainer: {
-      alignItems: "center",
-      marginBottom: 32,
-    },
-    title: {
-      fontSize: 32,
-      fontWeight: "bold",
-      color: colors.textPrimary,
-      marginTop: 16,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginTop: 8,
-    },
-    formContainer: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 24,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 4.65,
-      elevation: 8,
-    },
-    inputContainer: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.input,
-      borderRadius: 12,
-      marginBottom: 16,
-      paddingHorizontal: 16,
-      height: 56,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    inputIcon: {
-      marginRight: 12,
-    },
-    input: {
-      flex: 1,
-      fontSize: 16,
-      color: colors.textInput,
-    },
-    passwordInput: {
-      paddingRight: 40,
-    },
-    eyeIcon: {
-      position: "absolute",
-      right: 16,
-      padding: 8,
-    },
-    signupButton: {
-      backgroundColor: colors.secondary,
-      borderRadius: 12,
-      height: 56,
-      justifyContent: "center",
-      alignItems: "center",
-      marginTop: 8,
-      shadowColor: colors.secondary,
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-      shadowOpacity: 0.3,
-      shadowRadius: 4.65,
-      elevation: 8,
-    },
-    disabledButton: {
-      opacity: 0.6,
-    },
-    signupButtonText: {
-      color: colors.textPrimary,
-      fontSize: 18,
-      fontWeight: "bold",
-    },
-    loginContainer: {
-      flexDirection: "row",
-      justifyContent: "center",
-      marginTop: 24,
-      paddingTop: 24,
-      borderTopWidth: 1,
-      borderTopColor: colors.borderDark,
-    },
-    loginText: {
-      color: colors.textDark,
-      fontSize: 14,
-    },
-    loginLink: {
-      color: colors.info,
-      fontSize: 14,
-      fontWeight: "bold",
-    },
-    termsContainer: {
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    checkboxContainer: {
-      flexDirection: "row",
-      alignItems: "flex-start",
-    },
-    checkbox: {
-      width: 24,
-      height: 24,
-      borderRadius: 6,
-      borderWidth: 2,
-      borderColor: colors.borderDark,
-      backgroundColor: colors.card,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
-      marginTop: 2,
-    },
-    checkboxChecked: {
-      backgroundColor: colors.secondary,
-      borderColor: colors.secondary,
-    },
-    termsTextContainer: {
-      flex: 1,
-    },
-    termsLabel: {
-      fontSize: 13,
-      color: colors.textDark,
-      lineHeight: 20,
-    },
-    termsLink: {
-      color: colors.info,
-      fontWeight: "600",
-      textDecorationLine: "underline",
-    },
-    terms: {
-      marginTop: 24,
-      alignItems: "center",
-    },
-    termsText: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      textAlign: "center",
-      lineHeight: 18,
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0D1421',
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  content: {
+    flex: 1,
+    padding: 24,
+    paddingTop: 50,
+  },
+  headerContainer: {
+    marginBottom: 32,
+  },
+  backButton: {
+    marginBottom: 24,
+  },
+  backText: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: '#FFFFFF',
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 8,
+  },
+  formContainer: {
+    backgroundColor: '#131C2E',
+    borderRadius: 16,
+    padding: 24,
+  },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 8,
+    letterSpacing: 1,
+  },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: '#0D1421',
+    borderRadius: 8,
+    height: 50,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    color: '#FFFFFF',
+  },
+  toggleButton: {
+    paddingHorizontal: 8,
+  },
+  toggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#00C853',
+    letterSpacing: 1,
+  },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#1E293B',
+    backgroundColor: '#0D1421',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxChecked: {
+    backgroundColor: '#00C853',
+    borderColor: '#00C853',
+  },
+  checkmark: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    transform: [{ rotate: '45deg' }],
+  },
+  termsText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#6B7280',
+  },
+  termsLink: {
+    color: '#00C853',
+    fontWeight: '600',
+  },
+  signupButton: {
+    backgroundColor: '#00C853',
+    borderRadius: 8,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  signupButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
+  loginContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    marginTop: 24,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+  },
+  loginText: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  loginLink: {
+    color: '#00C853',
+    fontSize: 14,
+    fontWeight: "600",
+  },
+});
 
 export default SignUpScreen;

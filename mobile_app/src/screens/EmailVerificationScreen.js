@@ -11,7 +11,7 @@ import {
   Platform,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "../components/Icon";
 import { verifyEmail, resendVerificationCode } from "../services/api";
 
 /**

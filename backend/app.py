@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Форекс Сигнал Full Backend API
-MongoDB + JWT Authentication + Multi-Timeframe Deep Learning Prediction ONLY
+Forex Signal API v2
+- MongoDB + JWT Authentication
+- UniRate API for live rates
+- V2 Signal Generator (BUY-only, 80%+ accuracy)
 """
 
 import sys
@@ -16,29 +18,28 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 import jwt
 import bcrypt
-import pandas as pd
-import numpy as np
-import pickle
 import os
 import random
 import re
 
 # Import configuration
 from config.settings import (
-    MONGO_URI, SECRET_KEY, API_HOST, API_PORT, DEBUG_MODE,
-    MODELS_DIR, CURRENCY_PAIRS,
+    MONGO_URI, SECRET_KEY, API_HOST, API_PORT,
     MAIL_SERVER, MAIL_PORT, MAIL_USE_TLS, MAIL_USE_SSL,
     MAIL_USERNAME, MAIL_PASSWORD, MAIL_DEFAULT_SENDER,
-    VERIFICATION_CODE_EXPIRY_MINUTES, RESET_CODE_EXPIRY_MINUTES,
-    MT5_ENABLED, MT5_LOGIN, MT5_PASSWORD, MT5_SERVER
+    VERIFICATION_CODE_EXPIRY_MINUTES, RESET_CODE_EXPIRY_MINUTES
 )
 
-# Import UniRate handler (PRIMARY - EUR/USD only)
-from utils.unirate_handler import get_unirate_live_rate, get_unirate_historical
+# Import Twelve Data handler (real-time + historical forex data)
+from utils.twelvedata_handler import (
+    get_twelvedata_live_rate, 
+    get_twelvedata_historical, 
+    get_twelvedata_dataframe,
+    get_all_forex_rates
+)
 
-# MT5 handler (DISABLED - not used)
-# from utils.mt5_handler import initialize_mt5, get_mt5_live_rates, shutdown_mt5, mt5_handler
-mt5_handler = None  # Placeholder
+# Import V2 Signal Generator
+from ml.signal_generator_v2 import get_signal_generator
 
 app = Flask(__name__)
 CORS(app)
@@ -52,12 +53,6 @@ app.config['MAIL_USERNAME'] = MAIL_USERNAME
 app.config['MAIL_PASSWORD'] = MAIL_PASSWORD
 app.config['MAIL_DEFAULT_SENDER'] = MAIL_DEFAULT_SENDER
 
-if MAIL_USERNAME and MAIL_PASSWORD:
-    masked_email = MAIL_USERNAME[:3] + "***@" + MAIL_USERNAME.split('@')[1] if '@' in MAIL_USERNAME else "***"
-    print(f"✓ Имэйл тохиргоо: {masked_email}")
-else:
-    print("⚠️ АНХААРУУЛГА: Имэйл тохиргоо хийгдээгүй байна!")
-
 mail = Mail(app)
 
 # ==================== DATABASE SETUP ====================
@@ -68,288 +63,56 @@ try:
     users_collection = db['users']
     verification_codes = db['verification_codes']
     reset_codes = db['reset_codes']
+    signals_collection = db['signals']  # Таамгууд хадгалах collection
     print("✓ MongoDB холбогдлоо")
 except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
     exit(1)
 
-# ==================== MULTI-TIMEFRAME MODELS ONLY ====================
+# ==================== V2 SIGNAL GENERATOR ====================
 
-models_multi_timeframe = {
-    '15min': {'model': None, 'scaler': None, 'encoder': None, 'metadata': None},
-    '30min': {'model': None, 'scaler': None, 'encoder': None, 'metadata': None},
-    '60min': {'model': None, 'scaler': None, 'encoder': None, 'metadata': None}
-}
+signal_generator_v2 = None
 
-# Prediction Cache
-prediction_cache = {}
-prediction_cache_time = {}
-PREDICTION_CACHE_DURATION = 300  # 5 минут
-
-def load_multi_timeframe_models():
-    """15, 30, 60 минутын Deep Learning моделуудыг ачаалах"""
-    global models_multi_timeframe
-    
+def load_signal_generator():
+    global signal_generator_v2
     try:
-        import tensorflow as tf
-        from tensorflow import keras
-        import json
-        print("\n🤖 Multi-Timeframe моделуудыг ачаалж байна...")
-        try:
-            print(f"🔎 TensorFlow version: {tf.__version__}")
-            # keras may be the standalone package or tf.keras forwarding
-            try:
-                import importlib
-                k_mod = importlib.import_module('keras')
-                k_ver = getattr(k_mod, '__version__', None)
-                print(f"🔎 Keras module: {k_mod.__name__}, version: {k_ver}")
-            except Exception:
-                # fallback to tf.keras
-                print(f"🔎 Keras via tensorflow.keras, version: {getattr(keras, '__version__', 'unknown')}")
-        except Exception:
-            pass
-        # Try to import model definitions that contain custom layers so they are
-        # registered with Keras' serialization system before we call load_model.
-        # This ensures classes like `TransformerBlock` are available.
-        custom_objects = {}
-        try:
-            # Import the module where TransformerBlock (and any other custom
-            # layers) live. Importing registers them because the file decorates
-            # classes with keras.saving.register_keras_serializable.
-            import importlib
-            transformer_mod = importlib.import_module('backend.ml.models.transformer_lstm')
-            # If the module exposes the TransformerBlock, add it to custom_objects
-            if hasattr(transformer_mod, 'TransformerBlock'):
-                custom_objects['TransformerBlock'] = getattr(transformer_mod, 'TransformerBlock')
-        except Exception:
-            # If import fails, continue — load_model will raise a helpful error.
-            transformer_mod = None
-    except ImportError as e:
-        print(f"⚠ TensorFlow суулгагдаагүй байна: {e}")
-        return False
-    
-    success_count = 0
-    
-    for timeframe in ['15min', '30min', '60min']:
-        try:
-            model_dir = MODELS_DIR / timeframe
-            
-            model_path = model_dir / f'multi_currency_{timeframe}_best.keras'
-            scaler_path = model_dir / f'multi_currency_{timeframe}_scaler.pkl'
-            encoder_path = model_dir / f'multi_currency_{timeframe}_encoder.pkl'
-            metadata_path = model_dir / f'multi_currency_{timeframe}_metadata.json'
-            
-            if not model_path.exists():
-                print(f"⚠ {timeframe} модель олдсонгүй: {model_path}")
-                continue
-            
-            try:
-                # Pass any discovered custom objects (e.g., TransformerBlock)
-                loaded_model = keras.models.load_model(
-                    str(model_path), compile=False, custom_objects=custom_objects
-                )
-                models_multi_timeframe[timeframe]['model'] = loaded_model
-                print(f"✓ {timeframe} .keras модель амжилттай ачааллаа")
-            except Exception as load_err:
-                # Print more diagnostics and traceback to help debugging format/version issues
-                import traceback
-                print(f"⚠ {timeframe} .keras модель ачааллахад алдаа: {load_err}")
-                traceback.print_exc()
-                print("ℹ Suggestion: this error often means the model file format or Keras/TensorFlow versions are incompatible.\n" \
-                      "If you have a standalone `keras` package installed, try removing it so `tf.keras` is used, or use a Python environment matching the versions used to save the models.\n" \
-                      "You can also re-export the model in SavedModel format and place it under the *_saved_model directory as a fallback.")
-                saved_model_dir = model_dir / f'multi_currency_{timeframe}_saved_model'
-                if saved_model_dir.exists():
-                    try:
-                        loaded_model = keras.models.load_model(str(saved_model_dir))
-                        models_multi_timeframe[timeframe]['model'] = loaded_model
-                        print(f"✓ {timeframe} SavedModel форматаар амжилттай ачааллаа")
-                    except Exception as saved_err:
-                        print(f"✗ {timeframe} SavedModel ачаалах алдаа: {saved_err}")
-                        continue
-                else:
-                    print(f"✗ {timeframe} модель ачаалагдсангүй")
-                    continue
-            
-            def safe_load_pickle(path_obj):
-                """Try to load a scaler/encoder file robustly and return (obj, error_message).
-                Tries pickle.load, joblib.load (if available), and gzip+pickle as fallbacks.
-                Logs file size and header bytes to help debugging corrupted/incorrect formats.
-                """
-                try:
-                    p = Path(path_obj)
-                    sz = p.stat().st_size
-                    with open(p, 'rb') as fh:
-                        head = fh.read(16)
-                    head_hex = ' '.join([f"{b:02x}" for b in head])
-                except Exception as e:
-                    return None, f"Could not read file header: {e}"
-
-                # Try pickle
-                try:
-                    with open(path_obj, 'rb') as f:
-                        obj = pickle.load(f)
-                    return obj, None
-                except Exception as e_pickle:
-                    pickle_err = str(e_pickle)
-
-                # Try joblib if available
-                try:
-                    import joblib
-                    try:
-                        obj = joblib.load(path_obj)
-                        return obj, None
-                    except Exception as e_joblib:
-                        joblib_err = str(e_joblib)
-                except Exception:
-                    joblib_err = 'joblib not available'
-
-                # Try gzip + pickle
-                try:
-                    import gzip
-                    with gzip.open(path_obj, 'rb') as gf:
-                        obj = pickle.load(gf)
-                    return obj, None
-                except Exception as e_gzip:
-                    gzip_err = str(e_gzip)
-
-                # If reached here, all attempts failed — return combined message with header info
-                err_msg = (
-                    f"failed to load (size={sz} bytes, header={head_hex}). "
-                    f"pickle_err={pickle_err}; joblib_err={joblib_err}; gzip_err={gzip_err}"
-                )
-                return None, err_msg
-
-            # Load scaler with robust loader and log helpful diagnostics on failure
-            if scaler_path.exists():
-                obj, err = safe_load_pickle(scaler_path)
-                if err:
-                    print(f"⚠ {timeframe} scaler load failed: {err}")
-                    models_multi_timeframe[timeframe]['scaler'] = None
-                else:
-                    models_multi_timeframe[timeframe]['scaler'] = obj
-
-            # Load encoder with robust loader
-            if encoder_path.exists():
-                obj, err = safe_load_pickle(encoder_path)
-                if err:
-                    print(f"⚠ {timeframe} encoder load failed: {err}")
-                    models_multi_timeframe[timeframe]['encoder'] = None
-                else:
-                    models_multi_timeframe[timeframe]['encoder'] = obj
-            
-            if metadata_path.exists():
-                with open(metadata_path, 'r', encoding='utf-8') as f:
-                    models_multi_timeframe[timeframe]['metadata'] = json.load(f)
-            
-            success_count += 1
-            print(f"✓ {timeframe} модель бүрэн ачаалагдлаа")
-            
-        except Exception as e:
-            print(f"✗ {timeframe} модель ачаалах алдаа: {e}")
-            continue
-    
-    if success_count > 0:
-        print(f"✓ {success_count}/3 multi-timeframe модель бэлэн")
-        return True
-    else:
-        print("✗ Multi-timeframe модель нэг ч ачаалагдсангүй")
-        return False
-
-# Load models on startup
-load_multi_timeframe_models()
-
-# ==================== MT5 INITIALIZATION ====================
-
-# MT5 DISABLED - Using UniRate API only
-print("ℹ️  MT5 disabled - using UniRate API for EUR/USD")
-
-# ==================== AUTH HELPER FUNCTIONS ====================
-
-def generate_verification_code():
-    return ''.join([str(random.randint(0, 9)) for _ in range(6)])
-
-def send_verification_email(email, code, name=""):
-    try:
-        if not MAIL_USERNAME or not MAIL_PASSWORD:
-            return False
-        
-        msg = Message(
-            subject='Forex Signal App - Имэйл баталгаажуулалт',
-            recipients=[email]
-        )
-        msg.html = f"""
-<html>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-        <div style="background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">📈 Forex Signal App</h1>
-        </div>
-        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="color: #1a237e;">Сайн байна уу {name}!</h2>
-            <p>Forex Signal App-д тавтай морил! 🎉</p>
-            <p>Таны имэйл хаягийг баталгаажуулахын тулд доорх кодыг оруулна уу:</p>
-            <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
-                <h1 style="color: #1a237e; font-size: 36px; letter-spacing: 8px; margin: 0;">{code}</h1>
-            </div>
-            <p style="color: #666; font-size: 14px;">⏱ Энэ код <strong>{VERIFICATION_CODE_EXPIRY_MINUTES} минутын</strong> хугацаанд хүчинтэй.</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-        mail.send(msg)
-        return True
+        signal_generator_v2 = get_signal_generator()
+        if signal_generator_v2.is_loaded:
+            print("✓ V2 Signal Generator ачаалагдлаа")
+            return True
     except Exception as e:
-        print(f"❌ Email error: {e}")
-        return False
+        print(f"✗ V2 Signal Generator алдаа: {e}")
+    return False
 
-def send_reset_password_email(email, code, name=""):
+# Load on startup
+load_signal_generator()
+
+# ==================== PRELOAD HISTORICAL DATA ====================
+
+def preload_historical_data():
+    """Backend эхлэхэд historical data урьдчилан татах"""
     try:
-        if not MAIL_USERNAME or not MAIL_PASSWORD:
-            return False
-        
-        msg = Message(
-            subject='Forex Signal App - Нууц үг сэргээх',
-            recipients=[email]
-        )
-        msg.html = f"""
-<html>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
-        <div style="background: linear-gradient(135deg, #1a237e 0%, #283593 50%, #3949ab 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0;">Нууц үг сэргээх</h1>
-        </div>
-        <div style="background-color: white; padding: 30px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-            <h2 style="color: #1a237e;">Сайн байна уу, {name}!</h2>
-            <p>Нууц үг сэргээх кодыг доор харна уу:</p>
-            <div style="background-color: #fff3e0; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; border: 2px solid #1a237e;">
-                <h1 style="color: #1a237e; font-size: 36px; letter-spacing: 8px; margin: 0;">{code}</h1>
-            </div>
-            <p style="color: #666; font-size: 14px;">⏱ Энэ код <strong>{RESET_CODE_EXPIRY_MINUTES} минутын</strong> хугацаанд хүчинтэй.</p>
-        </div>
-    </div>
-</body>
-</html>
-"""
-        mail.send(msg)
-        return True
+        print("📥 Preloading historical data...")
+        df = get_twelvedata_dataframe(interval="1min", count=500)
+        if df is not None and len(df) >= 200:
+            print(f"✓ Historical data preloaded: {len(df)} bars")
+            return True
+        else:
+            print(f"⚠️ Historical data preload: got {len(df) if df is not None else 0} bars")
     except Exception as e:
-        print(f"❌ Reset email error: {e}")
-        return False
+        print(f"⚠️ Historical data preload failed: {e}")
+    return False
 
-def hash_password(password):
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+# Preload on startup
+preload_historical_data()
 
-def verify_password(password, hashed):
-    return bcrypt.checkpw(password.encode('utf-8'), hashed)
+# ==================== AUTH HELPERS ====================
 
 def generate_token(user_id, email):
     payload = {
-        'user_id': user_id,
+        'user_id': str(user_id),
         'email': email,
-        'exp': datetime.utcnow() + timedelta(days=7),
-        'iat': datetime.utcnow()
+        'exp': datetime.utcnow() + timedelta(days=7)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
@@ -360,1502 +123,690 @@ def verify_token(token):
     except:
         return None
 
-def get_user_from_token(token):
-    payload = verify_token(token)
-    if payload:
-        user = users_collection.find_one(
-            {'_id': payload['user_id']},
-            {'password': 0}
+def token_required(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            return jsonify({'error': 'Token шаардлагатай'}), 401
+        payload = verify_token(token)
+        if not payload:
+            return jsonify({'error': 'Token хүчингүй'}), 401
+        return f(payload, *args, **kwargs)
+    return decorated
+
+def generate_verification_code():
+    return str(random.randint(100000, 999999))
+
+def send_verification_email(email, code, name=""):
+    try:
+        msg = Message(
+            'Predictrix - Баталгаажуулах код',
+            recipients=[email]
         )
-        return user
-    return None
+        msg.html = f"""
+        <h2>Сайн байна уу{', ' + name if name else ''}!</h2>
+        <p>Таны баталгаажуулах код: <strong style="font-size: 24px; color: #1a237e;">{code}</strong></p>
+        <p>Код {VERIFICATION_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
+        """
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Email илгээх алдаа: {e}")
+        return False
 
-# ==================== ML HELPER FUNCTIONS ====================
-
-def calculate_features(df):
-    """Compute a rich set of technical features expected by the models.
-
-    The model metadata expects ~33 features (sma/ema, rsi, macd, bb, atr,
-    stochastic, volume metrics, momentum, pair_* one-hot placeholders, etc.).
-    This helper computes those names (lowercase) so `feature_columns` from
-    metadata match the DataFrame columns.
-    """
-    df = df.copy()
-
-    # Basic returns
-    df['returns'] = df['close'].pct_change()
-    df['log_returns'] = np.log(df['close']).diff()
-
-    # High/low/open/close ratios
-    if 'high' in df.columns and 'low' in df.columns:
-        df['hl_ratio'] = (df['high'] - df['low']) / df['close']
-    else:
-        df['hl_ratio'] = 0.0
-
-    if 'open' in df.columns:
-        df['co_ratio'] = (df['close'] - df['open']) / (df['open'].replace(0, np.nan))
-    else:
-        df['co_ratio'] = 0.0
-
-    # Moving averages and EMAs
-    df['sma_5'] = df['close'].rolling(window=5).mean()
-    df['ema_5'] = df['close'].ewm(span=5, adjust=False).mean()
-    df['sma_10'] = df['close'].rolling(window=10).mean()
-    df['ema_10'] = df['close'].ewm(span=10, adjust=False).mean()
-    df['sma_20'] = df['close'].rolling(window=20).mean()
-    df['ema_20'] = df['close'].ewm(span=20, adjust=False).mean()
-    df['sma_50'] = df['close'].rolling(window=50).mean()
-    df['ema_50'] = df['close'].ewm(span=50, adjust=False).mean()
-
-    # Volatility (rolling std)
-    df['volatility'] = df['returns'].rolling(window=20).std()
-
-    # RSI (14)
-    delta = df['close'].diff()
-    gain = delta.where(delta > 0, 0.0)
-    loss = -delta.where(delta < 0, 0.0)
-    avg_gain = gain.rolling(window=14).mean()
-    avg_loss = loss.rolling(window=14).mean()
-    rs = avg_gain / avg_loss.replace(0, np.nan)
-    df['rsi'] = 100 - (100 / (1 + rs))
-
-    # MACD (12,26) and signal(9)
-    ema12 = df['close'].ewm(span=12, adjust=False).mean()
-    ema26 = df['close'].ewm(span=26, adjust=False).mean()
-    df['macd'] = ema12 - ema26
-    df['macd_signal'] = df['macd'].ewm(span=9, adjust=False).mean()
-    df['macd_hist'] = df['macd'] - df['macd_signal']
-
-    # Bollinger Bands (20, 2std)
-    bb_mid = df['sma_20']
-    bb_std = df['close'].rolling(window=20).std()
-    df['bb_middle'] = bb_mid
-    df['bb_upper'] = bb_mid + 2 * bb_std
-    df['bb_lower'] = bb_mid - 2 * bb_std
-    df['bb_width'] = (df['bb_upper'] - df['bb_lower']) / bb_mid.replace(0, np.nan)
-
-    # ATR (14)
-    if {'high', 'low', 'close'}.issubset(df.columns):
-        high_low = df['high'] - df['low']
-        high_close = (df['high'] - df['close'].shift()).abs()
-        low_close = (df['low'] - df['close'].shift()).abs()
-        tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-        df['atr'] = tr.rolling(window=14).mean()
-    else:
-        df['atr'] = 0.0
-
-    # Stochastic oscillator (14,3)
-    if {'high', 'low', 'close'}.issubset(df.columns):
-        low14 = df['low'].rolling(window=14).min()
-        high14 = df['high'].rolling(window=14).max()
-        df['stoch_k'] = 100 * (df['close'] - low14) / (high14 - low14).replace(0, np.nan)
-        df['stoch_d'] = df['stoch_k'].rolling(window=3).mean()
-    else:
-        df['stoch_k'] = 0.0
-        df['stoch_d'] = 0.0
-
-    # Volume metrics
-    vol_col = 'volume' if 'volume' in df.columns else ('tick_volume' if 'tick_volume' in df.columns else None)
-    if vol_col:
-        df['volume_sma'] = df[vol_col].rolling(window=20).mean()
-        df['volume_ratio'] = df[vol_col] / df['volume_sma'].replace(0, np.nan)
-    else:
-        df['volume_sma'] = df['close'].rolling(window=20).std() * 1000
-        df['volume_ratio'] = 0.0
-
-    # Momentum and ROC
-    df['momentum'] = df['close'].diff(3)
-    df['roc'] = 100 * (df['close'] / df['close'].shift(10) - 1)
-
-    # Pair one-hot placeholders: pair_0 .. pair_5 (default zeros). Models expect these columns.
-    for i in range(6):
-        col = f'pair_{i}'
-        if col not in df.columns:
-            df[col] = 0.0
-
-    # If volume_ma existed previously, keep compatibility name
-    if 'volume_sma' in df.columns and 'volume_ma' not in df.columns:
-        df['volume_ma'] = df['volume_sma']
-
-    # Drop rows with NaN produced by rolling calculations
-    df = df.dropna()
-
-    return df
-
-# ==================== ROOT ENDPOINT ====================
-
-@app.route('/')
-def index():
-    """API мэдээлэл"""
-    return jsonify({
-        'name': 'Форекс Сигнал Full API',
-        'version': '3.0 - Multi-Timeframe Only',
-        'database': 'MongoDB',
-        'auth': 'JWT',
-        'ml_models': {
-            '15min': 'loaded' if models_multi_timeframe['15min']['model'] else 'not loaded',
-            '30min': 'loaded' if models_multi_timeframe['30min']['model'] else 'not loaded',
-            '60min': 'loaded' if models_multi_timeframe['60min']['model'] else 'not loaded'
-        },
-        'endpoints': {
-            '/': 'GET - API мэдээлэл',
-            '/auth/*': 'POST/GET/PUT - Authentication endpoints',
-            '/predict': 'POST - Multi-timeframe prediction (15, 30, 60 min)',
-            '/currencies': 'GET - Дэмжигдсэн валютын жагсаалт',
-            '/rates/live': 'GET - Бодит цагийн валютын ханш',
-            '/rates/specific': 'GET - Тодорхой хослолын ханш',
-            '/health': 'GET - Health check'
-        }
-    })
-
-# ==================== AUTHENTICATION ENDPOINTS ====================
+# ==================== AUTH ENDPOINTS ====================
 
 @app.route('/auth/register', methods=['POST'])
 def register():
-    try:
-        data = request.json
-        name = data.get('name', '').strip()
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        
-        if not name or not email or not password:
-            return jsonify({'success': False, 'error': 'Нэр, имэйл, нууц үг заавал шаардлагатай'}), 400
-        
-        if '@' not in email:
-            return jsonify({'success': False, 'error': 'Зөв имэйл хаяг оруулна уу'}), 400
-        
-        if len(password) < 6:
-            return jsonify({'success': False, 'error': 'Нууц үг дор хаяж 6 тэмдэгттэй байх ёстой'}), 400
-        
-        existing_user = users_collection.find_one({'email': email})
-        if existing_user:
-            return jsonify({'success': False, 'error': 'Энэ имэйл хаяг аль хэдийн бүртгэлтэй байна'}), 400
-        
-        verification_code = generate_verification_code()
-        hashed_password = hash_password(password)
-        
-        verification_data = {
-            'email': email,
-            'name': name,
-            'password': hashed_password,
-            'code': verification_code,
-            'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES),
-            'created_at': datetime.utcnow()
-        }
-        
-        verification_codes.delete_many({'email': email})
-        verification_codes.insert_one(verification_data)
-        
-        email_sent = send_verification_email(email, verification_code, name)
-        
-        if not email_sent:
-            return jsonify({'success': False, 'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
-        
+    data = request.json
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    
+    if not all([name, email, password]):
+        return jsonify({'error': 'Бүх талбарыг бөглөнө үү'}), 400
+    
+    if not re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email):
+        return jsonify({'error': 'Имэйл хаяг буруу байна'}), 400
+    
+    if len(password) < 6:
+        return jsonify({'error': 'Нууц үг хамгийн багадаа 6 тэмдэгт'}), 400
+    
+    if users_collection.find_one({'email': email}):
+        return jsonify({'error': 'Энэ имэйл бүртгэлтэй байна'}), 400
+    
+    # Generate verification code
+    code = generate_verification_code()
+    
+    # Save to verification_codes collection
+    verification_codes.delete_many({'email': email})
+    verification_codes.insert_one({
+        'email': email,
+        'code': code,
+        'name': name,
+        'password': bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
+        'created_at': datetime.utcnow(),
+        'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
+    })
+    
+    # Send email
+    if send_verification_email(email, code, name):
         return jsonify({
             'success': True,
-            'email': email,
-            'message': f'Баталгаажуулалтын код {email} хаяг руу илгээгдлээ'
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/login', methods=['POST'])
-def login():
-    try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '')
-        
-        if not email or not password:
-            return jsonify({'success': False, 'error': 'Имэйл болон нууц үг оруулна уу'}), 400
-        
-        user = users_collection.find_one({'email': email})
-        
-        if not user or not verify_password(password, user['password']):
-            return jsonify({'success': False, 'error': 'Имэйл эсвэл нууц үг буруу байна'}), 401
-        
-        users_collection.update_one(
-            {'_id': user['_id']},
-            {'$set': {'last_login': datetime.utcnow()}}
-        )
-        
-        user_id = str(user['_id'])
-        token = generate_token(user_id, email)
-        
-        return jsonify({
-            'success': True,
-            'token': token,
-            'user': {
-                'id': user_id,
-                'name': user['name'],
-                'email': user['email'],
-                'email_verified': user.get('email_verified', False)
-            }
+            'message': 'Баталгаажуулах код илгээлээ',
+            'email': email
         })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        return jsonify({'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
 
 @app.route('/auth/verify-email', methods=['POST'])
 def verify_email():
-    try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        code = data.get('code', '').strip()
-        
-        if not email or not code:
-            return jsonify({'success': False, 'error': 'Имэйл болон код шаардлагатай'}), 400
-        
-        verification = verification_codes.find_one({'email': email})
-        
-        if not verification:
-            return jsonify({'success': False, 'error': 'Баталгаажуулалтын код олдсонгүй'}), 404
-        
-        if datetime.utcnow() > verification['expires_at']:
-            verification_codes.delete_one({'email': email})
-            return jsonify({'success': False, 'error': 'Баталгаажуулалтын код хугацаа дууссан'}), 400
-        
-        if verification['code'] != code:
-            return jsonify({'success': False, 'error': 'Буруу код'}), 400
-        
-        is_existing_user = verification.get('is_existing_user', False)
-        
-        if is_existing_user:
-            users_collection.update_one(
-                {'email': email},
-                {'$set': {
-                    'email_verified': True,
-                    'verified_at': datetime.utcnow(),
-                    'updated_at': datetime.utcnow()
-                }}
-            )
-            user = users_collection.find_one({'email': email})
-            user_id = str(user['_id'])
-        else:
-            new_user = {
-                'name': verification['name'],
-                'email': verification['email'],
-                'password': verification['password'],
-                'email_verified': True,
-                'verified_at': datetime.utcnow(),
-                'created_at': datetime.utcnow(),
-                'updated_at': datetime.utcnow(),
-                'last_login': datetime.utcnow()
-            }
-            result = users_collection.insert_one(new_user)
-            user_id = str(result.inserted_id)
-        
-        verification_codes.delete_one({'email': email})
-        token = generate_token(user_id, email)
-        
-        return jsonify({
-            'success': True,
-            'token': token,
-            'user': {
-                'id': user_id,
-                'name': verification['name'] if not is_existing_user else users_collection.find_one({'email': email})['name'],
-                'email': email
-            },
-            'message': 'Имэйл амжилттай баталгаажлаа'
-        }), 200 if is_existing_user else 201
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    code = data.get('code', '').strip()
+    
+    record = verification_codes.find_one({
+        'email': email,
+        'code': code,
+        'expires_at': {'$gt': datetime.utcnow()}
+    })
+    
+    if not record:
+        return jsonify({'error': 'Код буруу эсвэл хугацаа дууссан'}), 400
+    
+    # Create user
+    user = {
+        'name': record['name'],
+        'email': email,
+        'password': record['password'],
+        'email_verified': True,
+        'created_at': datetime.utcnow()
+    }
+    result = users_collection.insert_one(user)
+    
+    # Clean up
+    verification_codes.delete_many({'email': email})
+    
+    # Generate token
+    token = generate_token(result.inserted_id, email)
+    
+    return jsonify({
+        'success': True,
+        'token': token,
+        'user': {
+            'name': user['name'],
+            'email': user['email'],
+            'email_verified': True
+        }
+    })
 
 @app.route('/auth/resend-verification', methods=['POST'])
 def resend_verification():
-    try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        
-        if not email:
-            return jsonify({'success': False, 'error': 'Имэйл шаардлагатай'}), 400
-        
-        verification = verification_codes.find_one({'email': email})
-        
-        if verification:
-            new_code = generate_verification_code()
-            verification_codes.update_one(
-                {'email': email},
-                {'$set': {
-                    'code': new_code,
-                    'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
-                }}
-            )
-            email_sent = send_verification_email(email, new_code, verification['name'])
-            if not email_sent:
-                return jsonify({'success': False, 'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
-            return jsonify({'success': True, 'message': 'Шинэ код илгээгдлээ'}), 200
-        
-        user = users_collection.find_one({'email': email})
-        
-        if not user:
-            return jsonify({'success': False, 'error': 'Имэйл хаяг бүртгэлгүй байна'}), 404
-        
-        if user.get('email_verified', False):
-            return jsonify({'success': False, 'error': 'Имэйл аль хэдийн баталгаажсан байна'}), 400
-        
-        new_code = generate_verification_code()
-        verification_codes.delete_many({'email': email})
-        verification_codes.insert_one({
-            'email': email,
-            'name': user['name'],
-            'password': user['password'],
-            'code': new_code,
-            'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES),
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    
+    record = verification_codes.find_one({'email': email})
+    if not record:
+        return jsonify({'error': 'Бүртгэл олдсонгүй'}), 404
+    
+    code = generate_verification_code()
+    verification_codes.update_one(
+        {'email': email},
+        {'$set': {
+            'code': code,
             'created_at': datetime.utcnow(),
-            'is_existing_user': True
-        })
-        
-        email_sent = send_verification_email(email, new_code, user['name'])
-        if not email_sent:
-            return jsonify({'success': False, 'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
-        
-        return jsonify({'success': True, 'message': 'Баталгаажуулалтын код таны имэйл хаяг руу илгээгдлээ'}), 200
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+            'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
+        }}
+    )
+    
+    if send_verification_email(email, code, record.get('name', '')):
+        return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
+    return jsonify({'error': 'Имэйл илгээхэд алдаа'}), 500
+
+@app.route('/auth/login', methods=['POST'])
+def login():
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    
+    user = users_collection.find_one({'email': email})
+    if not user:
+        return jsonify({'error': 'Имэйл эсвэл нууц үг буруу'}), 401
+    
+    # Password bytes эсвэл string байж болно
+    stored_password = user['password']
+    if isinstance(stored_password, str):
+        stored_password = stored_password.encode()
+    
+    if not bcrypt.checkpw(password.encode(), stored_password):
+        return jsonify({'error': 'Имэйл эсвэл нууц үг буруу'}), 401
+    
+    token = generate_token(user['_id'], email)
+    
+    return jsonify({
+        'success': True,
+        'token': token,
+        'user': {
+            'name': user['name'],
+            'email': user['email'],
+            'email_verified': user.get('email_verified', False)
+        }
+    })
+
+@app.route('/auth/me', methods=['GET'])
+@token_required
+def get_me(payload):
+    user = users_collection.find_one({'email': payload['email']})
+    if not user:
+        return jsonify({'error': 'Хэрэглэгч олдсонгүй'}), 404
+    
+    return jsonify({
+        'success': True,
+        'user': {
+            'name': user['name'],
+            'email': user['email'],
+            'email_verified': user.get('email_verified', False)
+        }
+    })
 
 @app.route('/auth/forgot-password', methods=['POST'])
 def forgot_password():
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    
+    user = users_collection.find_one({'email': email})
+    if not user:
+        return jsonify({'success': True, 'message': 'Хэрэв бүртгэлтэй бол код илгээлээ'})
+    
+    code = generate_verification_code()
+    reset_codes.delete_many({'email': email})
+    reset_codes.insert_one({
+        'email': email,
+        'code': code,
+        'created_at': datetime.utcnow(),
+        'expires_at': datetime.utcnow() + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
+    })
+    
     try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        
-        if not email:
-            return jsonify({'success': False, 'error': 'Имэйл шаардлагатай'}), 400
-        
-        user = users_collection.find_one({'email': email})
-        if not user:
-            return jsonify({'success': True, 'message': 'Хэрэв бүртгэлтэй бол код илгээгдсэн'}), 200
-        
-        reset_code = generate_verification_code()
-        reset_codes.delete_many({'email': email})
-        reset_codes.insert_one({
-            'email': email,
-            'code': reset_code,
-            'expires_at': datetime.utcnow() + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES),
-            'created_at': datetime.utcnow()
-        })
-        
-        email_sent = send_reset_password_email(email, reset_code, user['name'])
-        if not email_sent:
-            return jsonify({'success': False, 'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
-        
-        return jsonify({'success': True, 'message': 'Сэргээх код илгээгдлээ'}), 200
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/verify-reset-code', methods=['POST'])
-def verify_reset_code():
-    try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        code = data.get('code', '').strip()
-        
-        if not email or not code:
-            return jsonify({'success': False, 'error': 'Имэйл болон код шаардлагатай'}), 400
-        
-        reset_data = reset_codes.find_one({'email': email})
-        if not reset_data:
-            return jsonify({'success': False, 'error': 'Код олдсонгүй'}), 404
-        
-        if datetime.utcnow() > reset_data['expires_at']:
-            reset_codes.delete_one({'email': email})
-            return jsonify({'success': False, 'error': 'Код хугацаа дууссан'}), 400
-        
-        if reset_data['code'] != code:
-            return jsonify({'success': False, 'error': 'Буруу код'}), 400
-        
-        return jsonify({'success': True, 'message': 'Код баталгаажлаа'}), 200
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
+        msg.html = f"""
+        <h2>Нууц үг сэргээх</h2>
+        <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
+        <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
+        """
+        mail.send(msg)
+    except:
+        pass
+    
+    return jsonify({'success': True, 'message': 'Код илгээлээ'})
 
 @app.route('/auth/reset-password', methods=['POST'])
 def reset_password():
-    try:
-        data = request.json
-        email = data.get('email', '').strip().lower()
-        code = data.get('code', '').strip()
-        new_password = data.get('new_password', '')
-        
-        if not email or not code or not new_password:
-            return jsonify({'success': False, 'error': 'Бүх талбар шаардлагатай'}), 400
-        
-        if len(new_password) < 6:
-            return jsonify({'success': False, 'error': 'Нууц үг дор хаяж 6 тэмдэгт'}), 400
-        
-        reset_data = reset_codes.find_one({'email': email})
-        if not reset_data:
-            return jsonify({'success': False, 'error': 'Код олдсонгүй'}), 404
-        
-        if datetime.utcnow() > reset_data['expires_at']:
-            reset_codes.delete_one({'email': email})
-            return jsonify({'success': False, 'error': 'Код хугацаа дууссан'}), 400
-        
-        if reset_data['code'] != code:
-            return jsonify({'success': False, 'error': 'Буруу код'}), 400
-        
-        hashed_password = hash_password(new_password)
-        users_collection.update_one(
-            {'email': email},
-            {'$set': {'password': hashed_password, 'updated_at': datetime.utcnow()}}
-        )
-        
-        reset_codes.delete_one({'email': email})
-        return jsonify({'success': True, 'message': 'Нууц үг амжилттай солигдлоо'}), 200
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/verify', methods=['POST'])
-def verify():
-    try:
-        data = request.json
-        token = data.get('token', '')
-        
-        if not token:
-            return jsonify({'success': False, 'error': 'Token шаардлагатай'}), 400
-        
-        user = get_user_from_token(token)
-        
-        if user:
-            return jsonify({
-                'success': True,
-                'valid': True,
-                'user': {
-                    'id': str(user['_id']),
-                    'name': user['name'],
-                    'email': user['email'],
-                    'email_verified': user.get('email_verified', False)
-                }
-            })
-        else:
-            return jsonify({'success': False, 'valid': False, 'error': 'Token буруу эсвэл хугацаа дууссан'}), 401
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/me', methods=['GET'])
-def get_me():
-    try:
-        auth_header = request.headers.get('Authorization', '')
-        
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'success': False, 'error': 'Authorization header шаардлагатай'}), 401
-        
-        token = auth_header.split(' ')[1]
-        user = get_user_from_token(token)
-        
-        if user:
-            return jsonify({
-                'success': True,
-                'user': {
-                    'id': str(user['_id']),
-                    'name': user['name'],
-                    'email': user['email'],
-                    'created_at': user['created_at'].isoformat() if user.get('created_at') else None,
-                    'last_login': user['last_login'].isoformat() if user.get('last_login') else None
-                }
-            })
-        else:
-            return jsonify({'success': False, 'error': 'Token буруу эсвэл хугацаа дууссан'}), 401
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/update', methods=['PUT'])
-def update_profile():
-    try:
-        auth_header = request.headers.get('Authorization', '')
-        
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'success': False, 'error': 'Authorization header шаардлагатай'}), 401
-        
-        token = auth_header.split(' ')[1]
-        payload = verify_token(token)
-        
-        if not payload:
-            return jsonify({'success': False, 'error': 'Token буруу эсвэл хугацаа дууссан'}), 401
-        
-        data = request.json
-        name = data.get('name', '').strip()
-        
-        if not name:
-            return jsonify({'success': False, 'error': 'Нэр шаардлагатай'}), 400
-        
-        users_collection.update_one(
-            {'_id': payload['user_id']},
-            {'$set': {'name': name, 'updated_at': datetime.utcnow()}}
-        )
-        
-        return jsonify({'success': True, 'message': 'Мэдээлэл амжилттай шинэчлэгдлээ'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/auth/change-password', methods=['PUT'])
-def change_password():
-    try:
-        auth_header = request.headers.get('Authorization', '')
-        
-        if not auth_header.startswith('Bearer '):
-            return jsonify({'success': False, 'error': 'Authorization header шаардлагатай'}), 401
-        
-        token = auth_header.split(' ')[1]
-        payload = verify_token(token)
-        
-        if not payload:
-            return jsonify({'success': False, 'error': 'Token буруу эсвэл хугацаа дууссан'}), 401
-        
-        data = request.json
-        old_password = data.get('oldPassword', '')
-        new_password = data.get('newPassword', '')
-        
-        if not old_password or not new_password:
-            return jsonify({'success': False, 'error': 'Хуучин болон шинэ нууц үг шаардлагатай'}), 400
-        
-        if len(new_password) < 6:
-            return jsonify({'success': False, 'error': 'Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой'}), 400
-        
-        user = users_collection.find_one({'_id': payload['user_id']})
-        
-        if not user:
-            return jsonify({'success': False, 'error': 'Хэрэглэгч олдсонгүй'}), 404
-        
-        if not verify_password(old_password, user['password']):
-            return jsonify({'success': False, 'error': 'Хуучин нууц үг буруу байна'}), 401
-        
-        new_hashed_password = hash_password(new_password)
-        users_collection.update_one(
-            {'_id': payload['user_id']},
-            {'$set': {'password': new_hashed_password, 'updated_at': datetime.utcnow()}}
-        )
-        
-        return jsonify({'success': True, 'message': 'Нууц үг амжилттай солигдлоо'})
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-# ==================== PREDICTION ENDPOINTS (MULTI-TIMEFRAME ONLY) ====================
-
-@app.route('/predict_multi_timeframe', methods=['POST'])
-@app.route('/predict/multi-timeframe', methods=['POST'])
-@app.route('/predict', methods=['POST'])
-def predict():
-    """
-    Multi-timeframe prediction - 15, 30, 60 минутын моделуудыг ашиглана
+    data = request.json
+    email = data.get('email', '').strip().lower()
+    code = data.get('code', '').strip()
+    new_password = data.get('new_password', '')
     
-    Request body:
-        {
-            "currency_pair": "EUR/USD",
-            "force_refresh": false (optional)
-        }
+    if len(new_password) < 6:
+        return jsonify({'error': 'Нууц үг хамгийн багадаа 6 тэмдэгт'}), 400
     
-    Response:
-        {
-            "success": true,
-            "currency_pair": "EUR/USD",
-            "predictions": {
-                "15min": {...},
-                "30min": {...},
-                "60min": {...}
-            },
-            "timestamp": "2025-10-26T..."
-        }
-    """
-    try:
-        import tensorflow as tf
-        
-        data = request.json
-        currency_pair = data.get('currency_pair', '').strip()
-        force_refresh = data.get('force_refresh', False)
-        
-        if not currency_pair:
-            return jsonify({'success': False, 'error': 'Валютын хослол шаардлагатай'}), 400
-        
-        # Normalize
-        normalized_pair = currency_pair.replace('/', '_').upper()
-        valid_pairs_normalized = [p.replace('/', '_') for p in CURRENCY_PAIRS]
-        
-        if normalized_pair not in valid_pairs_normalized:
-            return jsonify({'success': False, 'error': f'Дэмжигдэхгүй валют: {currency_pair}'}), 400
-        
-        print(f"\n{'='*60}")
-        print(f"🔮 MULTI-TIMEFRAME PREDICTION: {currency_pair}")
-        print(f"{'='*60}")
-        
-        # Get data
-        df = None
-        data_source = 'FILE'
-        
-        # Fetch historical data
-        mt5_symbol = normalized_pair.replace('_', '')
-        if MT5_ENABLED and mt5_handler.connected:
-            try:
-                print(f"📊 MT5-аас өгөгдөл татаж байна...")
-                df = mt5_handler.get_historical_data(mt5_symbol, 'M1', 5000)
-                if df is not None and len(df) > 0:
-                    data_source = 'MT5'
-                    print(f"   ✓ MT5: {len(df)} bars")
-            except Exception as e:
-                print(f"   ⚠ MT5 алдаа: {e}")
-        
-        # Fallback to file
-        if df is None or len(df) == 0:
-            file_path = f"data/train/{normalized_pair}_1min.csv"
-            try:
-                full_path = Path(__file__).parent.parent / file_path
-                if full_path.exists():
-                    df = pd.read_csv(full_path)
-                    data_source = 'FILE'
-                    print(f"   ✓ FILE: {len(df)} rows")
-                else:
-                    file_path = f"data/test/{normalized_pair}_test.csv"
-                    full_path = Path(__file__).parent.parent / file_path
-                    if full_path.exists():
-                        df = pd.read_csv(full_path)
-                        data_source = 'FILE'
-                        print(f"   ✓ FILE (test): {len(df)} rows")
-            except Exception as e:
-                return jsonify({'success': False, 'error': f'Өгөгдөл олдсонгүй: {str(e)}'}), 404
-        
-        if df is None or len(df) < 100:
-            return jsonify({'success': False, 'error': 'Хангалтгүй өгөгдөл'}), 400
-        
-        # Calculate features
-        df = calculate_features(df)
-        
-        # Predictions for each timeframe
-        predictions = {}
-        
-        for timeframe in ['15min', '30min', '60min']:
-            try:
-                model_data = models_multi_timeframe[timeframe]
-                
-                if model_data['model'] is None:
-                    predictions[timeframe] = {
-                        'success': False,
-                        'error': f'{timeframe} модель ачаалагдаагүй'
-                    }
-                    print(f"   ⚠ {timeframe}: модель байхгүй")
-                    continue
-                
-                keras_model = model_data['model']
-                scaler = model_data['scaler']
-                encoder = model_data['encoder']
-                metadata = model_data['metadata']
-                
-                # Get feature columns from metadata (preserve order)
-                feature_cols = metadata['feature_columns'] if metadata else []
-
-                # Ensure all expected feature columns exist in df (fill missing with 0s)
-                for col in feature_cols:
-                    if col not in df.columns:
-                        df[col] = 0.0
-
-                # Ensure pair one-hot columns reflect the current currency_pair
-                # Clear any existing pair_* columns then set the correct one
-                try:
-                    if metadata and 'pairs' in metadata and isinstance(metadata['pairs'], (list, tuple)):
-                        # Normalize both sides to use UNDERSCORE and uppercase
-                        norm_pairs = [p.replace('/', '_').upper() for p in metadata['pairs']]
-                        target = currency_pair.replace('/', '_').upper()
-
-                        # Clear all pair_* columns that may exist
-                        for i, _ in enumerate(norm_pairs):
-                            col = f'pair_{i}'
-                            if col in df.columns:
-                                df[col] = 0.0
-
-                        if target in norm_pairs:
-                            pair_idx = norm_pairs.index(target)
-                            pair_col_name = f'pair_{pair_idx}'
-                            df[pair_col_name] = 1.0
-                        # Debug: print mapping information so we can verify which pair column is set
-                        try:
-                            set_cols = {c: df[c].iloc[-1] for c in df.columns if c.startswith('pair_')}
-                        except Exception:
-                            set_cols = None
-                        print(f"   Debug - timeframe={timeframe}, norm_pairs={norm_pairs}, target={target}, pair_idx={locals().get('pair_idx', None)}, set_pair_cols={set_cols}")
-                except Exception:
-                    pass
-
-                # Get sequence length
-                seq_length = metadata.get('sequence_length', 60) if metadata else 60
-
-                # Use the ordered feature list for model input
-                available_features = feature_cols
-                
-                # Get recent data
-                recent_df = df.tail(seq_length + 10).copy()
-                
-                # Extract features
-                X = recent_df[available_features].values
-                X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-                
-                # Scale
-                if scaler:
-                    X_scaled = scaler.transform(X)
-                else:
-                    X_scaled = X
-                
-                # Create sequences
-                if len(X_scaled) >= seq_length:
-                    X_seq = X_scaled[-seq_length:]
-                    X_seq = X_seq.reshape(1, seq_length, len(available_features))
-                    
-                    # Predict
-                    y_pred = keras_model.predict(X_seq, verbose=0)
-
-                    # Normalize outputs: many models return a list [direction, confidence]
-                    try:
-                        if isinstance(y_pred, (list, tuple)):
-                            dir_out = np.array(y_pred[0])
-                            conf_out = np.array(y_pred[1]) if len(y_pred) > 1 else None
-                        else:
-                            arr = np.array(y_pred)
-                            # If model returned list-like with shape (1, n_classes)
-                            dir_out = arr
-                            conf_out = None
-
-                        # direction probabilities as 1D array
-                        if dir_out.ndim == 2 and dir_out.shape[0] == 1:
-                            probs = dir_out[0]
-                        else:
-                            probs = dir_out.ravel()
-
-                        predicted_class = int(np.argmax(probs))
-
-                        # Debug: print raw prediction outputs for inspection
-                        try:
-                            print(f"   Debug - timeframe={timeframe}, y_pred_shape={getattr(y_pred, 'shape', None)}, probs={np.array2string(np.array(probs), precision=4, separator=',')}, predicted_class={predicted_class}")
-                        except Exception:
-                            pass
-
-                        if conf_out is not None:
-                            if conf_out.ndim == 2 and conf_out.shape[0] == 1:
-                                confidence = float(conf_out[0][0])
-                            else:
-                                confidence = float(np.array(conf_out).ravel()[0])
-                        else:
-                            confidence = float(probs[predicted_class])
-                    except Exception as e:
-                        # Fallback: try previous behavior but guard errors
-                        try:
-                            predicted_class = int(np.argmax(y_pred[0]))
-                            confidence = float(np.array(y_pred[0]).ravel()[predicted_class])
-                        except Exception:
-                            predicted_class = int(np.argmax(y_pred))
-                            confidence = float(np.array(y_pred).ravel()[predicted_class])
-                    
-                    # Decode signal - some encoders in model metadata actually contain currency pair names
-                    # Detect if encoder.classes_ looks like signal labels (no '/' or '_' present). If not, fall back.
-                    default_labels = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY']
-                    signal_name = None
-                    if encoder:
-                        try:
-                            classes = getattr(encoder, 'classes_', None)
-                            use_encoder = False
-                            if isinstance(classes, (list, tuple, np.ndarray)) and len(classes) > 0:
-                                # If classes look like currency pairs, avoid using encoder to decode signals
-                                all_str = all(isinstance(c, str) for c in classes)
-                                if all_str:
-                                    # Normalize classes (remove non-alnum) and compare to known currency pairs
-                                    norm_classes = [re.sub(r'[^A-Z0-9]', '', str(c).upper()) for c in classes]
-                                    norm_known = [re.sub(r'[^A-Z0-9]', '', str(p).upper()) for p in CURRENCY_PAIRS]
-                                    # If any normalized class matches a known pair, treat encoder as pair-encoder
-                                    if any(nc in norm_known for nc in norm_classes):
-                                        use_encoder = False
-                                    else:
-                                        # If none look like pairs and none contain slash/underscore, assume signal labels
-                                        if not any(('/' in c or '_' in c) for c in classes):
-                                            use_encoder = True
-                            if use_encoder:
-                                signal_name = encoder.inverse_transform([predicted_class])[0]
-                            else:
-                                signal_name = default_labels[predicted_class % len(default_labels)]
-                        except Exception:
-                            signal_name = default_labels[predicted_class % len(default_labels)]
-                    else:
-                        signal_name = default_labels[predicted_class % len(default_labels)]
-                    
-                    # Get current price
-                    last_close = float(recent_df['close'].iloc[-1])
-                    prev_close = float(recent_df['close'].iloc[-2])
-                    price_change = ((last_close - prev_close) / prev_close) * 100
-                    
-                    predictions[timeframe] = {
-                        'success': True,
-                        'signal': int(predicted_class),
-                        'signal_name': signal_name,
-                        'confidence': float(f"{confidence:.4f}"),
-                        'current_price': float(last_close),
-                        'price_change_percent': float(f"{price_change:.4f}"),
-                        'accuracy': metadata.get('weighted_accuracy', 0.0) if metadata else 0.0
-                    }
-                    
-                    print(f"   ✓ {timeframe}: {signal_name} ({confidence:.2%})")
-                else:
-                    predictions[timeframe] = {
-                        'success': False,
-                        'error': f'Sequence хангалтгүй ({len(X_scaled)}/{seq_length})'
-                    }
-                    print(f"   ⚠ {timeframe}: sequence дутуу")
-                    
-            except Exception as e:
-                print(f"   ✗ {timeframe} prediction error: {e}")
-                import traceback
-                traceback.print_exc()
-                predictions[timeframe] = {
-                    'success': False,
-                    'error': str(e)
-                }
-        
-        print(f"{'='*60}\n")
-        
-        return jsonify({
-            'success': True,
-            'currency_pair': currency_pair,
-            'predictions': predictions,
-            'data_source': data_source,
-            'timestamp': datetime.utcnow().isoformat()
-        }), 200
-        
-    except Exception as e:
-        print(f"⚠ Multi-timeframe prediction error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/predict_file', methods=['POST'])
-def predict_file():
-    """Predict using a CSV file path provided in the request JSON.
-
-    Expected JSON body:
-      { "file_path": "data/test/EUR_USD_test.csv", "force_refresh": false }
-
-    This handler loads the CSV, computes features and runs the same
-    multi-timeframe prediction loop as `/predict`.
-    """
-    try:
-        data = request.json or {}
-        file_path = data.get('file_path', '').strip()
-        force_refresh = data.get('force_refresh', False)
-
-        if not file_path:
-            return jsonify({'success': False, 'error': 'file_path шаардлагатай'}), 400
-
-        # Resolve file relative to project root
-        full_path = Path(__file__).parent.parent / file_path
-        if not full_path.exists():
-            return jsonify({'success': False, 'error': f'Файл олдсонгүй: {file_path}'}), 404
-
-        try:
-            df = pd.read_csv(full_path)
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'CSV унших алдаа: {e}'}), 500
-
-        if df is None or len(df) < 10:
-            return jsonify({'success': False, 'error': 'Хангалтгүй өгөгдөл файлаас'}), 400
-
-        # Attempt to infer currency_pair from filename if possible
-        fname = Path(file_path).stem
-        # Expected forms: EUR_USD_test or EUR_USD_1min
-        inferred_pair = None
-        parts = fname.split('_')
-        if len(parts) >= 2:
-            inferred_pair = f"{parts[0]}/{parts[1]}"
-
-        currency_pair = inferred_pair or data.get('currency_pair', '')
-        if not currency_pair:
-            currency_pair = ''
-
-        # Compute features
-        df = calculate_features(df)
-
-        # Now run the same per-timeframe prediction loop
-        predictions = {}
-
-        for timeframe in ['15min', '30min', '60min']:
-            try:
-                model_data = models_multi_timeframe[timeframe]
-
-                if model_data['model'] is None:
-                    predictions[timeframe] = {
-                        'success': False,
-                        'error': f'{timeframe} модель ачаалагдаагүй'
-                    }
-                    continue
-
-                keras_model = model_data['model']
-                scaler = model_data['scaler']
-                encoder = model_data['encoder']
-                metadata = model_data['metadata']
-
-                feature_cols = metadata['feature_columns'] if metadata else []
-
-                # Ensure all expected feature columns exist in df (fill missing with 0s)
-                for col in feature_cols:
-                    if col not in df.columns:
-                        df[col] = 0.0
-
-                # Ensure pair one-hot columns reflect the current currency_pair (if available)
-                # Ensure pair one-hot columns reflect the current currency_pair (if available)
-                try:
-                    if metadata and 'pairs' in metadata and isinstance(metadata['pairs'], (list, tuple)):
-                        norm_pairs = [p.replace('/', '_').upper() for p in metadata['pairs']]
-                        target = currency_pair.replace('/', '_').upper()
-
-                        # Clear existing pair flags
-                        for i, _ in enumerate(norm_pairs):
-                            col = f'pair_{i}'
-                            if col in df.columns:
-                                df[col] = 0.0
-
-                        if target in norm_pairs:
-                            pair_idx = norm_pairs.index(target)
-                            pair_col_name = f'pair_{pair_idx}'
-                            df[pair_col_name] = 1.0
-                except Exception:
-                    pass
-
-                seq_length = metadata.get('sequence_length', 60) if metadata else 60
-
-                available_features = feature_cols
-
-                recent_df = df.tail(seq_length + 10).copy()
-                X = recent_df[available_features].values
-                X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
-
-                if scaler:
-                    try:
-                        X_scaled = scaler.transform(X)
-                    except Exception:
-                        X_scaled = X
-                else:
-                    X_scaled = X
-
-                if len(X_scaled) >= seq_length:
-                    X_seq = X_scaled[-seq_length:]
-                    X_seq = X_seq.reshape(1, seq_length, len(available_features))
-
-                    y_pred = keras_model.predict(X_seq, verbose=0)
-
-                    # Normalize outputs for single- and multi-output models
-                    try:
-                        if isinstance(y_pred, (list, tuple)):
-                            dir_out = np.array(y_pred[0])
-                            conf_out = np.array(y_pred[1]) if len(y_pred) > 1 else None
-                        else:
-                            arr = np.array(y_pred)
-                            dir_out = arr
-                            conf_out = None
-
-                        if dir_out.ndim == 2 and dir_out.shape[0] == 1:
-                            probs = dir_out[0]
-                        else:
-                            probs = dir_out.ravel()
-
-                        predicted_class = int(np.argmax(probs))
-
-                        if conf_out is not None:
-                            if conf_out.ndim == 2 and conf_out.shape[0] == 1:
-                                confidence = float(conf_out[0][0])
-                            else:
-                                confidence = float(np.array(conf_out).ravel()[0])
-                        else:
-                            confidence = float(probs[predicted_class])
-                    except Exception:
-                        # Last-resort fallback
-                        dir_probs = np.array(y_pred[0]) if isinstance(y_pred, (list, tuple)) else np.array(y_pred)
-                        dir_probs = dir_probs.ravel()
-                        predicted_class = int(np.argmax(dir_probs))
-                        confidence = float(dir_probs[predicted_class])
-
-                    # Decode signal safely: some encoders actually encode currency pairs
-                    default_labels = ['STRONG_SELL', 'SELL', 'NEUTRAL', 'BUY', 'STRONG_BUY']
-                    signal_name = None
-                    if encoder:
-                        try:
-                            classes = getattr(encoder, 'classes_', None)
-                            use_encoder = False
-                            if isinstance(classes, (list, tuple, np.ndarray)) and len(classes) > 0:
-                                all_str = all(isinstance(c, str) for c in classes)
-                                if all_str and not any(('/' in c or '_' in c) for c in classes):
-                                    use_encoder = True
-                            if use_encoder:
-                                signal_name = encoder.inverse_transform([predicted_class])[0]
-                            else:
-                                signal_name = default_labels[predicted_class % len(default_labels)]
-                        except Exception:
-                            signal_name = default_labels[predicted_class % len(default_labels)]
-                    else:
-                        signal_name = default_labels[predicted_class % len(default_labels)]
-                
-
-                    last_close = float(recent_df['close'].iloc[-1]) if 'close' in recent_df.columns else float(recent_df.iloc[-1][available_features.index(available_features[0])])
-                    prev_close = float(recent_df['close'].iloc[-2]) if 'close' in recent_df.columns else last_close
-                    price_change = ((last_close - prev_close) / prev_close) * 100 if prev_close != 0 else 0.0
-
-                    predictions[timeframe] = {
-                        'success': True,
-                        'signal': int(predicted_class),
-                        'signal_name': signal_name,
-                        'confidence': float(f"{confidence:.4f}"),
-                        'current_price': float(last_close),
-                        'price_change_percent': float(f"{price_change:.4f}"),
-                        'accuracy': metadata.get('weighted_accuracy', 0.0) if metadata else 0.0
-                    }
-                else:
-                    predictions[timeframe] = {
-                        'success': False,
-                        'error': f'Sequence хангалтгүй ({len(X_scaled)}/{seq_length})'
-                    }
-
-            except Exception as e:
-                print(f"   ✗ {timeframe} prediction error (file): {e}")
-                import traceback
-                traceback.print_exc()
-                predictions[timeframe] = {
-                    'success': False,
-                    'error': str(e)
-                }
-
-        return jsonify({'success': True, 'file_path': file_path, 'predictions': predictions}), 200
-
-    except Exception as e:
-        print(f"⚠ predict_file error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/currencies', methods=['GET'])
-def get_currencies():
-    """Дэмжигдсэн валютын жагсаалт"""
-    return jsonify({
-        'success': True,
-        'currencies': CURRENCY_PAIRS,
-        'count': len(CURRENCY_PAIRS)
+    record = reset_codes.find_one({
+        'email': email,
+        'code': code,
+        'expires_at': {'$gt': datetime.utcnow()}
     })
+    
+    if not record:
+        return jsonify({'error': 'Код буруу эсвэл хугацаа дууссан'}), 400
+    
+    hashed = bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode()
+    users_collection.update_one({'email': email}, {'$set': {'password': hashed}})
+    reset_codes.delete_many({'email': email})
+    
+    return jsonify({'success': True, 'message': 'Нууц үг амжилттай солигдлоо'})
 
-# ==================== LIVE RATES ENDPOINTS ====================
+# ==================== LIVE RATES (Twelve Data) ====================
 
 @app.route('/rates/live', methods=['GET'])
 def get_live_rates():
     """
-    Бодит цагийн валютын ханш авах (UniRate API for EUR/USD)
-    
-    Query params:
-        currencies: Optional comma-separated list
-        source: 'unirate' or 'mt5'
+    Get live rates for all 20 forex pairs from Twelve Data API
+    Returns rate, change, and change_percent for each pair
     """
     try:
-        currencies_param = request.args.get('currencies')
-        source_param = request.args.get('source', 'unirate').lower()
+        result = get_all_forex_rates()
         
-        currencies = None
-        if currencies_param:
-            currencies = [c.strip().upper() for c in currencies_param.split(',')]
-        
-        # ⭐ Priority: UniRate API for EUR/USD
-        if source_param == 'unirate' or not MT5_ENABLED:
-            print("📊 Using UniRate API for EUR/USD...")
+        if result and result.get('success'):
+            return jsonify({
+                'success': True,
+                'source': 'twelvedata',
+                'rates': result.get('rates', {}),
+                'timestamp': result.get('time', datetime.utcnow().isoformat()),
+                'cached': result.get('cached', False),
+                'count': result.get('count', 0)
+            })
+        elif result.get('error') == 'rate_limited':
+            return jsonify({
+                'success': False,
+                'error': 'rate_limited',
+                'message': 'Rate limited. Please try again later.',
+                'next_update_in': result.get('next_update_in', 60)
+            }), 429
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Failed to fetch rates')
+            }), 503
             
-            try:
-                result = get_unirate_live_rate()
-                
-                if result['success']:
-                    return jsonify({
-                        'success': True,
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'source': 'UniRate API',
-                        'rates': {
-                            'EUR_USD': {
-                                'rate': result['rate'],
-                                'bid': result['bid'],
-                                'ask': result['ask'],
-                                'spread': result['spread'],
-                                'time': result['time']
-                            }
-                        },
-                        'count': 1
-                    }), 200
-                else:
-                    return jsonify({
-                        'success': False,
-                        'error': f"UniRate API error: {result.get('error')}"
-                    }), 503
-            
-            except Exception as e:
-                print(f"❌ UniRate error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'UniRate API failed: {str(e)}'
-                }), 503
-        
-        # Fallback to MT5
-        use_mt5 = MT5_ENABLED
-        
-        print(f"🔍 /rates/live: MT5_ENABLED={MT5_ENABLED}, connected={mt5_handler.connected if MT5_ENABLED else 'N/A'}")
-        
-        if use_mt5:
-            try:
-                print("📊 MT5-аас ханш татаж байна...")
-                
-                mt5_symbols = None
-                if currencies:
-                    mt5_symbols = []
-                    for curr in currencies:
-                        if curr != 'XAU':
-                            mt5_symbols.append(f"{curr}USD")
-                        else:
-                            mt5_symbols.append('XAUUSD')
-                else:
-                    mt5_symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'USDCAD', 'USDCHF', 'XAUUSD']
-                
-                # Get raw MT5 ticks first so we can compute 24h pip change (chg)
-                raw_rates = mt5_handler.get_live_rates(mt5_symbols)
-
-                enhanced = {}
-                for symbol, data in (raw_rates or {}).items():
-                    try:
-                        # Compute current rate (mid) or last
-                        if 'bid' in data and 'ask' in data:
-                            current_rate = (data['bid'] + data['ask']) / 2.0
-                        elif 'last' in data:
-                            current_rate = float(data['last'])
-                        else:
-                            continue
-
-                        item = {
-                            'rate': current_rate,
-                            'bid': data.get('bid'),
-                            'ask': data.get('ask'),
-                            'spread': data.get('spread'),
-                            'time': data.get('time'),
-                            'source': 'MT5'
-                        }
-
-                        # Try to compute 24h ago price using M1 bars; prefer bulk fetch then date-range
-                        try:
-                            hist = mt5_handler.get_historical_data(symbol, 'M1', count=1441)
-                            rows = len(hist) if hist is not None else 0
-                            if hist is None or rows < 2:
-                                # Fallback: use date-range for last 24 hours
-                                try:
-                                    start_dt = datetime.utcnow() - timedelta(days=1)
-                                    end_dt = datetime.utcnow()
-                                    hist = mt5_handler.get_historical_data(symbol, 'M1', start_date=start_dt, end_date=end_dt)
-                                except Exception:
-                                    hist = None
-
-                            if hist is not None and len(hist) >= 1:
-                                old_close = float(hist['close'].iloc[0])
-                                s_info = mt5_handler.get_symbol_info(symbol)
-                                if s_info and s_info.get('point'):
-                                    point = float(s_info['point'])
-                                    pip_change = (current_rate - old_close) / point
-                                    item['chg'] = float(f"{pip_change:.1f}")
-                                else:
-                                    item['chg'] = float(current_rate - old_close)
-                            else:
-                                item['chg'] = None
-                                print(f"   Debug: insufficient historical bars for {symbol} (rows={rows})")
-                        except Exception as hist_err:
-                            print(f"   Warning: could not compute 24h change for {symbol}: {hist_err}")
-                            item['chg'] = None
-
-                        enhanced[symbol] = item
-                    except Exception as item_err:
-                        print(f"   Warning processing symbol {symbol}: {item_err}")
-
-                if enhanced:
-                    converted = mt5_handler.convert_to_pair_format(enhanced)
-                    timestamp = datetime.now()
-                    first_rate = next(iter(converted.values())) if converted else None
-                    if first_rate and 'time' in first_rate:
-                        timestamp = first_rate['time']
-
-                    print(f"   ✓ MT5-аас {len(converted)} ханш татагдлаа")
-                    return jsonify({
-                        'success': True,
-                        'timestamp': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
-                        'source': 'MT5',
-                        'rates': converted,
-                        'count': len(converted)
-                    })
-                else:
-                    print("   ⚠ MT5 өгөгдөл хоосон")
-                    return jsonify({'success': False, 'error': 'MT5-аас ханш татаж чадсангүй'}), 500
-                    
-            except Exception as mt5_error:
-                print(f"   ⚠ MT5 алдаа: {mt5_error}")
-                return jsonify({'success': False, 'error': f'MT5 алдаа: {str(mt5_error)}'}), 500
-        
-        return jsonify({'success': False, 'error': 'MT5 идэвхгүй байна'}), 503
-        
     except Exception as e:
-        print(f"❌ Get live rates error: {e}")
-        import traceback
-        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/rates/specific', methods=['GET'])
 def get_specific_rate():
+    """Get specific currency pair rate"""
+    pair = request.args.get('pair', 'EUR_USD')
+    
+    try:
+        result = get_twelvedata_live_rate()
+        
+        if result and result.get('success'):
+            return jsonify({
+                'success': True,
+                'pair': pair,
+                'rate': result.get('rate', 0),
+                'bid': result.get('bid'),
+                'ask': result.get('ask'),
+                'timestamp': result.get('time')
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Rate олдсонгүй'}), 404
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== V2 SIGNAL GENERATOR ====================
+
+@app.route('/signal/v2', methods=['GET'])
+def get_signal_v2():
     """
-    Тодорхой валютын хослолын ханш авах (UniRate API for EUR/USD)
+    V2 Signal Generator - BUY-only mode with 80%+ confidence
+    NON-BLOCKING: Returns cached data if rate limited
     
     Query params:
-        pair: Currency pair (e.g., ?pair=EUR_USD or ?pair=EUR/USD)
-        source: 'unirate' or 'mt5'
+        min_confidence: Minimum confidence threshold (default: 80)
     """
     try:
-        pair = request.args.get('pair', '').upper()
-        source_param = request.args.get('source', 'unirate').lower()
-        
-        print(f"💱 Get specific rate хүсэлт: {pair}")
-        
-        if not pair:
-            return jsonify({'success': False, 'error': 'Валютын хослол заавал шаардлагатай'}), 400
-        
-        normalized_pair = pair.replace('/', '_')
-        
-        # Only EUR_USD supported
-        if normalized_pair != 'EUR_USD':
+        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
             return jsonify({
                 'success': False,
-                'error': f'Only EUR_USD is supported. Got: {pair}'
-            }), 400
+                'error': 'Signal Generator ачаалагдаагүй'
+            }), 500
         
-        pair = normalized_pair
+        min_confidence = float(request.args.get('min_confidence', 80))
         
-        # ⭐ Priority: UniRate API for EUR/USD
-        if source_param == 'unirate' or not MT5_ENABLED:
-            print("📊 Using UniRate API for EUR/USD...")
-            
-            try:
-                result = get_unirate_live_rate()
-                
-                if result['success']:
-                    return jsonify({
-                        'success': True,
-                        'pair': 'EUR_USD',
-                        'rate': result['rate'],
-                        'bid': result['bid'],
-                        'ask': result['ask'],
-                        'spread': result['spread'],
-                        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'source': 'UniRate API'
-                    }), 200
-                else:
-                    return jsonify({
-                        'success': False,
-                        'error': f"UniRate API error: {result.get('error')}"
-                    }), 503
-            
-            except Exception as e:
-                print(f"❌ UniRate error: {e}")
-                return jsonify({
-                    'success': False,
-                    'error': f'UniRate API failed: {str(e)}'
-                }), 503
+        # Get historical data from Twelve Data API (NON-BLOCKING)
+        df = get_twelvedata_dataframe(interval="1min", count=500)
         
-        # MT5 fallback disabled
-        return jsonify({
-            'success': False,
-            'error': 'Only EUR/USD supported via UniRate API. MT5 disabled.'
-        }), 503
+        if df is None or len(df) < 200:
+            # Rate limited and no cached data
+            return jsonify({
+                'success': False,
+                'error': 'rate_limited',
+                'message': 'Rate limited. Data not available yet.',
+                'data_count': len(df) if df is not None else 0,
+                'required': 200
+            }), 429
         
-    except Exception as e:
-        print(f"❌ Get specific rate error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/rates/mt5/historical', methods=['GET'])
-def get_mt5_historical():
-    """Return MT5 historical rates for a given symbol and timeframe.
-
-    Query params:
-      symbol: e.g., EURUSD
-      timeframe: M1, M5, M15, M30, H1, etc. (default M1)
-      count: number of bars (default 100)
-    """
-    try:
-        symbol = request.args.get('symbol', '').strip()
-        timeframe = request.args.get('timeframe', 'M1').strip()
-        count = int(request.args.get('count', 100))
-
-        if not symbol:
-            return jsonify({'success': False, 'error': 'symbol параметр шаардлагатай'}), 400
-
-        if not MT5_ENABLED or not mt5_handler.connected:
-            return jsonify({'success': False, 'error': 'MT5 идэвхгүй байна'}), 503
-
-        try:
-            df = mt5_handler.get_historical_data(symbol, timeframe, count)
-        except Exception as e:
-            return jsonify({'success': False, 'error': f'MT5 түүх татах алдаа: {e}'}), 500
-
-        if df is None:
-            return jsonify({'success': False, 'error': 'MT5 өгөгдөл олдсонгүй'}), 404
-
-        # Convert DataFrame to serializable list
-        data = []
-        for _, row in df.iterrows():
-            data.append({
-                'time': str(row['time']),
-                'open': float(row.get('open', row.get('open', 0))) if 'open' in row else None,
-                'high': float(row.get('high', row.get('high', 0))) if 'high' in row else None,
-                'low': float(row.get('low', row.get('low', 0))) if 'low' in row else None,
-                'close': float(row.get('close', row.get('close', row.get('close', 0)))) if 'close' in row else None,
-                'volume': float(row.get('tick_volume', row.get('volume', 0)))
-            })
-
-        return jsonify({'success': True, 'symbol': symbol, 'timeframe': timeframe, 'count': len(data), 'data': data}), 200
-
-    except Exception as e:
-        print(f"❌ get_mt5_historical error: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/rates/mt5/status', methods=['GET'])
-def get_mt5_status():
-    """Return a simple MT5 connection/status check used by the mobile client.
-
-    Mobile app expects GET /rates/mt5/status and currently receives 404.
-    This endpoint mirrors the MT5 status field from /health but returns
-    a compact JSON so the client can show connection status quickly.
-    """
-    try:
-        enabled = bool(MT5_ENABLED)
-        connected = bool(getattr(mt5_handler, 'connected', False)) if enabled else False
-        status = 'connected' if (enabled and connected) else ('enabled_but_disconnected' if enabled else 'disabled')
-
+        # Check data timestamps
+        data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
+        data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
+        
+        # Check if market is closed (Saturday & Sunday, Monday before 8am local)
+        from datetime import datetime
+        now = datetime.now()  # Local time
+        day = now.weekday()  # 0=Monday, 5=Saturday, 6=Sunday
+        hour = now.hour
+        
+        is_weekend = day >= 5  # Saturday or Sunday
+        is_monday_early = day == 0 and hour < 8  # Monday before 8:00 local
+        market_closed = is_weekend or is_monday_early
+        
+        # Generate signal directly from DataFrame
+        signal = signal_generator_v2.generate_signal(df, min_confidence)
+        
         return jsonify({
             'success': True,
-            'mt5_enabled': enabled,
-            'mt5_connected': connected,
-            'status': status
-        }), 200
+            'pair': 'EUR_USD',
+            'data_info': {
+                'from': data_from,
+                'to': data_to,
+                'bars': len(df),
+                'market_closed': market_closed,
+                'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
+            },
+            **signal
+        })
+        
     except Exception as e:
-        print(f"❌ get_mt5_status error: {e}")
+        print(f"Signal V2 error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/rates/history', methods=['GET'])
-def get_rate_history():
-    """
-    Ханшийн түүх авах
-    
-    Query params:
-        pair: Currency pair
-        limit: Хэдэн мөр авах (default: 20)
-    """
+@app.route('/signal/v2/demo', methods=['GET'])
+def get_signal_v2_demo():
+    """Demo signal with test data"""
     try:
-        pair = request.args.get('pair', '').upper().replace('/', '_')
-        limit = int(request.args.get('limit', 20))
+        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
+            return jsonify({
+                'success': False,
+                'error': 'Signal Generator ачаалагдаагүй'
+            }), 500
         
-        if not pair:
-            return jsonify({'success': False, 'error': 'Pair параметр шаардлагатай'}), 400
+        min_confidence = float(request.args.get('min_confidence', 80))
         
-        test_file = os.path.join(Path(__file__).parent.parent, 'data', 'test', f'{pair}_test.csv')
+        import pandas as pd
+        test_file = Path(__file__).parent.parent / 'data' / 'EUR_USD_test.csv'
         
-        if not os.path.exists(test_file):
-            return jsonify({'success': False, 'error': f'{pair} өгөгдөл олдсонгүй'}), 404
+        if not test_file.exists():
+            return jsonify({'success': False, 'error': 'Test data олдсонгүй'}), 404
         
         df = pd.read_csv(test_file)
-        df = df.tail(limit)
+        df.columns = df.columns.str.lower()
+        df = df.tail(500).reset_index(drop=True)
         
-        history = []
-        for idx, row in df.iterrows():
-            history.append({
-                'time': str(row.get('date', row.get('time', str(idx)))),
-                'close': float(row.get('close', row.get('Close', row.get('rate', 0)))),
-                'open': float(row.get('open', row.get('Open', 0))) if 'open' in row or 'Open' in row else None,
-                'high': float(row.get('high', row.get('High', 0))) if 'high' in row or 'High' in row else None,
-                'low': float(row.get('low', row.get('Low', 0))) if 'low' in row or 'Low' in row else None,
+        signal = signal_generator_v2.generate_signal(df, min_confidence)
+        
+        return jsonify({
+            'success': True,
+            'pair': 'EUR_USD',
+            'demo': True,
+            **signal
+        })
+        
+    except Exception as e:
+        print(f"Signal V2 demo error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== PREDICT (V2 Signal wrapper) ====================
+
+@app.route('/predict', methods=['POST'])
+def predict():
+    """Main prediction endpoint - uses V2 Signal Generator"""
+    try:
+        data = request.json or {}
+        pair = data.get('pair', 'EUR_USD')
+        
+        if pair != 'EUR_USD':
+            return jsonify({
+                'success': False,
+                'error': 'Зөвхөн EUR_USD дэмжигддэг'
+            }), 400
+        
+        # Get signal from V2
+        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
+            return jsonify({
+                'success': False,
+                'error': 'Signal Generator ачаалагдаагүй'
+            }), 500
+        
+        df = get_twelvedata_dataframe(interval="1min", count=500)
+        
+        if df is None or len(df) < 200:
+            return jsonify({
+                'success': False,
+                'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
             })
+        
+        signal = signal_generator_v2.generate_signal(df, min_confidence=70)
+        
+        return jsonify({
+            'success': True,
+            'predictions': {
+                pair: {
+                    'signal': signal.get('signal', 'HOLD'),
+                    'confidence': signal.get('confidence', 0),
+                    'entry_price': signal.get('entry_price'),
+                    'stop_loss': signal.get('stop_loss'),
+                    'take_profit': signal.get('take_profit'),
+                    'sl_pips': signal.get('sl_pips'),
+                    'tp_pips': signal.get('tp_pips'),
+                    'risk_reward': signal.get('risk_reward')
+                }
+            }
+        })
+        
+    except Exception as e:
+        print(f"Predict error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== SIGNAL STORAGE ====================
+
+@app.route('/signal/save', methods=['POST'])
+def save_signal():
+    """
+    Таамаг хадгалах endpoint
+    Request body:
+        - pair: Валютын хослол (EUR_USD)
+        - signal: BUY/SELL/HOLD
+        - confidence: Итгэлцэл (0-100)
+        - entry_price: Орох үнэ
+        - stop_loss: Stop loss үнэ
+        - take_profit: Take profit үнэ
+        - sl_pips, tp_pips: Pip утгууд
+        - risk_reward: Risk/Reward ratio
+        - model_probabilities: Модел бүрийн таамаг
+        - models_agree: Модел санал нийлсэн эсэх
+        - atr_pips: ATR volatility
+    """
+    try:
+        data = request.json
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'Data шаардлагатай'}), 400
+        
+        # Required fields
+        signal_type = data.get('signal')
+        confidence = data.get('confidence')
+        pair = data.get('pair', 'EUR_USD')
+        
+        if not signal_type or confidence is None:
+            return jsonify({'success': False, 'error': 'signal, confidence шаардлагатай'}), 400
+        
+        # Create signal document
+        signal_doc = {
+            'pair': pair,
+            'signal': signal_type,
+            'confidence': float(confidence),
+            'entry_price': data.get('entry_price'),
+            'stop_loss': data.get('stop_loss'),
+            'take_profit': data.get('take_profit'),
+            'sl_pips': data.get('sl_pips'),
+            'tp_pips': data.get('tp_pips'),
+            'risk_reward': data.get('risk_reward'),
+            'model_probabilities': data.get('model_probabilities'),
+            'models_agree': data.get('models_agree'),
+            'atr_pips': data.get('atr_pips'),
+            'reason': data.get('reason'),
+            'created_at': datetime.utcnow(),
+            'status': 'active'  # active, closed, expired
+        }
+        
+        # Insert to MongoDB
+        result = signals_collection.insert_one(signal_doc)
+        
+        print(f"✓ Signal хадгалагдлаа: {signal_type} @ {confidence}% (ID: {result.inserted_id})")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Signal амжилттай хадгалагдлаа',
+            'signal_id': str(result.inserted_id)
+        })
+        
+    except Exception as e:
+        print(f"Signal хадгалах алдаа: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/signals/history', methods=['GET'])
+def get_signals_history():
+    """
+    Таамгийн түүх авах endpoint
+    Query params:
+        - pair: Валютын хослол (optional, default: EUR_USD)
+        - limit: Хэдэн signal авах (optional, default: 50)
+        - signal_type: BUY/SELL/HOLD (optional)
+        - min_confidence: Хамгийн бага итгэлцэл (optional)
+    """
+    try:
+        pair = request.args.get('pair', 'EUR_USD')
+        limit = int(request.args.get('limit', 50))
+        signal_type = request.args.get('signal_type')
+        min_confidence = request.args.get('min_confidence')
+        
+        # Build query
+        query = {'pair': pair}
+        
+        if signal_type:
+            query['signal'] = signal_type
+        
+        if min_confidence:
+            query['confidence'] = {'$gte': float(min_confidence)}
+        
+        # Get signals sorted by created_at (newest first)
+        signals = list(signals_collection.find(query)
+                      .sort('created_at', -1)
+                      .limit(limit))
+        
+        # Convert ObjectId to string and datetime to ISO string
+        for sig in signals:
+            sig['_id'] = str(sig['_id'])
+            if sig.get('created_at'):
+                sig['created_at'] = sig['created_at'].isoformat()
+        
+        return jsonify({
+            'success': True,
+            'count': len(signals),
+            'signals': signals
+        })
+        
+    except Exception as e:
+        print(f"Signal history алдаа: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/signals/stats', methods=['GET'])
+def get_signals_stats():
+    """
+    Таамгийн статистик
+    """
+    try:
+        pair = request.args.get('pair', 'EUR_USD')
+        
+        # Count by signal type
+        buy_count = signals_collection.count_documents({'pair': pair, 'signal': 'BUY'})
+        sell_count = signals_collection.count_documents({'pair': pair, 'signal': 'SELL'})
+        hold_count = signals_collection.count_documents({'pair': pair, 'signal': 'HOLD'})
+        total_count = buy_count + sell_count + hold_count
+        
+        # Average confidence
+        pipeline = [
+            {'$match': {'pair': pair}},
+            {'$group': {
+                '_id': None,
+                'avg_confidence': {'$avg': '$confidence'},
+                'max_confidence': {'$max': '$confidence'},
+                'min_confidence': {'$min': '$confidence'}
+            }}
+        ]
+        
+        stats_result = list(signals_collection.aggregate(pipeline))
+        avg_stats = stats_result[0] if stats_result else {}
+        
+        # Last signal
+        last_signal = signals_collection.find_one(
+            {'pair': pair},
+            sort=[('created_at', -1)]
+        )
+        
+        if last_signal:
+            last_signal['_id'] = str(last_signal['_id'])
+            if last_signal.get('created_at'):
+                last_signal['created_at'] = last_signal['created_at'].isoformat()
         
         return jsonify({
             'success': True,
             'pair': pair,
-            'count': len(history),
-            'data': history
+            'stats': {
+                'total_signals': total_count,
+                'buy_count': buy_count,
+                'sell_count': sell_count,
+                'hold_count': hold_count,
+                'avg_confidence': round(avg_stats.get('avg_confidence', 0), 2),
+                'max_confidence': round(avg_stats.get('max_confidence', 0), 2),
+                'min_confidence': round(avg_stats.get('min_confidence', 0), 2)
+            },
+            'last_signal': last_signal
         })
         
     except Exception as e:
-        print(f"❌ Get rate history error: {e}")
+        print(f"Signal stats алдаа: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
 
 # ==================== HEALTH CHECK ====================
 
 @app.route('/health', methods=['GET'])
 def health():
-    """Систем эрүүл эсэхийг шалгах"""
     try:
         client.server_info()
         user_count = users_collection.count_documents({})
-        
-        models_status = {
-            '15min': 'loaded' if models_multi_timeframe['15min']['model'] else 'not loaded',
-            '30min': 'loaded' if models_multi_timeframe['30min']['model'] else 'not loaded',
-            '60min': 'loaded' if models_multi_timeframe['60min']['model'] else 'not loaded'
-        }
         
         return jsonify({
             'status': 'healthy',
             'database': 'connected',
             'users_count': user_count,
-            'ml_models': models_status,
-            'mt5_status': 'connected' if (MT5_ENABLED and mt5_handler.connected) else 'disabled',
+            'signal_generator_v2': 'loaded' if (signal_generator_v2 and signal_generator_v2.is_loaded) else 'not loaded',
             'timestamp': datetime.utcnow().isoformat()
         })
     except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e)
-        }), 500
+        return jsonify({'status': 'unhealthy', 'error': str(e)}), 500
+
+@app.route('/', methods=['GET'])
+def index():
+    return jsonify({
+        'name': 'Forex Signal API',
+        'version': '2.0',
+        'status': 'running',
+        'endpoints': {
+            'auth': ['/auth/register', '/auth/login', '/auth/verify-email', '/auth/me'],
+            'rates': ['/rates/live', '/rates/specific'],
+            'signal': ['/signal/v2', '/signal/v2/demo', '/predict'],
+            'system': ['/health']
+        }
+    })
 
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
     PORT = 5000
     
-    print("=" * 70)
-    print("ФОРЕКС СИГНАЛ FULL API v3.0 - MULTI-TIMEFRAME ONLY")
-    print("=" * 70)
+    print("=" * 60)
+    print("FOREX SIGNAL API v2.0")
+    print("=" * 60)
     print(f"✓ MongoDB: Connected")
-    print(f"✓ JWT Authentication: Enabled")
-    print(f"✓ ML Models (Multi-Timeframe):")
-    print(f"  - 15min: {'✓ Loaded' if models_multi_timeframe['15min']['model'] else '✗ Not loaded'}")
-    print(f"  - 30min: {'✓ Loaded' if models_multi_timeframe['30min']['model'] else '✗ Not loaded'}")
-    print(f"  - 60min: {'✓ Loaded' if models_multi_timeframe['60min']['model'] else '✗ Not loaded'}")
-    print(f"✓ MT5: {'Connected' if (MT5_ENABLED and mt5_handler.connected) else 'Disabled'}")
+    print(f"✓ Signal Generator V2: {'Loaded' if (signal_generator_v2 and signal_generator_v2.is_loaded) else 'Not loaded'}")
+    print(f"✓ Twelve Data API: Enabled")
     print(f"✓ Port: {PORT}")
-    print(f"\n🚀 API эхэлж байна...")
-    print(f"📡 Холбогдох хаяг: http://localhost:{PORT}")
-    print(f"📱 Android Emulator: http://10.0.2.2:{PORT}")
-    print(f"\n🔐 Authentication Endpoints:")
-    print(f"  POST /auth/register")
-    print(f"  POST /auth/login")
-    print(f"  POST /auth/verify")
-    print(f"  GET  /auth/me")
-    print(f"\n🤖 Prediction Endpoint:")
-    print(f"  POST /predict - Multi-timeframe (15, 30, 60 min)")
-    print(f"\n💱 Live Rates Endpoints:")
-    print(f"  GET  /rates/live")
-    print(f"  GET  /rates/specific")
-    print(f"\n📊 System:")
+    print(f"\n🚀 API Endpoints:")
+    print(f"  POST /auth/register, /auth/login")
+    print(f"  GET  /rates/live, /rates/specific")
+    print(f"  GET  /signal/v2, /signal/v2/demo")
+    print(f"  POST /predict")
     print(f"  GET  /health")
-    print(f"  GET  /")
-    print("\n" + "=" * 70)
+    print("=" * 60)
     
-    app.run(debug=False, host=API_HOST, port=PORT, use_reloader=False, threaded=True)
+    # Use waitress for production-ready server (more stable on Windows)
+    from waitress import serve
+    print(f"\n🚀 Server starting with Waitress on http://0.0.0.0:{PORT}")
+    serve(app, host='0.0.0.0', port=PORT, threads=4)

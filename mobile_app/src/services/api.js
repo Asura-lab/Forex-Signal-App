@@ -188,11 +188,11 @@ export const logoutUser = async () => {
 // ==================== API STATUS ====================
 
 /**
- * API холболтыг шалгах
+ * API холболтыг шалгах (Health check)
  */
 export const checkApiStatus = async () => {
   try {
-    const response = await apiClient.get("/");
+    const response = await apiClient.get("/health");
     return { success: true, data: response.data };
   } catch (error) {
     console.error("API холболт амжилтгүй:", error.message);
@@ -200,117 +200,15 @@ export const checkApiStatus = async () => {
   }
 };
 
-/**
- * Моделийн мэдээлэл авах
- */
-export const getModelInfo = async () => {
-  try {
-    const response = await apiClient.get("/model_info");
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error("Моделийн мэдээлэл авах алдаа:", error.message);
-    return { success: false, error: error.message };
-  }
-};
+// ==================== LIVE RATES ENDPOINTS (UniRate API) ====================
 
 /**
- * Форекс хослолын таамаглал авах
- * @param {string} currencyPair - Валютын хос (жишээ: EUR/USD)
- * @param {boolean} forceRefresh - Кэшийг давж шинээр тооцоолох эсэх
+ * Бодит цагийн EUR/USD ханш авах (UniRate API-аас)
+ * @returns {Object} { success, data: { pair, rate, bid, ask, spread, time, source } }
  */
-export const getPrediction = async (currencyPair, forceRefresh = false) => {
+export const getLiveRates = async () => {
   try {
-    // Файлын нэр үүсгэх
-    const fileName = currencyPair.replace("/", "_") + "_test.csv";
-    const filePath = `data/test/${fileName}`;
-
-    const response = await apiClient.post("/predict_file", {
-      file_path: filePath,
-      force_refresh: forceRefresh,
-    });
-
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error("Таамаглал авах алдаа:", error.message);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Бүх валютын хослолуудын таамаглал авах
- * @param {boolean} forceRefresh - Кэшийг давж шинээр тооцоолох эсэх
- */
-export const getAllPredictions = async (forceRefresh = false) => {
-  const pairs = [
-    "EUR/USD",
-    "GBP/USD",
-    "USD/CAD",
-    "USD/CHF",
-    "USD/JPY",
-    "XAU/USD",
-  ];
-
-  try {
-    const predictions = await Promise.all(
-      pairs.map(async (pair) => {
-        const result = await getPrediction(pair, forceRefresh);
-        return {
-          pair,
-          ...result,
-        };
-      })
-    );
-
-    return { success: true, data: predictions };
-  } catch (error) {
-    console.error("Бүх таамаглал авах алдаа:", error.message);
-    return { success: false, error: error.message };
-  }
-};
-
-/**
- * Шинэ дата дээр таамаглал хийх
- * @param {Array} ohlcvData - OHLCV дата массив
- */
-export const predictWithData = async (ohlcvData) => {
-  try {
-    const response = await apiClient.post("/predict", {
-      data: ohlcvData,
-    });
-
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error("Дата дээр таамаглал хийх алдаа:", error.message);
-    return { success: false, error: error.message };
-  }
-};
-
-// ==================== LIVE RATES ENDPOINTS ====================
-
-/**
- * Бодит цагийн валютын ханш авах
- * @param {Array} currencies - Optional: ['EUR', 'GBP', 'JPY'] гэх мэт
- * @param {String} source - 'mt5', 'api', or 'auto' (default: 'auto')
- * @returns {Object} { success, data: { rates, timestamp, source } }
- */
-export const getLiveRates = async (currencies = null, source = "auto") => {
-  try {
-    let url = "/rates/live";
-    const params = [];
-
-    if (currencies && currencies.length > 0) {
-      params.push(`currencies=${currencies.join(",")}`);
-    }
-
-    if (source) {
-      params.push(`source=${source}`);
-    }
-
-    if (params.length > 0) {
-      url += `?${params.join("&")}`;
-    }
-
-    const response = await apiClient.get(url);
+    const response = await apiClient.get("/rates/live");
     return { success: true, data: response.data };
   } catch (error) {
     console.error("Live rates авах алдаа:", error.message);
@@ -321,58 +219,41 @@ export const getLiveRates = async (currencies = null, source = "auto") => {
   }
 };
 
-/**
- * Тодорхой хослолын бодит цагийн ханш авах
- * @param {String} pair - Жишээ: "EUR_USD", "USD_JPY"
- * @returns {Object} { success, data: { pair, rate, timestamp } }
- */
-export const getSpecificRate = async (pair) => {
-  try {
-    const response = await apiClient.get(`/rates/specific?pair=${pair}`);
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error(`${pair} ханш авах алдаа:`, error.message);
-    return {
-      success: false,
-      error: error.response?.data?.error || error.message,
-    };
-  }
-};
+// ==================== SIGNAL V2 ENDPOINTS ====================
 
 /**
- * MT5 холболтын статус шалгах
- * @returns {Object} { success, data: { enabled, connected, account_info } }
+ * V2 Signal Generator - BUY-only mode with 80%+ accuracy
+ * @param {number} minConfidence - Minimum confidence threshold (default: 80)
+ * @returns Signal object with entry, SL, TP, confidence
  */
-export const getMT5Status = async () => {
+export const getSignalV2 = async (minConfidence = 80) => {
   try {
-    const response = await apiClient.get("/rates/mt5/status");
-    return { success: true, data: response.data };
-  } catch (error) {
-    console.error("MT5 статус шалгах алдаа:", error.message);
-    return {
-      success: false,
-      error: error.response?.data?.error || error.message,
-    };
-  }
-};
-
-/**
- * MT5-аас ханшийн түүх авах (график зурахад)
- */
-export const getMT5HistoricalRates = async (
-  pair,
-  timeframe = "M1",
-  count = 30
-) => {
-  try {
-    // Convert EUR/USD to EURUSD format
-    const symbol = pair.replace("/", "").replace("_", "");
     const response = await apiClient.get(
-      `/rates/mt5/historical?symbol=${symbol}&timeframe=${timeframe}&count=${count}`
+      `/signal/v2?min_confidence=${minConfidence}`
     );
     return { success: true, data: response.data };
   } catch (error) {
-    console.error("MT5 historical rates авах алдаа:", error.message);
+    console.error("Signal V2 авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+// ==================== SIGNAL STORAGE ENDPOINTS ====================
+
+/**
+ * Signal хадгалах (таамаг гарвал database-д хадгална)
+ * @param {Object} signalData - Signal object
+ * @returns {Object} { success, signal_id }
+ */
+export const saveSignal = async (signalData) => {
+  try {
+    const response = await apiClient.post("/signal/save", signalData);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Signal хадгалах алдаа:", error.message);
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -381,16 +262,41 @@ export const getMT5HistoricalRates = async (
 };
 
 /**
- * Ханшийн түүх авах (график зурахад) - устгах
+ * Signal түүх авах
+ * @param {Object} options - { pair, limit, signal_type, min_confidence }
+ * @returns {Object} { success, signals }
  */
-export const getHistoricalRates = async (pair, limit = 20) => {
+export const getSignalsHistory = async (options = {}) => {
   try {
-    const response = await apiClient.get(
-      `/rates/history?pair=${pair}&limit=${limit}`
-    );
+    const params = new URLSearchParams();
+    if (options.pair) params.append("pair", options.pair);
+    if (options.limit) params.append("limit", options.limit);
+    if (options.signal_type) params.append("signal_type", options.signal_type);
+    if (options.min_confidence)
+      params.append("min_confidence", options.min_confidence);
+
+    const response = await apiClient.get(`/signals/history?${params.toString()}`);
     return { success: true, data: response.data };
   } catch (error) {
-    console.error("Historical rates авах алдаа:", error.message);
+    console.error("Signal түүх авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Signal статистик авах
+ * @param {string} pair - Currency pair (default: EUR_USD)
+ * @returns {Object} { success, stats }
+ */
+export const getSignalsStats = async (pair = "EUR_USD") => {
+  try {
+    const response = await apiClient.get(`/signals/stats?pair=${pair}`);
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Signal stats авах алдаа:", error.message);
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -399,14 +305,21 @@ export const getHistoricalRates = async (pair, limit = 20) => {
 };
 
 export default {
+  // Auth
+  registerUser,
+  verifyEmail,
+  resendVerificationCode,
+  loginUser,
+  forgotPassword,
+  verifyResetCode,
+  resetPassword,
+  logoutUser,
+  // API
   checkApiStatus,
-  getModelInfo,
-  getPrediction,
-  getAllPredictions,
-  predictWithData,
   getLiveRates,
-  getSpecificRate,
-  getMT5Status,
-  getMT5HistoricalRates,
-  getHistoricalRates, // Keep for backward compatibility
+  getSignalV2,
+  // Signal storage
+  saveSignal,
+  getSignalsHistory,
+  getSignalsStats,
 };

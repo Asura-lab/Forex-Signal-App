@@ -10,11 +10,9 @@ import {
   Switch,
   Modal,
   ActivityIndicator,
-  Linking,
+  StatusBar,
   Platform,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
@@ -41,6 +39,7 @@ const ProfileScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [currentDocument, setCurrentDocument] = useState(null);
+  const [showThemeModal, setShowThemeModal] = useState(false);
   const [stats, setStats] = useState({
     daysUsed: 0,
     signalsReceived: 0,
@@ -424,65 +423,42 @@ GitHub: github.com/Asura-lab/Predictrix
 
   return (
     <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#0D1421" />
+      
       {/* Header */}
-      <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
+      <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.avatarContainer}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={50} color="#FFFFFF" />
+              <Text style={styles.avatarText}>{(userData?.name || "U").charAt(0).toUpperCase()}</Text>
             </View>
-            <TouchableOpacity style={styles.editAvatarButton}>
-              <Ionicons name="camera" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{userData?.name || "Хэрэглэгч"}</Text>
+          <Text style={styles.userName}>{userData?.name || "User"}</Text>
           <Text style={styles.userEmail}>{userData?.email || ""}</Text>
         </View>
-      </LinearGradient>
+      </View>
 
       <ScrollView style={styles.content}>
         {/* Statistics Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Статистик</Text>
+          <Text style={styles.sectionTitle}>STATISTICS</Text>
 
           <View style={styles.statsContainer}>
             <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Ionicons name="calendar-outline" size={24} color="#4CAF50" />
-              </View>
               <Text style={styles.statValue}>{stats.daysUsed}</Text>
-              <Text style={styles.statLabel}>Хоног ашигласан</Text>
+              <Text style={styles.statLabel}>Days Used</Text>
             </View>
 
             <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Ionicons
-                  name="notifications-outline"
-                  size={24}
-                  color="#2196F3"
-                />
-              </View>
               <Text style={styles.statValue}>{stats.signalsReceived}</Text>
-              <Text style={styles.statLabel}>Сигнал авсан</Text>
+              <Text style={styles.statLabel}>Signals</Text>
             </View>
 
             <View style={styles.statCard}>
-              <View style={styles.statIconContainer}>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={24}
-                  color="#FF9800"
-                />
-              </View>
               <Text style={styles.statValue}>
-                {stats.lastActive || "Өнөөдөр"}
+                {stats.lastActive || "Today"}
               </Text>
-              <Text style={styles.statLabel}>Сүүлд нэвтэрсэн</Text>
+              <Text style={styles.statLabel}>Last Active</Text>
             </View>
           </View>
         </View>
@@ -490,31 +466,28 @@ GitHub: github.com/Asura-lab/Predictrix
         {/* Personal Information Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Хувийн мэдээлэл</Text>
+            <Text style={styles.sectionTitle}>PERSONAL INFO</Text>
             {!editMode && (
               <TouchableOpacity
                 onPress={() => setEditMode(true)}
                 style={styles.editButton}
               >
-                <Ionicons name="pencil" size={20} color="#2196F3" />
-                <Text style={styles.editButtonText}>Засах</Text>
+                <Text style={styles.editButtonText}>Edit</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons name="person-outline" size={22} color="#666" />
-              </View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Нэр</Text>
+                <Text style={styles.infoLabel}>NAME</Text>
                 {editMode ? (
                   <TextInput
                     style={styles.input}
                     value={name}
                     onChangeText={setName}
-                    placeholder="Нэр оруулах"
+                    placeholder="Enter name"
+                    placeholderTextColor="#4A5568"
                   />
                 ) : (
                   <Text style={styles.infoValue}>{name}</Text>
@@ -525,17 +498,15 @@ GitHub: github.com/Asura-lab/Predictrix
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons name="mail-outline" size={22} color="#666" />
-              </View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Имэйл</Text>
+                <Text style={styles.infoLabel}>EMAIL</Text>
                 {editMode ? (
                   <TextInput
                     style={styles.input}
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="Имэйл оруулах"
+                    placeholder="Enter email"
+                    placeholderTextColor="#4A5568"
                     keyboardType="email-address"
                   />
                 ) : (
@@ -556,7 +527,7 @@ GitHub: github.com/Asura-lab/Predictrix
                       setEmail(userData?.email || "");
                     }}
                   >
-                    <Text style={styles.cancelButtonText}>Цуцлах</Text>
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.saveButton]}
@@ -566,7 +537,7 @@ GitHub: github.com/Asura-lab/Predictrix
                     {loading ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
-                      <Text style={styles.saveButtonText}>Хадгалах</Text>
+                      <Text style={styles.saveButtonText}>Save</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -577,152 +548,96 @@ GitHub: github.com/Asura-lab/Predictrix
 
         {/* Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Тохиргоо</Text>
+          <Text style={styles.sectionTitle}>SETTINGS</Text>
 
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons name="notifications-outline" size={22} color="#666" />
-              </View>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Мэдэгдэл</Text>
+                <Text style={styles.infoLabel}>NOTIFICATIONS</Text>
                 <Text style={styles.infoDescription}>
-                  Сигнал ирэх үед мэдэгдэнэ
+                  Get signal alerts
                 </Text>
               </View>
               <Switch
                 value={notifications}
                 onValueChange={handleNotificationToggle}
-                trackColor={{ false: "#E0E0E0", true: "#4CAF50" }}
-                thumbColor={notifications ? "#FFFFFF" : "#F5F5F5"}
+                trackColor={{ false: "#1E293B", true: "#00C853" }}
+                thumbColor={notifications ? "#FFFFFF" : "#6B7280"}
               />
             </View>
 
             <View style={styles.divider} />
 
-            <View style={styles.infoRow}>
-              <View style={styles.infoIcon}>
-                <Ionicons
-                  name={
-                    themeMode === "dark"
-                      ? "moon"
-                      : themeMode === "light"
-                      ? "sunny"
-                      : "contrast"
-                  }
-                  size={22}
-                  color="#666"
-                />
-              </View>
+            <TouchableOpacity 
+              style={styles.infoRow}
+              onPress={() => setShowThemeModal(true)}
+            >
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>Дэлгэцийн горим</Text>
+                <Text style={styles.infoLabel}>THEME</Text>
                 <Text style={styles.infoDescription}>
                   {themeMode === "dark"
-                    ? "🌙 Харанхуй"
+                    ? "Dark"
                     : themeMode === "light"
-                    ? "☀️ Гэрэл"
-                    : "⚙️ Автомат"}
+                    ? "Light"
+                    : "System"}
                 </Text>
               </View>
-              <TouchableOpacity
-                style={styles.themeButton}
-                onPress={() => handleDarkModeToggle(themeMode)}
-              >
-                <Text style={styles.themeButtonText}>Солих</Text>
-              </TouchableOpacity>
-            </View>
+              <Text style={styles.chevron}>{">"}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         {/* Security Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Аюулгүй байдал</Text>
+          <Text style={styles.sectionTitle}>SECURITY</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleChangePassword}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons name="lock-closed-outline" size={22} color="#666" />
-              </View>
-              <Text style={styles.menuItemText}>Нууц үг солих</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#999" />
+            <Text style={styles.menuItemText}>Change Password</Text>
+            <Text style={styles.chevron}>{">"}</Text>
           </TouchableOpacity>
         </View>
 
         {/* About Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Мэдээлэл</Text>
+          <Text style={styles.sectionTitle}>ABOUT</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("help")}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons name="help-circle-outline" size={22} color="#666" />
-              </View>
-              <Text style={styles.menuItemText}>Тусламж</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#999" />
+            <Text style={styles.menuItemText}>Help</Text>
+            <Text style={styles.chevron}>{">"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("terms")}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons name="document-text-outline" size={22} color="#666" />
-              </View>
-              <Text style={styles.menuItemText}>Үйлчилгээний нөхцөл</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#999" />
+            <Text style={styles.menuItemText}>Terms of Service</Text>
+            <Text style={styles.chevron}>{">"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("privacy")}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons
-                  name="shield-checkmark-outline"
-                  size={22}
-                  color="#666"
-                />
-              </View>
-              <Text style={styles.menuItemText}>Нууцлалын бодлого</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#999" />
+            <Text style={styles.menuItemText}>Privacy Policy</Text>
+            <Text style={styles.chevron}>{">"}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("about")}
           >
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons
-                  name="information-circle-outline"
-                  size={22}
-                  color="#666"
-                />
-              </View>
-              <Text style={styles.menuItemText}>Апп-ын тухай</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={22} color="#999" />
+            <Text style={styles.menuItemText}>About App</Text>
+            <Text style={styles.chevron}>{">"}</Text>
           </TouchableOpacity>
 
           <View style={styles.menuItem}>
-            <View style={styles.menuItemLeft}>
-              <View style={styles.menuIcon}>
-                <Ionicons name="code-outline" size={22} color="#666" />
-              </View>
-              <Text style={styles.menuItemText}>Хувилбар</Text>
-            </View>
+            <Text style={styles.menuItemText}>Version</Text>
             <Text style={styles.versionText}>1.1.0</Text>
           </View>
         </View>
@@ -730,8 +645,7 @@ GitHub: github.com/Asura-lab/Predictrix
         {/* Logout Button */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Ionicons name="log-out-outline" size={22} color="#F44336" />
-            <Text style={styles.logoutButtonText}>Гарах</Text>
+            <Text style={styles.logoutButtonText}>Sign Out</Text>
           </TouchableOpacity>
         </View>
 
@@ -748,7 +662,7 @@ GitHub: github.com/Asura-lab/Predictrix
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Нууц үг солих</Text>
+              <Text style={styles.modalTitle}>Change Password</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowPasswordModal(false);
@@ -757,43 +671,46 @@ GitHub: github.com/Asura-lab/Predictrix
                   setConfirmPassword("");
                 }}
               >
-                <Ionicons name="close" size={28} color="#666" />
+                <Text style={styles.closeButton}>X</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Хуучин нууц үг</Text>
+                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={oldPassword}
                   onChangeText={setOldPassword}
                   secureTextEntry
-                  placeholder="Хуучин нууц үг оруулах"
+                  placeholder="Enter current password"
+                  placeholderTextColor="#4A5568"
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Шинэ нууц үг</Text>
+                <Text style={styles.inputLabel}>NEW PASSWORD</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
-                  placeholder="Шинэ нууц үг (дор хаяж 6 тэмдэгт)"
+                  placeholder="Min 6 characters"
+                  placeholderTextColor="#4A5568"
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Нууц үг баталгаажуулах</Text>
+                <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
-                  placeholder="Шинэ нууц үг дахин оруулах"
+                  placeholder="Confirm new password"
+                  placeholderTextColor="#4A5568"
                   autoCapitalize="none"
                 />
               </View>
@@ -806,7 +723,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalButtonText}>Нууц үг солих</Text>
+                  <Text style={styles.modalButtonText}>Update Password</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -831,7 +748,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 onPress={() => setShowDocumentModal(false)}
                 style={styles.documentCloseButton}
               >
-                <Ionicons name="close" size={28} color="#666" />
+                <Text style={styles.closeButton}>X</Text>
               </TouchableOpacity>
             </View>
 
@@ -849,11 +766,72 @@ GitHub: github.com/Asura-lab/Predictrix
                 style={styles.documentButton}
                 onPress={() => setShowDocumentModal(false)}
               >
-                <Text style={styles.documentButtonText}>Хаах</Text>
+                <Text style={styles.documentButtonText}>Close</Text>
               </TouchableOpacity>
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Theme Selection Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showThemeModal}
+        onRequestClose={() => setShowThemeModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.themeModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowThemeModal(false)}
+        >
+          <View style={styles.themeModalContent}>
+            <Text style={styles.themeModalTitle}>Select Theme</Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                themeMode === 'auto' && styles.themeOptionActive
+              ]}
+              onPress={() => {
+                setTheme('auto');
+                setShowThemeModal(false);
+              }}
+            >
+              <Text style={styles.themeOptionText}>System</Text>
+              {themeMode === 'auto' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                themeMode === 'light' && styles.themeOptionActive
+              ]}
+              onPress={() => {
+                setTheme('light');
+                setShowThemeModal(false);
+              }}
+            >
+              <Text style={styles.themeOptionText}>Light</Text>
+              {themeMode === 'light' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                styles.themeOptionLast,
+                themeMode === 'dark' && styles.themeOptionActive
+              ]}
+              onPress={() => {
+                setTheme('dark');
+                setShowThemeModal(false);
+              }}
+            >
+              <Text style={styles.themeOptionText}>Dark</Text>
+              {themeMode === 'dark' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
       </Modal>
     </View>
   );
@@ -870,52 +848,44 @@ const createStyles = (colors) =>
       paddingBottom: 30,
       paddingHorizontal: 20,
       alignItems: "center",
+      backgroundColor: colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
     headerContent: {
       alignItems: "center",
     },
     avatarContainer: {
-      position: "relative",
       marginBottom: 16,
     },
     avatar: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
-      backgroundColor: "rgba(255, 255, 255, 0.2)",
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: colors.success,
       justifyContent: "center",
       alignItems: "center",
-      borderWidth: 3,
-      borderColor: "#FFFFFF",
     },
-    editAvatarButton: {
-      position: "absolute",
-      bottom: 0,
-      right: 0,
-      backgroundColor: colors.info,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      justifyContent: "center",
-      alignItems: "center",
-      borderWidth: 3,
-      borderColor: "#FFFFFF",
+    avatarText: {
+      fontSize: 32,
+      fontWeight: "700",
+      color: "#FFFFFF",
     },
     userName: {
-      fontSize: 24,
-      fontWeight: "bold",
+      fontSize: 20,
+      fontWeight: "700",
       color: colors.textPrimary,
       marginBottom: 4,
     },
     userEmail: {
-      fontSize: 14,
-      color: "rgba(255, 255, 255, 0.8)",
+      fontSize: 13,
+      color: colors.textSecondary,
     },
     content: {
       flex: 1,
     },
     section: {
-      marginTop: 20,
+      marginTop: 24,
       paddingHorizontal: 16,
     },
     statsContainer: {
@@ -926,34 +896,23 @@ const createStyles = (colors) =>
     statCard: {
       flex: 1,
       backgroundColor: colors.card,
-      borderRadius: 12,
+      borderRadius: 8,
       padding: 16,
       alignItems: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-    },
-    statIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.input,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     statValue: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: colors.textDark,
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.textPrimary,
       marginBottom: 4,
     },
     statLabel: {
-      fontSize: 12,
-      color: colors.textLabel,
+      fontSize: 10,
+      color: colors.textSecondary,
       textAlign: "center",
+      letterSpacing: 1,
     },
     sectionHeader: {
       flexDirection: "row",
@@ -962,78 +921,63 @@ const createStyles = (colors) =>
       marginBottom: 12,
     },
     sectionTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-      color: colors.textDark,
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textSecondary,
       marginBottom: 12,
+      letterSpacing: 1,
     },
     editButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: colors.primary + "20",
       paddingHorizontal: 12,
       paddingVertical: 6,
-      borderRadius: 20,
     },
     editButtonText: {
-      marginLeft: 4,
-      color: colors.primary,
-      fontSize: 14,
+      color: colors.success,
+      fontSize: 13,
       fontWeight: "600",
     },
     infoCard: {
       backgroundColor: colors.card,
-      borderRadius: 12,
+      borderRadius: 8,
       padding: 16,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     infoRow: {
       flexDirection: "row",
       alignItems: "center",
       paddingVertical: 12,
     },
-    infoIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.input,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
-    },
     infoContent: {
       flex: 1,
     },
     infoLabel: {
-      fontSize: 12,
-      color: colors.textLabel,
+      fontSize: 10,
+      color: colors.textSecondary,
       marginBottom: 4,
+      letterSpacing: 1,
     },
     infoValue: {
-      fontSize: 16,
-      color: colors.textDark,
+      fontSize: 15,
+      color: colors.textPrimary,
       fontWeight: "500",
     },
     infoDescription: {
       fontSize: 12,
-      color: colors.textLabel,
+      color: colors.textSecondary,
       marginTop: 2,
     },
     input: {
-      fontSize: 16,
-      color: colors.textDark,
+      fontSize: 15,
+      color: colors.textPrimary,
       fontWeight: "500",
       borderBottomWidth: 1,
-      borderBottomColor: "#2196F3",
+      borderBottomColor: colors.success,
       paddingVertical: 4,
     },
     divider: {
       height: 1,
-      backgroundColor: colors.borderDark,
+      backgroundColor: colors.border,
       marginVertical: 8,
     },
     buttonRow: {
@@ -1049,19 +993,19 @@ const createStyles = (colors) =>
       alignItems: "center",
     },
     cancelButton: {
-      backgroundColor: colors.input,
+      backgroundColor: colors.cardSecondary,
     },
     cancelButtonText: {
-      color: colors.textLabel,
-      fontSize: 16,
+      color: colors.textSecondary,
+      fontSize: 14,
       fontWeight: "600",
     },
     saveButton: {
-      backgroundColor: colors.secondary,
+      backgroundColor: colors.success,
     },
     saveButtonText: {
-      color: colors.textPrimary,
-      fontSize: 16,
+      color: "#FFFFFF",
+      fontSize: 14,
       fontWeight: "600",
     },
     menuItem: {
@@ -1070,61 +1014,52 @@ const createStyles = (colors) =>
       justifyContent: "space-between",
       backgroundColor: colors.card,
       padding: 16,
-      borderRadius: 12,
+      borderRadius: 8,
       marginBottom: 8,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 2,
-    },
-    menuItemLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    menuIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.input,
-      justifyContent: "center",
-      alignItems: "center",
-      marginRight: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     menuItemText: {
-      fontSize: 16,
-      color: colors.textDark,
+      fontSize: 14,
+      color: colors.textPrimary,
       fontWeight: "500",
     },
+    chevron: {
+      color: colors.textSecondary,
+      fontSize: 16,
+    },
     versionText: {
-      fontSize: 14,
-      color: colors.textLabel,
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    closeButton: {
+      fontSize: 20,
+      color: colors.textSecondary,
+      fontWeight: "600",
     },
     logoutButton: {
-      flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
       backgroundColor: colors.card,
       padding: 16,
-      borderRadius: 12,
-      borderWidth: 2,
-      borderColor: "#F44336",
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.error,
     },
     logoutButtonText: {
-      marginLeft: 8,
-      fontSize: 16,
-      color: "#F44336",
+      fontSize: 14,
+      color: colors.error,
       fontWeight: "600",
     },
     modalOverlay: {
       flex: 1,
-      backgroundColor: "rgba(0, 0, 0, 0.5)",
+      backgroundColor: colors.overlay,
       justifyContent: "flex-end",
     },
     modalContent: {
       backgroundColor: colors.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
       paddingBottom: 40,
     },
     modalHeader: {
@@ -1133,12 +1068,12 @@ const createStyles = (colors) =>
       alignItems: "center",
       padding: 20,
       borderBottomWidth: 1,
-      borderBottomColor: "#E0E0E0",
+      borderBottomColor: colors.border,
     },
     modalTitle: {
-      fontSize: 20,
-      fontWeight: "bold",
-      color: colors.textDark,
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.textPrimary,
     },
     modalBody: {
       padding: 20,
@@ -1147,37 +1082,38 @@ const createStyles = (colors) =>
       marginBottom: 20,
     },
     inputLabel: {
-      fontSize: 14,
+      fontSize: 10,
       fontWeight: "600",
-      color: colors.textDark,
+      color: colors.textSecondary,
       marginBottom: 8,
+      letterSpacing: 1,
     },
     modalInput: {
       borderWidth: 1,
-      borderColor: colors.borderDark,
+      borderColor: colors.border,
       borderRadius: 8,
       padding: 12,
-      fontSize: 16,
-      color: colors.textDark,
-      backgroundColor: colors.cardSecondary,
+      fontSize: 15,
+      color: colors.textPrimary,
+      backgroundColor: colors.background,
     },
     modalButton: {
-      backgroundColor: colors.secondary,
+      backgroundColor: colors.success,
       borderRadius: 8,
       padding: 16,
       alignItems: "center",
       marginTop: 10,
     },
     modalButtonText: {
-      color: colors.textPrimary,
-      fontSize: 16,
+      color: "#FFFFFF",
+      fontSize: 14,
       fontWeight: "600",
     },
     // Document Modal Styles
     documentModalContainer: {
       backgroundColor: colors.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
       height: "85%",
       paddingBottom: 0,
     },
@@ -1187,12 +1123,12 @@ const createStyles = (colors) =>
       alignItems: "center",
       padding: 20,
       borderBottomWidth: 1,
-      borderBottomColor: "#E0E0E0",
+      borderBottomColor: colors.border,
     },
     documentModalTitle: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: "700",
-      color: colors.textDark,
+      color: colors.textPrimary,
       flex: 1,
     },
     documentCloseButton: {
@@ -1203,37 +1139,84 @@ const createStyles = (colors) =>
       padding: 20,
     },
     documentText: {
-      fontSize: 15,
-      lineHeight: 24,
-      color: colors.textDark,
-      fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+      fontSize: 14,
+      lineHeight: 22,
+      color: colors.textPrimary,
     },
     documentModalFooter: {
       padding: 20,
       borderTopWidth: 1,
-      borderTopColor: colors.borderDark,
+      borderTopColor: colors.border,
     },
     documentButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: colors.success,
       borderRadius: 8,
       padding: 16,
       alignItems: "center",
     },
     documentButtonText: {
-      color: colors.textPrimary,
-      fontSize: 16,
+      color: "#FFFFFF",
+      fontSize: 14,
       fontWeight: "600",
     },
     themeButton: {
-      backgroundColor: colors.secondary,
+      backgroundColor: colors.success,
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 8,
     },
     themeButtonText: {
-      color: colors.textPrimary,
-      fontSize: 14,
+      color: "#FFFFFF",
+      fontSize: 12,
       fontWeight: "600",
+    },
+    // Theme Modal Styles
+    themeModalOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    themeModalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      width: '80%',
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    themeModalTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    themeOption: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    themeOptionLast: {
+      borderBottomWidth: 0,
+    },
+    themeOptionActive: {
+      backgroundColor: colors.success + '20',
+    },
+    themeOptionText: {
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    checkmark: {
+      color: colors.success,
+      fontSize: 18,
+      fontWeight: '700',
     },
   });
 

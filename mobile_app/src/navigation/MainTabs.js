@@ -1,12 +1,40 @@
 import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import HomeScreen from "../screens/HomeScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
+
+/**
+ * Simple Tab Icon - Using SF Symbols-like Unicode
+ */
+const TabIcon = ({ name, focused, colors }) => {
+  const activeColor = colors.success;
+  const inactiveColor = colors.textSecondary;
+  const iconColor = focused ? activeColor : inactiveColor;
+  
+  return (
+    <View style={styles.iconContainer}>
+      {name === 'HomeTab' ? (
+        // Chart/Market icon - 3 bars
+        <View style={styles.chartIcon}>
+          <View style={[styles.bar, styles.bar1, { backgroundColor: iconColor }]} />
+          <View style={[styles.bar, styles.bar2, { backgroundColor: iconColor }]} />
+          <View style={[styles.bar, styles.bar3, { backgroundColor: iconColor }]} />
+        </View>
+      ) : (
+        // Profile icon - person silhouette
+        <View style={styles.profileIcon}>
+          <View style={[styles.head, { backgroundColor: iconColor }]} />
+          <View style={[styles.body, { backgroundColor: iconColor }]} />
+        </View>
+      )}
+    </View>
+  );
+};
 
 /**
  * Main Tabs Navigator - Bottom navigation
@@ -19,19 +47,11 @@ const MainTabs = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === "HomeTab") {
-            iconName = focused ? "home" : "home-outline";
-          } else if (route.name === "ProfileTab") {
-            iconName = focused ? "person" : "person-outline";
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
+        tabBarIcon: ({ focused }) => {
+          return <TabIcon name={route.name} focused={focused} colors={colors} />;
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.icon,
+        tabBarActiveTintColor: colors.success,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopWidth: 1,
@@ -39,18 +59,11 @@ const MainTabs = () => {
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
-          shadowColor: "#000",
-          shadowOffset: {
-            width: 0,
-            height: -2,
-          },
-          shadowOpacity: 0.1,
-          shadowRadius: 3,
-          elevation: 10,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: "600",
+          letterSpacing: 1,
         },
       })}
     >
@@ -58,18 +71,65 @@ const MainTabs = () => {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: "Нүүр",
+          tabBarLabel: "MARKET",
         }}
       />
       <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
-          tabBarLabel: "Профайл",
+          tabBarLabel: "PROFILE",
         }}
       />
     </Tab.Navigator>
   );
 };
+
+const styles = StyleSheet.create({
+  iconContainer: {
+    width: 28,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Chart icon styles (3 bars)
+  chartIcon: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 18,
+    gap: 3,
+  },
+  bar: {
+    width: 4,
+    borderRadius: 1,
+  },
+  bar1: {
+    height: 8,
+  },
+  bar2: {
+    height: 14,
+  },
+  bar3: {
+    height: 10,
+  },
+  // Profile icon styles (head + body)
+  profileIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 20,
+  },
+  head: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  body: {
+    width: 14,
+    height: 8,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
+  },
+});
 
 export default MainTabs;

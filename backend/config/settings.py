@@ -1,6 +1,6 @@
 """
-Backend Configuration
-Environment тохиргоо болон database холболт
+Backend Configuration - V2 (Simplified)
+UniRate API + V2 Signal Generator only
 """
 
 import os
@@ -39,12 +39,6 @@ MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 VERIFICATION_CODE_EXPIRY_MINUTES = 10
 RESET_CODE_EXPIRY_MINUTES = 10
 
-# MT5 Configuration - Зөвхөн MT5 ашиглана
-MT5_ENABLED = os.getenv('MT5_ENABLED', 'True').lower() == 'true'  # Default True
-MT5_LOGIN = int(os.getenv('MT5_LOGIN')) if os.getenv('MT5_LOGIN') else None  # MT5 account number (int)
-MT5_PASSWORD = os.getenv('MT5_PASSWORD')  # MT5 password
-MT5_SERVER = os.getenv('MT5_SERVER')  # MT5 server name
-
 # API Configuration
 API_HOST = os.getenv('API_HOST', '0.0.0.0')
 API_PORT = int(os.getenv('API_PORT', 5000))
@@ -52,16 +46,11 @@ DEBUG_MODE = os.getenv('DEBUG', 'True').lower() == 'true'
 
 # Data directories
 DATA_DIR = BASE_DIR / 'data'
-TRAIN_DATA_DIR = DATA_DIR / 'train'
-TEST_DATA_DIR = DATA_DIR / 'test'
 MODELS_DIR = BASE_DIR / 'models'
 
-# Supported currency pairs
-CURRENCY_PAIRS = [
-    'EUR_USD'  # Single pair focus for optimal model training
-]
+# Twelve Data API Configuration
+TWELVEDATA_API_KEY = "e98702484b0f4a9a9fd17c6d9f41948e"
+SUPPORTED_PAIR = "EUR_USD"
 
-# Disable MT5 (using UniRate API only)
-MT5_ENABLED = False
-print(f"✓ Configuration loaded from: {ENV_PATH}")
-print(f"ℹ️  MT5 disabled - Using UniRate API for EUR/USD")
+print(f"✓ Configuration V2 loaded from: {ENV_PATH}")
+print(f"ℹ️  Using Twelve Data API for EUR/USD live rates")

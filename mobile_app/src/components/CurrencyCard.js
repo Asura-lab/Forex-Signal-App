@@ -1,230 +1,163 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useTheme } from "../context/ThemeContext";
-import { getColors } from "../config/theme";
 
 /**
- * Валютын хос картын компонент - TradingView style
+ * Currency Card - Professional trading style row
  */
-const CurrencyCard = ({
-  pair,
-  prediction,
-  liveRate,
-  onPress,
-  loading,
-  showChangeColumn = true,
-}) => {
-  const { isDark } = useTheme();
-  const colors = getColors(isDark);
+const CurrencyCard = ({ pair, liveRate, onPress, loading, colors }) => {
+  // Default colors if not passed
+  const c = colors || {
+    background: "#0D1421",
+    card: "#131C2E",
+    border: "#1E293B",
+    textPrimary: "#FFFFFF",
+    textSecondary: "#6B7280",
+    success: "#00C853",
+    error: "#EF5350",
+    neutral: "#6B7280",
+  };
+  
+  // Get rate data
+  const rateData = typeof liveRate === "object" ? liveRate : { rate: liveRate };
+  const rate = rateData?.rate || 0;
+  const change = rateData?.change || 0;
+  const changePercent = rateData?.change_percent || 0;
 
-  const formatRate = (rate) => {
-    if (!rate) return "—";
+  const isPositive = change > 0;
+  const isNegative = change < 0;
+  const changeColor = isPositive ? c.success : isNegative ? c.error : c.textSecondary;
 
-    const rateValue = typeof rate === "object" ? rate.rate : rate;
-    if (!rateValue) return "—";
-
-    // Format with thousands separator for large numbers like XAU/USD
-    if (rateValue >= 1000) {
-      return rateValue.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
-    }
-
-    // Standard forex pairs
+  const formatRate = (value) => {
+    if (!value) return "-.-----";
     if (pair.name.includes("JPY")) {
-      return rateValue.toFixed(2);
+      return value.toFixed(3);
     }
-    return rateValue.toFixed(5);
+    return value.toFixed(5);
   };
 
-  const getChange = () => {
-    if (!prediction || !prediction.latest_prediction) {
-      return {
-        value: "—",
-        percent: "—",
-        signal: "—",
-        isPositive: null,
-      };
+  const formatChange = (value) => {
+    if (!value && value !== 0) return "-";
+    const prefix = value > 0 ? "+" : "";
+    if (pair.name.includes("JPY")) {
+      return prefix + value.toFixed(3);
     }
-
-    const { label, confidence } = prediction.latest_prediction;
-
-    // Signal mapping based on prediction
-    let signalText = "HOLD";
-    let changeDirection = 0; // -1: sell, 0: hold, 1: buy
-
-    if (label === 0) {
-      signalText = "S.SELL";
-      changeDirection = -1;
-    } else if (label === 1) {
-      signalText = "SELL";
-      changeDirection = -1;
-    } else if (label === 2) {
-      signalText = "HOLD";
-      changeDirection = 0;
-    } else if (label === 3) {
-      signalText = "BUY";
-      changeDirection = 1;
-    } else if (label === 4) {
-      signalText = "S.BUY";
-      changeDirection = 1;
-    }
-
-    // Compute 24h pip change if backend provided it as liveRate.chg
-    let changeValue = "—";
-    let changePercent = "—";
-    let isChangePositive = null;
-
-    if (liveRate && typeof liveRate === "object") {
-      // Backend now returns 'chg' as pip difference over last 24h when available
-      if (liveRate.chg !== undefined && liveRate.chg !== null) {
-        const pip = Number(liveRate.chg);
-        if (!isNaN(pip)) {
-          // Show pip change as integer or one decimal
-          changeValue = pip % 1 === 0 ? pip.toFixed(0) : pip.toFixed(1);
-          isChangePositive = pip > 0 ? true : pip < 0 ? false : null;
-        }
-      } else if (liveRate.rate && liveRate.previous_close) {
-        // Fallback: compute from previous_close if backend supplies it
-        const change = liveRate.rate - liveRate.previous_close;
-        const s_info = null; // cannot compute pips without point info on mobile
-        changeValue = change.toFixed(pair.name.includes("JPY") ? 3 : 5);
-        changePercent = ((change / liveRate.previous_close) * 100).toFixed(2);
-        isChangePositive = change >= 0;
-      }
-    }
-
-    return {
-      value: changeValue,
-      percent: changePercent !== "—" ? changePercent + "%" : "—",
-      signal: signalText,
-      isPositive: isChangePositive,
-      isNeutral: isChangePositive === null || changeValue === "—",
-      signalDirection: changeDirection, // Keep signal direction separate
-    };
+    return prefix + value.toFixed(5);
   };
 
-  const change = getChange();
-  const styles = createStyles(colors, change.isPositive);
+  const formatChangePercent = (value) => {
+    if (!value && value !== 0) return "-";
+    const prefix = value > 0 ? "+" : "";
+    return prefix + value.toFixed(2) + "%";
+  };
+
+  const styles = createStyles(c);
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={onPress}
-      activeOpacity={0.8}
+      activeOpacity={0.7}
       disabled={loading}
     >
-      {/* Symbol Column */}
+      {/* Symbol */}
       <View style={styles.symbolColumn}>
-        <Text style={styles.symbol}>{pair.name}</Text>
+        <View style={[styles.indicator, { backgroundColor: changeColor }]} />
+        <View>
+          <Text style={styles.symbol}>{pair.displayName}</Text>
+          <Text style={styles.pairLabel}>{pair.name.replace("/", " / ")}</Text>
+        </View>
       </View>
 
-      {/* Last Price Column */}
-      <View style={styles.column}>
-        <Text style={styles.lastPrice}>{formatRate(liveRate)}</Text>
+      {/* Price */}
+      <View style={styles.priceColumn}>
+        <Text style={styles.price}>{formatRate(rate)}</Text>
       </View>
 
-      {/* Change Column - Hidden on small screens */}
-      {showChangeColumn && (
-        <View style={styles.column}>
-          <Text
-            style={[styles.changeValue, change.isNeutral && styles.neutralText]}
-          >
-            {change.value !== "—" &&
-              change.isPositive !== null &&
-              (change.isPositive ? "+" : "")}
-            {change.value}
+      {/* Change */}
+      <View style={styles.changeColumn}>
+        <Text style={[styles.change, { color: changeColor }]}>
+          {formatChange(change)}
+        </Text>
+      </View>
+
+      {/* Change % */}
+      <View style={styles.percentColumn}>
+        <View style={[styles.percentBadge, { backgroundColor: changeColor + '20' }]}>
+          <Text style={[styles.percent, { color: changeColor }]}>
+            {formatChangePercent(changePercent)}
           </Text>
         </View>
-      )}
-
-      {/* Note: chg% column removed. We display pip change in the Chg column. */}
-
-      {/* Signal Column */}
-      <View style={styles.signalColumn}>
-        <Text
-          style={[
-            styles.signalText,
-            change.isNeutral && styles.neutralSignal,
-            change.signalDirection > 0 && !change.isNeutral && styles.buySignal,
-            change.signalDirection < 0 &&
-              !change.isNeutral &&
-              styles.sellSignal,
-            change.signalDirection === 0 && styles.neutralSignal,
-          ]}
-        >
-          {change.signal}
-        </Text>
       </View>
     </TouchableOpacity>
   );
 };
 
-const createStyles = (colors, isPositive) =>
-  StyleSheet.create({
-    card: {
-      backgroundColor: colors.card,
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderDark,
-    },
-    symbolColumn: {
-      flex: 1.5,
-    },
-    symbol: {
-      fontSize: 16,
-      fontWeight: "600",
-      color: colors.textDark,
-    },
-    column: {
-      flex: 1,
-      alignItems: "flex-end",
-    },
-    lastPrice: {
-      fontSize: 15,
-      fontWeight: "500",
-      color: colors.textDark,
-    },
-    changeValue: {
-      fontSize: 15,
-      fontWeight: "500",
-      color: isPositive ? "#00C853" : "#FF1744",
-    },
-    changePercent: {
-      fontSize: 15,
-      fontWeight: "600",
-      color: isPositive ? "#00C853" : "#FF1744",
-    },
-    neutralText: {
-      color: colors.textLabel,
-    },
-    signalColumn: {
-      flex: 1,
-      alignItems: "flex-end",
-    },
-    signalText: {
-      fontSize: 13,
-      fontWeight: "700",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 4,
-    },
-    buySignal: {
-      color: "#00C853",
-      backgroundColor: "#00C85320",
-    },
-    sellSignal: {
-      color: "#FF1744",
-      backgroundColor: "#FF174420",
-    },
-    neutralSignal: {
-      color: colors.textLabel,
-      backgroundColor: colors.input,
-    },
-  });
+const createStyles = (colors) => StyleSheet.create({
+  card: {
+    backgroundColor: colors.background,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  symbolColumn: {
+    flex: 2.5,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  indicator: {
+    width: 3,
+    height: 32,
+    borderRadius: 1.5,
+    marginRight: 12,
+  },
+  symbol: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  pairLabel: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 2,
+    letterSpacing: 0.5,
+  },
+  priceColumn: {
+    flex: 2,
+    alignItems: "flex-end",
+  },
+  price: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    fontVariant: ["tabular-nums"],
+  },
+  changeColumn: {
+    flex: 1.5,
+    alignItems: "flex-end",
+  },
+  change: {
+    fontSize: 12,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  percentColumn: {
+    flex: 1.5,
+    alignItems: "flex-end",
+  },
+  percentBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  percent: {
+    fontSize: 12,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+});
 
 export default CurrencyCard;

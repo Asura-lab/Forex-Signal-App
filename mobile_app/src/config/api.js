@@ -5,28 +5,13 @@
 
 import { Platform } from "react-native";
 
-// Development режимд ашиглах backend URL
-//
-// Android Emulator:     10.0.2.2 (host машины localhost-ийг заана)
-// iOS Simulator:        localhost эсвэл 127.0.0.1
-// Physical Device:      Компьютерийн WiFi IP хаяг (утас болон компьютер ижил WiFi-д байх ёстой)
-//
-// Production:           Deploy хийсэн backend URL
+// WiFi IP хаяг - утас болон компьютер ижил WiFi-д байх ёстой
+const WIFI_IP = "192.168.1.138";
 
 // Автоматаар тогтоох
 const getApiUrl = () => {
-  // Development mode: Check __DEV__ flag
-  if (__DEV__) {
-    // Development - use emulator address
-    if (Platform.OS === "android") {
-      return "http://10.0.2.2:5000";
-    }
-    // iOS Simulator
-    return "http://localhost:5000";
-  }
-
-  // Production - Physical Device with WiFi IP
-  return "http://172.26.54.200:5000";
+  // Бүх тохиолдолд WiFi IP ашиглана (physical device + emulator)
+  return `http://${WIFI_IP}:5000`;
 };
 
 export const API_BASE_URL = getApiUrl();
