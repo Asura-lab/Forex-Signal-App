@@ -38,6 +38,9 @@ backend/config/.env
 models/*.pkl
 models/*.h5
 models/*.joblib
+models/**/*.joblib
+models/**/*.pkl
+models/**/*.h5
 
 # Data files (датанууд - GitHub-д их том файлууд оруулахгүй)
 data/train/*.csv
