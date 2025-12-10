@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Forex Signal API v2
+Forex Signal API v10
 - MongoDB + JWT Authentication
 - UniRate API for live rates
-- V2 Signal Generator (BUY-only, 80%+ accuracy)
+- V10 Signal Generator (7-Model Ensemble, 85%+ = 97% accuracy)
 """
 
 import sys
@@ -38,8 +38,8 @@ from utils.twelvedata_handler import (
     get_all_forex_rates
 )
 
-# Import V2 Signal Generator
-from ml.signal_generator_v2 import get_signal_generator
+# Import V10 Signal Generator (Best performing model)
+from ml.signal_generator_v10 import get_signal_generator_v10
 
 app = Flask(__name__)
 CORS(app)
@@ -69,19 +69,19 @@ except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
     exit(1)
 
-# ==================== V2 SIGNAL GENERATOR ====================
+# ==================== V10 SIGNAL GENERATOR ====================
 
-signal_generator_v2 = None
+signal_generator = None
 
 def load_signal_generator():
-    global signal_generator_v2
+    global signal_generator
     try:
-        signal_generator_v2 = get_signal_generator()
-        if signal_generator_v2.is_loaded:
-            print("✓ V2 Signal Generator ачаалагдлаа")
+        signal_generator = get_signal_generator_v10()
+        if signal_generator.is_loaded:
+            print("✓ V10 Signal Generator ачаалагдлаа (7-Model Ensemble)")
             return True
     except Exception as e:
-        print(f"✗ V2 Signal Generator алдаа: {e}")
+        print(f"✗ V10 Signal Generator алдаа: {e}")
     return False
 
 # Load on startup
@@ -431,20 +431,20 @@ def get_specific_rate():
 @app.route('/signal/v2', methods=['GET'])
 def get_signal_v2():
     """
-    V2 Signal Generator - BUY-only mode with 80%+ confidence
+    V10 Signal Generator - 7-Model Ensemble with Agreement Bonus
     NON-BLOCKING: Returns cached data if rate limited
     
     Query params:
-        min_confidence: Minimum confidence threshold (default: 80)
+        min_confidence: Minimum confidence threshold (default: 85 for V10)
     """
     try:
-        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
+        if signal_generator is None or not signal_generator.is_loaded:
             return jsonify({
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
         
-        min_confidence = float(request.args.get('min_confidence', 80))
+        min_confidence = float(request.args.get('min_confidence', 85))
         
         # Get historical data from Twelve Data API (NON-BLOCKING)
         df = get_twelvedata_dataframe(interval="1min", count=500)
@@ -474,7 +474,7 @@ def get_signal_v2():
         market_closed = is_weekend or is_monday_early
         
         # Generate signal directly from DataFrame
-        signal = signal_generator_v2.generate_signal(df, min_confidence)
+        signal = signal_generator.generate_signal(df, min_confidence)
         
         return jsonify({
             'success': True,
@@ -497,13 +497,13 @@ def get_signal_v2():
 def get_signal_v2_demo():
     """Demo signal with test data"""
     try:
-        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
+        if signal_generator is None or not signal_generator.is_loaded:
             return jsonify({
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
         
-        min_confidence = float(request.args.get('min_confidence', 80))
+        min_confidence = float(request.args.get('min_confidence', 85))
         
         import pandas as pd
         test_file = Path(__file__).parent.parent / 'data' / 'EUR_USD_test.csv'
@@ -515,7 +515,7 @@ def get_signal_v2_demo():
         df.columns = df.columns.str.lower()
         df = df.tail(500).reset_index(drop=True)
         
-        signal = signal_generator_v2.generate_signal(df, min_confidence)
+        signal = signal_generator.generate_signal(df, min_confidence)
         
         return jsonify({
             'success': True,
@@ -543,8 +543,8 @@ def predict():
                 'error': 'Зөвхөн EUR_USD дэмжигддэг'
             }), 400
         
-        # Get signal from V2
-        if signal_generator_v2 is None or not signal_generator_v2.is_loaded:
+        # Get signal from V10
+        if signal_generator is None or not signal_generator.is_loaded:
             return jsonify({
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
@@ -558,7 +558,7 @@ def predict():
                 'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
             })
         
-        signal = signal_generator_v2.generate_signal(df, min_confidence=70)
+        signal = signal_generator.generate_signal(df, min_confidence=85)
         
         return jsonify({
             'success': True,
@@ -766,7 +766,7 @@ def health():
             'status': 'healthy',
             'database': 'connected',
             'users_count': user_count,
-            'signal_generator_v2': 'loaded' if (signal_generator_v2 and signal_generator_v2.is_loaded) else 'not loaded',
+            'signal_generator': 'V10 loaded' if (signal_generator and signal_generator.is_loaded) else 'not loaded',
             'timestamp': datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -776,7 +776,8 @@ def health():
 def index():
     return jsonify({
         'name': 'Forex Signal API',
-        'version': '2.0',
+        'version': '10.0',
+        'model': 'V10 (7-Model Ensemble)',
         'status': 'running',
         'endpoints': {
             'auth': ['/auth/register', '/auth/login', '/auth/verify-email', '/auth/me'],
@@ -792,10 +793,10 @@ if __name__ == '__main__':
     PORT = 5000
     
     print("=" * 60)
-    print("FOREX SIGNAL API v2.0")
+    print("FOREX SIGNAL API v10.0")
     print("=" * 60)
     print(f"✓ MongoDB: Connected")
-    print(f"✓ Signal Generator V2: {'Loaded' if (signal_generator_v2 and signal_generator_v2.is_loaded) else 'Not loaded'}")
+    print(f"✓ Signal Generator V10: {'Loaded (7-Model Ensemble)' if (signal_generator and signal_generator.is_loaded) else 'Not loaded'}")
     print(f"✓ Twelve Data API: Enabled")
     print(f"✓ Port: {PORT}")
     print(f"\n🚀 API Endpoints:")

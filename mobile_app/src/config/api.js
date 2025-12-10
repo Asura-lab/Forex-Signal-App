@@ -6,11 +6,20 @@
 import { Platform } from "react-native";
 
 // WiFi IP хаяг - утас болон компьютер ижил WiFi-д байх ёстой
-const WIFI_IP = "192.168.1.138";
+const WIFI_IP = "10.73.82.168";
 
 // Автоматаар тогтоох
 const getApiUrl = () => {
-  // Бүх тохиолдолд WiFi IP ашиглана (physical device + emulator)
+  // Android-д:
+  // - Emulator дээр 10.0.2.2 нь host машины localhost руу заадаг
+  // - Physical device дээр WiFi IP хэрэгтэй
+  // 
+  // Emulator ашиглаж байгаа бол доорх мөрийг uncomment хий:
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000';
+  }
+  
+  // iOS simulator эсвэл physical device
   return `http://${WIFI_IP}:5000`;
 };
 
