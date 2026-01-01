@@ -53,9 +53,6 @@ TWELVEDATA_API_KEY = os.getenv('TWELVEDATA_API_KEY')
 if not TWELVEDATA_API_KEY:
     print("Warning: TWELVEDATA_API_KEY not found in .env")
 
-# Gemini API Configuration
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-
 SUPPORTED_PAIR = "EUR_USD"
 
 print(f"[OK] Configuration V2 loaded from: {ENV_PATH}")
