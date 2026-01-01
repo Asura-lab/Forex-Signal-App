@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import random
 import json
+import ast
 import time
 import requests
 import urllib.parse
@@ -35,30 +36,32 @@ class MarketAnalyst:
         self.last_insight_time = 0
         self.cache_duration = 900  # 15 minutes
 
-    def _call_pollinations(self, prompt, force_json=False):
-        """Helper to call Pollinations.ai API"""
-        try:
-            if force_json:
-                prompt += " RETURN ONLY RAW JSON. NO MARKDOWN. NO EXPLANATION."
-            
-            encoded_prompt = urllib.parse.quote(prompt)
-            url = f"https://text.pollinations.ai/{encoded_prompt}"
-            
-            response = requests.get(url, timeout=30)
-            if response.status_code == 200:
-                text = response.text.strip()
-                # Clean up Pollinations ads/headers
-                if "**Support Pollinations.AI:**" in text:
-                    text = text.split("**Support Pollinations.AI:**")[0]
-                if "**Ad**" in text:
-                    text = text.split("**Ad**")[0]
-                if "---" in text:
-                    text = text.split("---")[0]
-                return text.strip()
-            return None
-        except Exception as e:
-            print(f"Pollinations API Error: {e}")
-            return None
+    def _call_pollinations(self, prompt, force_json=False, retries=3):
+        """Helper to call Pollinations.ai API with retry logic"""
+        if force_json:
+            prompt += " RETURN ONLY RAW JSON. NO MARKDOWN. NO EXPLANATION. NO ```json WRAPPERS."
+        
+        encoded_prompt = urllib.parse.quote(prompt)
+        url = f"https://text.pollinations.ai/{encoded_prompt}"
+        
+        for attempt in range(retries):
+            try:
+                response = requests.get(url, timeout=30)
+                if response.status_code == 200:
+                    text = response.text.strip()
+                    # Clean up Pollinations ads/headers
+                    if "**Support Pollinations.AI:**" in text:
+                        text = text.split("**Support Pollinations.AI:**")[0]
+                    if "**Ad**" in text:
+                        text = text.split("**Ad**")[0]
+                    if "---" in text:
+                        text = text.split("---")[0]
+                    return text.strip()
+                time.sleep(1)
+            except Exception as e:
+                print(f"Pollinations API Error (Attempt {attempt+1}/{retries}): {e}")
+                time.sleep(1)
+        return None
 
     def get_latest_news(self, limit=10):
         """Get latest news from TradingView"""
@@ -280,7 +283,7 @@ class MarketAnalyst:
                 - forecast: A general forecast for major pairs in Mongolian.
                 - market_sentiment: "Risk-On" or "Risk-Off" (Translate explanation to Mongolian).
                 
-                IMPORTANT: Return ONLY valid JSON. Do not use markdown. Do not use double quotes inside strings (use single quotes).
+                IMPORTANT: Return ONLY valid JSON. Use double quotes for all keys and string values. Escape double quotes inside strings. NO markdown.
                 """
             else:
                 prompt = f"""
@@ -301,28 +304,54 @@ class MarketAnalyst:
                 - forecast: A specific forecast for the next 24 hours in Mongolian.
                 - market_sentiment: "Risk-On" or "Risk-Off" (Translate explanation to Mongolian).
                 
-                IMPORTANT: Return ONLY valid JSON. Do not use markdown. Do not use double quotes inside strings (use single quotes).
+                IMPORTANT: Return ONLY valid JSON. Use double quotes for all keys and string values. Escape double quotes inside strings. NO markdown.
                 """
             
-            response_text = self._call_pollinations(prompt, force_json=True)
+            # Retry logic for JSON parsing
+            max_retries = 3
+            insight = None
             
-            if not response_text:
-                raise Exception("AI service failed")
+            for attempt in range(max_retries):
+                response_text = self._call_pollinations(prompt, force_json=True)
+                
+                if not response_text:
+                    continue
 
-            # Clean up markdown
-            if response_text.startswith("```json"): response_text = response_text[7:]
-            if response_text.endswith("```"): response_text = response_text[:-3]
+                # Clean up markdown
+                clean_text = response_text
+                if "```json" in clean_text:
+                    clean_text = clean_text.split("```json")[1].split("```")[0]
+                elif "```" in clean_text:
+                    clean_text = clean_text.split("```")[1].split("```")[0]
+                
+                clean_text = clean_text.strip()
+                
+                # Regex to find the first JSON object
+                json_match = re.search(r'\{[\s\S]*\}', clean_text)
+                if json_match:
+                    clean_text = json_match.group(0)
+                
+                try:
+                    insight = json.loads(clean_text)
+                    break # Success
+                except json.JSONDecodeError as e:
+                    print(f"JSON Decode Error (Attempt {attempt+1}): {e}")
+                    # Try ast.literal_eval for single-quoted JSON (Python dict)
+                    try:
+                        insight = ast.literal_eval(clean_text)
+                        if isinstance(insight, dict):
+                            print("✅ Successfully parsed using ast.literal_eval")
+                            break
+                    except Exception as ast_e:
+                        print(f"AST Parse Error: {ast_e}")
+                    
+                    if attempt == max_retries - 1:
+                        print(f"❌ FAILED JSON: {clean_text[:500]}...") # Log the failed text
+                        raise Exception("Invalid JSON from AI after retries")
+                    time.sleep(1)
             
-            # Regex to find the first JSON object
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                response_text = json_match.group(0)
-            
-            try:
-                insight = json.loads(response_text)
-            except json.JSONDecodeError as e:
-                print(f"JSON Decode Error: {e}. Raw: {response_text[:100]}...")
-                raise Exception("Invalid JSON from AI")
+            if not insight:
+                raise Exception("Failed to generate valid JSON")
             
             # Normalize keys
             normalized_insight = {}
@@ -350,6 +379,22 @@ class MarketAnalyst:
 
         except Exception as e:
             print(f"AI Analysis Error: {e}")
+            
+            # CRITICAL: Do not mock EUR/USD if user requested
+            if pair == "EUR/USD":
+                print("⚠️ EUR/USD Analysis Failed - Returning Error State (No Mocking)")
+                return {
+                    "pair": pair,
+                    "outlook": "Analysis Unavailable",
+                    "summary": "AI System is currently offline. Unable to generate real-time analysis.",
+                    "recent_events": [],
+                    "event_impacts": "N/A",
+                    "risk_factors": [],
+                    "forecast": "N/A",
+                    "market_sentiment": "Neutral",
+                    "error": True
+                }
+                
             return self._generate_mock_insight(technical_signal, pair)
 
     def _save_to_db(self, insight, pair):
