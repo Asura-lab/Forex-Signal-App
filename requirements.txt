@@ -31,3 +31,6 @@ MetaTrader5>=5.0.45
 # === БУСАД ===
 jupyter>=1.0.0
 ipykernel>=6.25.0
+
+# === AI & LLM ===
+google-generativeai>=0.3.0

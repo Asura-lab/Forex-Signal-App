@@ -219,7 +219,27 @@ export const getLiveRates = async () => {
   }
 };
 
-// ==================== SIGNAL V2 ENDPOINTS ====================
+// ==================== SIGNAL ENDPOINTS ====================
+
+/**
+ * Get Best Signal (Currently V10)
+ * @param {number} minConfidence - Minimum confidence threshold (default: 80)
+ * @returns Signal object with entry, SL, TP, confidence
+ */
+export const getBestSignal = async (minConfidence = 80) => {
+  try {
+    const response = await apiClient.get(
+      `/signal/best?min_confidence=${minConfidence}`
+    );
+    return { success: true, data: response.data };
+  } catch (error) {
+    console.error("Signal авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
 
 /**
  * V2 Signal Generator - BUY-only mode with 80%+ accuracy
@@ -304,6 +324,26 @@ export const getSignalsStats = async (pair = "EUR_USD") => {
   }
 };
 
+/**
+ * Market Analysis авах
+ * @param {string} pair - Currency pair (e.g. "EUR/USD")
+ * @returns {Object} { success, data }
+ */
+export const getMarketAnalysis = async (pair) => {
+  try {
+    const response = await apiClient.get(`/api/market-analysis?pair=${pair}`);
+    // Backend returns { status: "success", data: { ... } }
+    // We want to return the inner data object
+    return { success: true, data: response.data.data };
+  } catch (error) {
+    console.error("Market analysis авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
 export default {
   // Auth
   registerUser,
@@ -322,4 +362,5 @@ export default {
   saveSignal,
   getSignalsHistory,
   getSignalsStats,
+  getMarketAnalysis,
 };

@@ -15,7 +15,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_mail import Mail, Message
 from pymongo import MongoClient
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 import bcrypt
 import os
@@ -37,6 +37,9 @@ from utils.twelvedata_handler import (
     get_twelvedata_dataframe,
     get_all_forex_rates
 )
+
+# Import Market Analyst (News & AI)
+from utils.market_analyst import market_analyst
 
 # Import V10 Signal Generator (Best performing model)
 from ml.signal_generator_v10 import get_signal_generator_v10
@@ -93,7 +96,7 @@ def preload_historical_data():
     """Backend эхлэхэд historical data урьдчилан татах"""
     try:
         print("📥 Preloading historical data...")
-        df = get_twelvedata_dataframe(interval="1min", count=500)
+        df = get_twelvedata_dataframe(interval="1min", outputsize=500)
         if df is not None and len(df) >= 200:
             print(f"✓ Historical data preloaded: {len(df)} bars")
             return True
@@ -112,7 +115,7 @@ def generate_token(user_id, email):
     payload = {
         'user_id': str(user_id),
         'email': email,
-        'exp': datetime.utcnow() + timedelta(days=7)
+        'exp': datetime.now(timezone.utc) + timedelta(days=7)
     }
     return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
@@ -187,8 +190,8 @@ def register():
         'code': code,
         'name': name,
         'password': bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(),
-        'created_at': datetime.utcnow(),
-        'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
+        'created_at': datetime.now(timezone.utc),
+        'expires_at': datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
     })
     
     # Send email
@@ -210,7 +213,7 @@ def verify_email():
     record = verification_codes.find_one({
         'email': email,
         'code': code,
-        'expires_at': {'$gt': datetime.utcnow()}
+        'expires_at': {'$gt': datetime.now(timezone.utc)}
     })
     
     if not record:
@@ -222,7 +225,7 @@ def verify_email():
         'email': email,
         'password': record['password'],
         'email_verified': True,
-        'created_at': datetime.utcnow()
+        'created_at': datetime.now(timezone.utc)
     }
     result = users_collection.insert_one(user)
     
@@ -256,8 +259,8 @@ def resend_verification():
         {'email': email},
         {'$set': {
             'code': code,
-            'created_at': datetime.utcnow(),
-            'expires_at': datetime.utcnow() + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
+            'created_at': datetime.now(timezone.utc),
+            'expires_at': datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
         }}
     )
     
@@ -325,8 +328,8 @@ def forgot_password():
     reset_codes.insert_one({
         'email': email,
         'code': code,
-        'created_at': datetime.utcnow(),
-        'expires_at': datetime.utcnow() + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
+        'created_at': datetime.now(timezone.utc),
+        'expires_at': datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
     })
     
     try:
@@ -355,7 +358,7 @@ def reset_password():
     record = reset_codes.find_one({
         'email': email,
         'code': code,
-        'expires_at': {'$gt': datetime.utcnow()}
+        'expires_at': {'$gt': datetime.now(timezone.utc)}
     })
     
     if not record:
@@ -383,7 +386,7 @@ def get_live_rates():
                 'success': True,
                 'source': 'twelvedata',
                 'rates': result.get('rates', {}),
-                'timestamp': result.get('time', datetime.utcnow().isoformat()),
+                'timestamp': result.get('time', datetime.now(timezone.utc).isoformat()),
                 'cached': result.get('cached', False),
                 'count': result.get('count', 0)
             })
@@ -428,6 +431,15 @@ def get_specific_rate():
 
 # ==================== V2 SIGNAL GENERATOR ====================
 
+@app.route('/signal/best', methods=['GET'])
+def get_signal_best():
+    """
+    Best Signal Generator (Currently V10)
+    - 7-Model Ensemble with Agreement Bonus
+    - Returns the best available signal
+    """
+    return get_signal_v2()
+
 @app.route('/signal/v2', methods=['GET'])
 def get_signal_v2():
     """
@@ -447,7 +459,7 @@ def get_signal_v2():
         min_confidence = float(request.args.get('min_confidence', 85))
         
         # Get historical data from Twelve Data API (NON-BLOCKING)
-        df = get_twelvedata_dataframe(interval="1min", count=500)
+        df = get_twelvedata_dataframe(interval="1min", outputsize=500)
         
         if df is None or len(df) < 200:
             # Rate limited and no cached data
@@ -628,7 +640,7 @@ def save_signal():
             'models_agree': data.get('models_agree'),
             'atr_pips': data.get('atr_pips'),
             'reason': data.get('reason'),
-            'created_at': datetime.utcnow(),
+            'created_at': datetime.now(timezone.utc),
             'status': 'active'  # active, closed, expired
         }
         
@@ -754,6 +766,90 @@ def get_signals_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+# ==================== NEWS & AI ANALYSIS ====================
+
+@app.route('/api/news', methods=['GET'])
+def get_news():
+    """Мэдээний жагсаалт авах (History, Upcoming, Outlook)"""
+    try:
+        news_type = request.args.get('type', 'latest')
+        
+        if news_type == 'history':
+            data = market_analyst.get_news_history()
+        elif news_type == 'upcoming':
+            data = market_analyst.get_upcoming_news()
+        elif news_type == 'outlook':
+            data = market_analyst.get_market_outlook()
+        else:
+            # Default to latest/upcoming mixed or just upcoming
+            data = market_analyst.get_latest_news()
+        
+        return jsonify({
+            "status": "success",
+            "data": data
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/news/analyze', methods=['POST'])
+def analyze_news_event():
+    """Specific news event analysis using AI"""
+    try:
+        event_data = request.json
+        if not event_data:
+            return jsonify({"status": "error", "message": "No data provided"}), 400
+            
+        analysis = market_analyst.analyze_specific_event(event_data)
+        
+        return jsonify({
+            "status": "success",
+            "analysis": analysis
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+import traceback
+
+@app.route('/api/market-analysis', methods=['GET'])
+def get_market_analysis():
+    """AI зах зээлийн дүгнэлт авах"""
+    try:
+        pair = request.args.get('pair', 'EUR/USD')
+        print(f"Analyzing pair: {pair}")
+        
+        mock_signal = {
+            "signal": "NEUTRAL",
+            "confidence": 50.0
+        }
+        
+        if pair != "MARKET":
+            # 1. Одоогийн ханш болон дохиог авах
+            try:
+                df = get_twelvedata_dataframe(symbol=pair, interval="15min", outputsize=100)
+                
+                if df is not None and not df.empty:
+                    # Simple trend check for demo
+                    close = df['close'].iloc[-1]
+                    open_p = df['open'].iloc[-1]
+                    mock_signal["signal"] = "BUY" if close > open_p else "SELL"
+                    mock_signal["confidence"] = 75.0
+            except Exception as e:
+                print(f"Error fetching data for {pair}: {e}")
+                traceback.print_exc()
+                # Continue with mock signal if data fetch fails
+        
+        insight = market_analyst.generate_ai_insight(mock_signal, pair=pair)
+        
+        return jsonify({
+            "status": "success",
+            "data": insight
+        }), 200
+    except Exception as e:
+        print(f"Error in analysis: {e}")
+        traceback.print_exc()
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
 # ==================== HEALTH CHECK ====================
 
 @app.route('/health', methods=['GET'])
@@ -767,7 +863,7 @@ def health():
             'database': 'connected',
             'users_count': user_count,
             'signal_generator': 'V10 loaded' if (signal_generator and signal_generator.is_loaded) else 'not loaded',
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
         return jsonify({'status': 'unhealthy', 'error': str(e)}), 500

@@ -22,6 +22,7 @@ import { registerUser } from "../services/api";
 const SignUpScreen = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
+  const styles = createStyles(colors);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -112,7 +113,7 @@ const SignUpScreen = ({ navigation }) => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <StatusBar barStyle="light-content" backgroundColor="#0D1421" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.content}>
           {/* Header */}
@@ -133,7 +134,7 @@ const SignUpScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Your name"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.textSecondary}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -147,8 +148,8 @@ const SignUpScreen = ({ navigation }) => {
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="your@email.com"
-                  placeholderTextColor="#4A5568"
+                  placeholder="Email"
+                  placeholderTextColor={colors.textSecondary}
                   value={email}
                   onChangeText={setEmail}
                   keyboardType="email-address"
@@ -165,7 +166,7 @@ const SignUpScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Min 6 characters"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.textSecondary}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
@@ -184,7 +185,7 @@ const SignUpScreen = ({ navigation }) => {
                 <TextInput
                   style={styles.input}
                   placeholder="Confirm password"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.textSecondary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
@@ -197,9 +198,13 @@ const SignUpScreen = ({ navigation }) => {
             </View>
 
             {/* Terms Checkbox */}
-            <TouchableOpacity style={styles.termsContainer} onPress={() => setAcceptedTerms(!acceptedTerms)}>
+            <TouchableOpacity 
+              style={styles.termsContainer} 
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              activeOpacity={0.7}
+            >
               <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-                {acceptedTerms && <Text style={styles.checkmark}>+</Text>}
+                {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
               </View>
               <Text style={styles.termsText}>
                 I agree to the{" "}
@@ -236,10 +241,10 @@ const SignUpScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0D1421',
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
@@ -256,22 +261,22 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   backText: {
-    color: '#6B7280',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   title: {
     fontSize: 24,
     fontWeight: "700",
-    color: '#FFFFFF',
+    color: colors.textPrimary,
     letterSpacing: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginTop: 8,
   },
   formContainer: {
-    backgroundColor: '#131C2E',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 24,
   },
@@ -281,24 +286,24 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#6B7280',
+    color: colors.textSecondary,
     marginBottom: 8,
     letterSpacing: 1,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: '#0D1421',
+    backgroundColor: colors.background,
     borderRadius: 8,
     height: 50,
     paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#1E293B',
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    color: '#FFFFFF',
+    color: colors.textPrimary,
   },
   toggleButton: {
     paddingHorizontal: 8,
@@ -306,46 +311,47 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#00C853',
+    color: colors.success,
     letterSpacing: 1,
   },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 24,
+    paddingVertical: 4,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#1E293B',
-    backgroundColor: '#0D1421',
+    borderColor: colors.border,
+    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   checkboxChecked: {
-    backgroundColor: '#00C853',
-    borderColor: '#00C853',
+    backgroundColor: colors.success,
+    borderColor: colors.success,
   },
   checkmark: {
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: 'bold',
-    transform: [{ rotate: '45deg' }],
   },
   termsText: {
     flex: 1,
     fontSize: 13,
-    color: '#6B7280',
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   termsLink: {
-    color: '#00C853',
+    color: colors.success,
     fontWeight: '600',
   },
   signupButton: {
-    backgroundColor: '#00C853',
+    backgroundColor: colors.success,
     borderRadius: 8,
     height: 50,
     justifyContent: "center",
@@ -366,14 +372,14 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: colors.border,
   },
   loginText: {
-    color: '#6B7280',
+    color: colors.textSecondary,
     fontSize: 14,
   },
   loginLink: {
-    color: '#00C853',
+    color: colors.success,
     fontSize: 14,
     fontWeight: "600",
   },

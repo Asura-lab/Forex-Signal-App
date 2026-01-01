@@ -457,11 +457,15 @@ def get_twelvedata_historical(count: int = 500) -> list:
     return twelvedata_handler.get_historical_bars(count)
 
 
-def get_twelvedata_dataframe(interval: str = "1min", count: int = 500) -> pd.DataFrame:
+def get_twelvedata_dataframe(symbol: str = "EUR/USD", interval: str = "1min", outputsize: int = 500) -> pd.DataFrame:
     """
     DataFrame хэлбэрээр түүхэн өгөгдөл авах
     """
-    return twelvedata_handler.get_historical_data(interval, count)
+    # Update symbol if provided
+    if symbol and symbol != twelvedata_handler.symbol:
+        twelvedata_handler.symbol = symbol
+        
+    return twelvedata_handler.get_historical_data(interval, outputsize)
 
 
 # Test

@@ -13,6 +13,7 @@ import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import CurrencyList from "../components/CurrencyList";
 import { checkApiStatus, getLiveRates } from "../services/api";
+import { API_URL } from "../config/api";
 
 /**
  * Home Screen - Professional TradingView style
@@ -112,15 +113,6 @@ const HomeScreen = ({ navigation }) => {
         )}
       </View>
 
-      {/* Table Header */}
-      <View style={styles.tableHeader}>
-        <Text style={[styles.tableHeaderText, styles.symbolColumn]}>SYMBOL</Text>
-        <Text style={[styles.tableHeaderText, styles.priceColumn]}>PRICE</Text>
-        <Text style={[styles.tableHeaderText, styles.changeColumn]}>CHG</Text>
-        <Text style={[styles.tableHeaderText, styles.percentColumn]}>CHG%</Text>
-      </View>
-
-      {/* Currency List */}
       <ScrollView
         style={styles.scrollView}
         refreshControl={
@@ -132,6 +124,15 @@ const HomeScreen = ({ navigation }) => {
           />
         }
       >
+        {/* Table Header */}
+        <View style={styles.tableHeader}>
+          <Text style={[styles.tableHeaderText, styles.symbolColumn]}>SYMBOL</Text>
+          <Text style={[styles.tableHeaderText, styles.priceColumn]}>PRICE</Text>
+          <Text style={[styles.tableHeaderText, styles.changeColumn]}>CHG</Text>
+          <Text style={[styles.tableHeaderText, styles.percentColumn]}>CHG%</Text>
+        </View>
+
+        {/* Currency List */}
         <CurrencyList
           liveRates={liveRates}
           onPairPress={handlePairPress}

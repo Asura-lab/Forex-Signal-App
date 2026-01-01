@@ -10,9 +10,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  StatusBar,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "../components/Icon";
+import { useTheme } from "../context/ThemeContext";
+import { getColors } from "../config/theme";
 import {
   forgotPassword,
   verifyResetCode,
@@ -20,12 +21,16 @@ import {
 } from "../services/api";
 
 /**
- * Forgot Password Screen - Нууц үг сэргээх 3 алхмын дэлгэц
- * Step 1: Имэйл оруулах
- * Step 2: Код шалгах
- * Step 3: Шинэ нууц үг оруулах
+ * Forgot Password Screen - Professional minimal design
+ * Step 1: Email
+ * Step 2: Verify Code
+ * Step 3: New Password
  */
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { isDark } = useTheme();
+  const colors = getColors(isDark);
+  const styles = createStyles(colors);
+
   const [step, setStep] = useState(1); // 1: Email, 2: Code, 3: New Password
   const [email, setEmail] = useState("");
   const [code, setCode] = useState(["", "", "", "", "", ""]);
@@ -163,32 +168,21 @@ const ForgotPasswordScreen = ({ navigation }) => {
   };
 
   const renderStep1 = () => (
-    <>
-      <View style={styles.stepHeader}>
-        <Ionicons name="mail" size={48} color="#1a237e" />
-        <Text style={styles.stepTitle}>Алхам 1: Имэйл хаяг</Text>
-        <Text style={styles.stepSubtitle}>
-          Бүртгэлтэй имэйл хаягаа оруулна уу
-        </Text>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons
-          name="mail-outline"
-          size={20}
-          color="#666"
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Имэйл хаяг"
-          placeholderTextColor="#999"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+    <View style={styles.formContainer}>
+      <View style={styles.inputWrapper}>
+        <Text style={styles.inputLabel}>ИМЭЙЛ ХАЯГ</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Имэйл хаягаа оруулна уу"
+            placeholderTextColor={colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+          />
+        </View>
       </View>
 
       <TouchableOpacity
@@ -197,30 +191,29 @@ const ForgotPasswordScreen = ({ navigation }) => {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color="#FFFFFF" size="small" />
         ) : (
-          <Text style={styles.primaryButtonText}>Код илгээх</Text>
+          <Text style={styles.primaryButtonText}>Код авах</Text>
         )}
       </TouchableOpacity>
-    </>
+    </View>
   );
 
   const renderStep2 = () => (
-    <>
-      <View style={styles.stepHeader}>
-        <Ionicons name="shield-checkmark" size={48} color="#1a237e" />
-        <Text style={styles.stepTitle}>Алхам 2: Код баталгаажуулах</Text>
-        <Text style={styles.stepSubtitle}>
-          {email} хаягт илгээсэн 6 оронтой кодыг оруулна уу
-        </Text>
-      </View>
-
+    <View style={styles.formContainer}>
+      <Text style={styles.instructionText}>
+        {email} хаяг руу илгээсэн 6 оронтой кодыг оруулна уу
+      </Text>
+      
       <View style={styles.codeContainer}>
         {code.map((digit, index) => (
           <TextInput
             key={index}
             ref={(ref) => (inputRefs.current[index] = ref)}
-            style={[styles.codeInput, digit && styles.codeInputFilled]}
+            style={[
+              styles.codeInput,
+              digit ? styles.codeInputFilled : null,
+            ]}
             value={digit}
             onChangeText={(text) => handleCodeChange(text, index)}
             onKeyPress={(e) => handleKeyPress(e, index)}
@@ -232,94 +225,61 @@ const ForgotPasswordScreen = ({ navigation }) => {
       </View>
 
       <TouchableOpacity
-        style={[
-          styles.primaryButton,
-          (loading || code.join("").length !== 6) && styles.disabledButton,
-        ]}
+        style={[styles.primaryButton, loading && styles.disabledButton]}
         onPress={handleVerifyCode}
-        disabled={loading || code.join("").length !== 6}
+        disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color="#FFFFFF" size="small" />
         ) : (
-          <Text style={styles.primaryButtonText}>Үргэлжлүүлэх</Text>
+          <Text style={styles.primaryButtonText}>Баталгаажуулах</Text>
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => {
-          setStep(1);
-          setCode(["", "", "", "", "", ""]);
-        }}
+      <TouchableOpacity 
+        style={styles.resendButton} 
+        onPress={handleSendEmail}
+        disabled={loading}
       >
-        <Text style={styles.secondaryButtonText}>← Буцах</Text>
+        <Text style={styles.resendText}>Код дахин авах</Text>
       </TouchableOpacity>
-    </>
+    </View>
   );
 
   const renderStep3 = () => (
-    <>
-      <View style={styles.stepHeader}>
-        <Ionicons name="key" size={48} color="#1a237e" />
-        <Text style={styles.stepTitle}>Алхам 3: Шинэ нууц үг</Text>
-        <Text style={styles.stepSubtitle}>Шинэ нууц үгээ оруулна уу</Text>
+    <View style={styles.formContainer}>
+      <View style={styles.inputWrapper}>
+        <Text style={styles.inputLabel}>ШИНЭ НУУЦ ҮГ</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Доод тал нь 6 оронтой"
+            placeholderTextColor={colors.textSecondary}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!showNewPassword}
+          />
+          <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.toggleButton}>
+            <Text style={styles.toggleText}>{showNewPassword ? "HIDE" : "SHOW"}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.inputContainer}>
-        <Ionicons
-          name="lock-closed-outline"
-          size={20}
-          color="#666"
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={[styles.input, styles.passwordInput]}
-          placeholder="Шинэ нууц үг"
-          placeholderTextColor="#999"
-          value={newPassword}
-          onChangeText={setNewPassword}
-          secureTextEntry={!showNewPassword}
-          autoCapitalize="none"
-        />
-        <TouchableOpacity
-          onPress={() => setShowNewPassword(!showNewPassword)}
-          style={styles.eyeIcon}
-        >
-          <Ionicons
-            name={showNewPassword ? "eye-outline" : "eye-off-outline"}
-            size={20}
-            color="#666"
+      <View style={styles.inputWrapper}>
+        <Text style={styles.inputLabel}>НУУЦ ҮГ ДАВТАХ</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Нууц үгээ давтан оруулна уу"
+            placeholderTextColor={colors.textSecondary}
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            secureTextEntry={!showConfirmPassword}
           />
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Ionicons
-          name="lock-closed-outline"
-          size={20}
-          color="#666"
-          style={styles.inputIcon}
-        />
-        <TextInput
-          style={[styles.input, styles.passwordInput]}
-          placeholder="Нууц үг давтах"
-          placeholderTextColor="#999"
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          secureTextEntry={!showConfirmPassword}
-          autoCapitalize="none"
-        />
-        <TouchableOpacity
-          onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-          style={styles.eyeIcon}
-        >
-          <Ionicons
-            name={showConfirmPassword ? "eye-outline" : "eye-off-outline"}
-            size={20}
-            color="#666"
-          />
-        </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.toggleButton}>
+            <Text style={styles.toggleText}>{showConfirmPassword ? "HIDE" : "SHOW"}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <TouchableOpacity
@@ -328,19 +288,12 @@ const ForgotPasswordScreen = ({ navigation }) => {
         disabled={loading}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color="#FFFFFF" size="small" />
         ) : (
-          <Text style={styles.primaryButtonText}>Нууц үг солих</Text>
+          <Text style={styles.primaryButtonText}>Хадгалах</Text>
         )}
       </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() => setStep(2)}
-      >
-        <Text style={styles.secondaryButtonText}>← Буцах</Text>
-      </TouchableOpacity>
-    </>
+    </View>
   );
 
   return (
@@ -348,162 +301,160 @@ const ForgotPasswordScreen = ({ navigation }) => {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.content}>
-            {/* Logo/Title */}
-            <View style={styles.logoContainer}>
-              <Ionicons name="lock-closed" size={60} color="#FFFFFF" />
-              <Text style={styles.logoTitle}>Форекс Сигнал</Text>
-              <Text style={styles.logoSubtitle}>Нууц үг сэргээх</Text>
-            </View>
-
-            {/* Form Container */}
-            <View style={styles.formContainer}>
-              {/* Progress Indicator */}
-              <View style={styles.progressContainer}>
-                {[1, 2, 3].map((s) => (
-                  <View
-                    key={s}
-                    style={[
-                      styles.progressDot,
-                      s <= step && styles.progressDotActive,
-                    ]}
-                  />
-                ))}
-              </View>
-
-              {/* Render current step */}
-              {step === 1 && renderStep1()}
-              {step === 2 && renderStep2()}
-              {step === 3 && renderStep3()}
-            </View>
-
-            {/* Back to Login */}
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => navigation.navigate("Login")}
-            >
-              <Ionicons name="arrow-back-outline" size={20} color="#FFFFFF" />
-              <Text style={styles.backButtonText}>
-                Нэвтрэх хуудас руу буцах
-              </Text>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
+          {/* Header */}
+          <View style={styles.headerContainer}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Text style={styles.backText}>{"<"} Буцах</Text>
             </TouchableOpacity>
+            <Text style={styles.title}>НУУЦ ҮГ СЭРГЭЭХ</Text>
+            <Text style={styles.subtitle}>
+              {step === 1 && "Имэйл хаягаа оруулна уу"}
+              {step === 2 && "Баталгаажуулах код"}
+              {step === 3 && "Шинэ нууц үг үүсгэх"}
+            </Text>
           </View>
-        </ScrollView>
-      </LinearGradient>
+
+          {/* Steps Indicator */}
+          <View style={styles.progressContainer}>
+            {[1, 2, 3].map((s) => (
+              <View
+                key={s}
+                style={[
+                  styles.progressDot,
+                  step >= s && styles.progressDotActive,
+                  step === s && styles.progressDotCurrent,
+                ]}
+              />
+            ))}
+          </View>
+
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-  },
-  gradient: {
-    flex: 1,
+    backgroundColor: colors.background,
   },
   scrollContent: {
     flexGrow: 1,
   },
   content: {
     flex: 1,
-    justifyContent: "center",
     padding: 24,
+    paddingTop: 50,
   },
-  logoContainer: {
-    alignItems: "center",
-    marginBottom: 40,
+  headerContainer: {
+    marginBottom: 32,
   },
-  logoTitle: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginTop: 16,
+  backButton: {
+    marginBottom: 24,
   },
-  logoSubtitle: {
-    fontSize: 16,
-    color: "#B0BEC5",
+  backText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    letterSpacing: 2,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
     marginTop: 8,
-  },
-  formContainer: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
   },
   progressContainer: {
     flexDirection: "row",
-    justifyContent: "center",
-    gap: 12,
-    marginBottom: 30,
+    marginBottom: 32,
+    gap: 8,
   },
   progressDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#E0E0E0",
+    width: 40,
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
   },
   progressDotActive: {
-    backgroundColor: "#1a237e",
-    width: 30,
+    backgroundColor: colors.success,
+    opacity: 0.5,
   },
-  stepHeader: {
-    alignItems: "center",
-    marginBottom: 24,
+  progressDotCurrent: {
+    backgroundColor: colors.success,
+    opacity: 1,
   },
-  stepTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1a237e",
-    marginTop: 12,
+  formContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 24,
+  },
+  inputWrapper: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
     marginBottom: 8,
-    textAlign: "center",
-  },
-  stepSubtitle: {
-    fontSize: 14,
-    color: "#666",
-    textAlign: "center",
-    lineHeight: 20,
+    letterSpacing: 1,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: 12,
-    marginBottom: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    height: 50,
     paddingHorizontal: 16,
-    height: 56,
-  },
-  inputIcon: {
-    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   input: {
     flex: 1,
-    fontSize: 16,
-    color: "#333",
+    fontSize: 15,
+    color: colors.textPrimary,
   },
-  passwordInput: {
-    paddingRight: 40,
+  toggleButton: {
+    paddingHorizontal: 8,
   },
-  eyeIcon: {
-    position: "absolute",
-    right: 16,
+  toggleText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.success,
+    letterSpacing: 1,
+  },
+  primaryButton: {
+    backgroundColor: colors.success,
+    borderRadius: 8,
+    height: 50,
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  disabledButton: {
+    opacity: 0.5,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: 1,
+  },
+  instructionText: {
+    color: colors.textSecondary,
+    fontSize: 14,
+    marginBottom: 24,
+    textAlign: 'center',
   },
   codeContainer: {
     flexDirection: "row",
@@ -513,66 +464,27 @@ const styles = StyleSheet.create({
   },
   codeInput: {
     flex: 1,
-    height: 60,
-    borderWidth: 2,
-    borderColor: "#E0E0E0",
-    borderRadius: 12,
-    backgroundColor: "#F5F5F5",
-    color: "#333",
-    fontSize: 24,
+    height: 50,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    color: colors.textPrimary,
+    fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
   },
   codeInputFilled: {
-    borderColor: "#1a237e",
-    backgroundColor: "#E8EAF6",
+    borderColor: colors.success,
+    backgroundColor: colors.background,
   },
-  primaryButton: {
-    backgroundColor: "#1a237e",
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  disabledButton: {
-    backgroundColor: "#BDBDBD",
-    opacity: 0.7,
-  },
-  secondaryButton: {
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  secondaryButtonText: {
-    color: "#666",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 16,
+  resendButton: {
     marginTop: 16,
+    alignItems: 'center',
   },
-  backButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "500",
+  resendText: {
+    color: colors.textSecondary,
+    fontSize: 13,
   },
 });
 

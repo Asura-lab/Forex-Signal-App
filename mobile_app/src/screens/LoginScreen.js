@@ -111,7 +111,7 @@ const LoginScreen = ({ navigation }) => {
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="your@email.com"
+                placeholder="Enter your email"
                 placeholderTextColor="#4A5568"
                 value={email}
                 onChangeText={setEmail}

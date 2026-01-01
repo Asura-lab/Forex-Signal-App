@@ -13,17 +13,20 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
-import { getSignalV2, saveSignal } from "../services/api";
+import { getBestSignal, saveSignal, getMarketAnalysis } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const { width } = Dimensions.get("window");
 
 // Mock signal data for non-EUR/USD pairs
-const generateMockSignal = (pairName) => {
-  const signals = ["BUY", "SELL", "HOLD"];
-  const randomSignal = signals[Math.floor(Math.random() * 3)];
+const generateMockSignal = (pairName, threshold = 80) => {
   const confidence = 55 + Math.random() * 40; // 55-95%
   
+  let randomSignal = "HOLD";
+  if (confidence >= threshold) {
+    randomSignal = Math.random() > 0.5 ? "BUY" : "SELL";
+  }
+
   // Mock prices based on pair
   const mockPrices = {
     "GBP/USD": { price: 1.2650, pip: 0.0001 },
@@ -86,6 +89,7 @@ const SignalScreen = ({ route, navigation }) => {
   const { pair } = route.params || {};
   const { isDark } = useTheme();
   const colors = getColors(isDark);
+  const styles = createStyles(colors);
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -94,6 +98,10 @@ const SignalScreen = ({ route, navigation }) => {
   const [lastUpdate, setLastUpdate] = useState(null);
   const [confidenceThreshold, setConfidenceThreshold] = useState(80);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
+  
+  // AI Analysis State
+  const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
 
   const isRealAI = pair?.name === "EUR/USD";
 
@@ -145,6 +153,7 @@ const SignalScreen = ({ route, navigation }) => {
 
   useEffect(() => {
     loadSignal();
+    fetchAnalysis();
     
     const interval = setInterval(() => {
       loadSignal(false);
@@ -175,8 +184,8 @@ const SignalScreen = ({ route, navigation }) => {
     
     try {
       if (isRealAI) {
-        // EUR/USD - Real AI analysis
-        const result = await getSignalV2(confidenceThreshold);
+        // EUR/USD - Real AI analysis (Best Model)
+        const result = await getBestSignal(confidenceThreshold);
         
         if (result.success) {
           setSignal({ 
@@ -209,7 +218,7 @@ const SignalScreen = ({ route, navigation }) => {
         }
       } else {
         // Other pairs - Mock data
-        const mockSignal = generateMockSignal(pair?.name);
+        const mockSignal = generateMockSignal(pair?.name, confidenceThreshold);
         setSignal(mockSignal);
         setLastUpdate(new Date().toLocaleTimeString("en-US", { hour12: false }));
       }
@@ -221,49 +230,62 @@ const SignalScreen = ({ route, navigation }) => {
     }
   };
 
+  const fetchAnalysis = async () => {
+    if (!pair?.name) return;
+    setLoadingAnalysis(true);
+    try {
+      const result = await getMarketAnalysis(pair.name);
+      if (result.success) {
+        setAiAnalysis(result.data);
+      }
+    } catch (e) {
+      console.error("Analysis fetch error:", e);
+    } finally {
+      setLoadingAnalysis(false);
+    }
+  };
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     loadSignal(false);
-  }, [confidenceThreshold, pair]);
+    fetchAnalysis();
+  }, [pair, confidenceThreshold]);
 
-  const getSignalColor = (sig) => {
-    if (sig === "BUY") return "#10B981";
-    if (sig === "SELL") return "#EF4444";
-    return "#6B7280";
+  const getSignalColor = (type) => {
+    if (type === "BUY") return colors.success;
+    if (type === "SELL") return colors.error;
+    return colors.warning;
   };
 
-  const getConfidenceColor = (conf) => {
-    if (conf >= 80) return "#10B981";
-    if (conf >= 60) return "#F59E0B";
-    return "#EF4444";
-  };
-
-  const thresholdOptions = [60, 70, 75, 80, 85, 90, 95];
+  const thresholdOptions = [60, 70, 80, 85, 90];
   const priceDigits = signal?.digits || 5;
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0F172A" />
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>❮</Text>
+        <TouchableOpacity 
+          style={styles.backBtn} 
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>
           <Text style={styles.pairName}>{pair?.name || "EUR/USD"}</Text>
           <Text style={styles.pairSub}>
-            {isRealAI ? "AI Trading Signal" : "Demo Signal"}
+            {isRealAI ? "AI Powered Analysis" : "Technical Analysis"}
           </Text>
         </View>
-        
+
         {isRealAI ? (
           <TouchableOpacity 
             style={styles.thresholdBtn}
             onPress={() => setShowThresholdModal(true)}
           >
-            <Text style={styles.thresholdText}>{confidenceThreshold}%</Text>
+            <Text style={styles.thresholdText}>{confidenceThreshold}%+</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.demoBadge}>
@@ -272,31 +294,65 @@ const SignalScreen = ({ route, navigation }) => {
         )}
       </View>
 
-      <ScrollView
+      <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#10B981"
-            colors={["#10B981"]}
-          />
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Loading */}
-        {loading && (
-          <View style={styles.centerBox}>
-            <ActivityIndicator size="large" color="#10B981" />
-            <Text style={styles.loadingText}>
-              {isRealAI ? "AI analyzing market..." : "Loading demo signal..."}
+        {/* Mock Warning */}
+        {!isRealAI && (
+          <View style={styles.mockWarning}>
+            <Text style={styles.mockWarningText}>
+              Дохио (Signal) нь туршилтын (mock) өгөгдөл. Харин зах зээлийн анализ нь бодит AI дээр суурилсан.
             </Text>
           </View>
         )}
 
-        {/* Error */}
-        {error && !loading && (
+        {/* Market Closed Warning */}
+        {marketClosed && (
+          <View style={styles.marketClosedBox}>
+            <View style={styles.marketClosedHeader}>
+              <View style={styles.marketClosedIconBox}>
+                <Text style={styles.marketClosedIcon}>🌙</Text>
+              </View>
+              <View style={styles.marketClosedContent}>
+                <Text style={styles.marketClosedTitle}>Зах зээл хаалттай байна</Text>
+                <Text style={styles.marketClosedText}>
+                  Форекс зах зээл амралтын өдрүүдэд амардаг.
+                </Text>
+              </View>
+            </View>
+            
+            <View style={styles.marketClosedInfo}>
+              <View style={styles.marketInfoRow}>
+                <Text style={styles.marketInfoLabel}>Нээгдэх цаг:</Text>
+                <Text style={styles.marketInfoValue}>{nextMarketOpen}</Text>
+              </View>
+              {signal?.dataInfo?.to && (
+                <View style={styles.marketInfoRow}>
+                  <Text style={styles.marketInfoLabel}>Сүүлийн дата:</Text>
+                  <Text style={styles.marketInfoValue}>
+                    {new Date(signal.dataInfo.to).toLocaleString('mn-MN', {
+                      month: 'numeric',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {loading ? (
+          <View style={styles.centerBox}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>AI зах зээлийг шинжилж байна...</Text>
+          </View>
+        ) : error ? (
           <View style={styles.centerBox}>
             <View style={styles.errorIcon}>
               <Text style={styles.errorIconText}>!</Text>
@@ -306,65 +362,25 @@ const SignalScreen = ({ route, navigation }) => {
               <Text style={styles.retryText}>Дахин оролдох</Text>
             </TouchableOpacity>
           </View>
-        )}
-
-        {/* Signal Result */}
-        {!loading && !error && signal && (
+        ) : signal && (
           <>
-            {/* Market Closed Warning */}
-            {marketClosed && isRealAI && (
-              <View style={styles.marketClosedBox}>
-                <View style={styles.marketClosedHeader}>
-                  <View style={styles.marketClosedContent}>
-                    <Text style={styles.marketClosedTitle}>Market хаалттай</Text>
-                    <Text style={styles.marketClosedText}>
-                      Амралтын өдрүүдэд Forex market хаалттай байна
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.marketClosedInfo}>
-                  {signal?.dataInfo?.to && (
-                    <View style={styles.marketInfoRow}>
-                      <Text style={styles.marketInfoLabel}>📊 Сүүлийн дата:</Text>
-                      <Text style={styles.marketInfoValue}>{signal.dataInfo.to.split('T')[0]}</Text>
-                    </View>
-                  )}
-                  <View style={styles.marketInfoRow}>
-                    <Text style={styles.marketInfoLabel}>🔓 Нээгдэх цаг:</Text>
-                    <Text style={styles.marketInfoValue}>{nextMarketOpen}</Text>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* Mock Warning */}
-            {signal.isMock && (
-              <View style={styles.mockWarning}>
-                <Text style={styles.mockWarningText}>
-                  ⚠️ Demo Signal - Зөвхөн туршилтын зорилгоор
-                </Text>
-              </View>
-            )}
-
             {/* Main Signal Card */}
             <View style={styles.signalCard}>
               <View style={styles.signalTop}>
                 <View>
-                  <Text style={styles.signalLabel}>
-                    {signal.isMock ? "DEMO SIGNAL" : "AI SIGNAL"}
-                  </Text>
-                  <Text style={styles.updateTime}>{lastUpdate}</Text>
+                  <Text style={styles.signalLabel}>SIGNAL</Text>
+                  <Text style={styles.updateTime}>Updated: {lastUpdate}</Text>
                 </View>
                 <View style={[styles.signalBadge, { backgroundColor: getSignalColor(signal.signal) }]}>
                   <Text style={styles.signalBadgeText}>{signal.signal}</Text>
                 </View>
               </View>
 
-              {/* Confidence */}
+              {/* Confidence Meter */}
               <View style={styles.confidenceBox}>
                 <View style={styles.confidenceRow}>
-                  <Text style={styles.confLabel}>Confidence</Text>
-                  <Text style={[styles.confValue, { color: getConfidenceColor(signal.confidence) }]}>
+                  <Text style={styles.confLabel}>Confidence Score</Text>
+                  <Text style={[styles.confValue, { color: getSignalColor(signal.signal) }]}>
                     {signal.confidence?.toFixed(1)}%
                   </Text>
                 </View>
@@ -373,8 +389,8 @@ const SignalScreen = ({ route, navigation }) => {
                     style={[
                       styles.progressFill, 
                       { 
-                        width: `${Math.min(signal.confidence, 100)}%`,
-                        backgroundColor: getConfidenceColor(signal.confidence)
+                        width: `${signal.confidence}%`,
+                        backgroundColor: getSignalColor(signal.signal)
                       }
                     ]} 
                   />
@@ -389,13 +405,13 @@ const SignalScreen = ({ route, navigation }) => {
                     <Text style={styles.entryValue}>{signal.entry_price?.toFixed(priceDigits)}</Text>
                   </View>
                   <View style={[styles.entryItem, styles.slItem]}>
-                    <Text style={[styles.entryLabel, { color: "#EF4444" }]}>STOP LOSS</Text>
-                    <Text style={[styles.entryValue, { color: "#EF4444" }]}>{signal.stop_loss?.toFixed(priceDigits)}</Text>
+                    <Text style={[styles.entryLabel, { color: colors.error }]}>STOP LOSS</Text>
+                    <Text style={[styles.entryValue, { color: colors.error }]}>{signal.stop_loss?.toFixed(priceDigits)}</Text>
                     <Text style={styles.pipsText}>-{signal.sl_pips} pips</Text>
                   </View>
                   <View style={[styles.entryItem, styles.tpItem]}>
-                    <Text style={[styles.entryLabel, { color: "#10B981" }]}>TAKE PROFIT</Text>
-                    <Text style={[styles.entryValue, { color: "#10B981" }]}>{signal.take_profit?.toFixed(priceDigits)}</Text>
+                    <Text style={[styles.entryLabel, { color: colors.success }]}>TAKE PROFIT</Text>
+                    <Text style={[styles.entryValue, { color: colors.success }]}>{signal.take_profit?.toFixed(priceDigits)}</Text>
                     <Text style={styles.pipsText}>+{signal.tp_pips} pips</Text>
                   </View>
                 </View>
@@ -406,7 +422,10 @@ const SignalScreen = ({ route, navigation }) => {
                 <View style={styles.holdBox}>
                   <Text style={styles.holdLabel}>ХҮЛЭЭЛТИЙН ШАЛТГААН</Text>
                   <Text style={styles.holdText}>
-                    BUY итгэлцүүр ({signal.confidence?.toFixed(1)}%) таны тохируулсан босго ({confidenceThreshold}%)-оос бага байна. Илүү өндөр итгэлцүүртэй дохио хүлээнэ үү.
+                    {signal.confidence < confidenceThreshold 
+                      ? `Итгэлцүүр (${signal.confidence?.toFixed(1)}%) таны тохируулсан босго (${confidenceThreshold}%)-оос бага байна. Илүү өндөр итгэлцүүртэй дохио хүлээнэ үү.`
+                      : `Зах зээлийн нөхцөл байдал тодорхойгүй байна. (Итгэлцүүр: ${signal.confidence?.toFixed(1)}%)`
+                    }
                   </Text>
                 </View>
               )}
@@ -427,24 +446,69 @@ const SignalScreen = ({ route, navigation }) => {
                   {signal.isMock ? "🤖 ШИНЖИЛГЭЭ (DEMO)" : "🤖 AI ЗАГВАРУУДЫН ШИНЖИЛГЭЭ"}
                 </Text>
                 <View style={styles.modelGrid}>
-                  {Object.entries(signal.model_probabilities).map(([name, prob]) => (
-                    <View key={name} style={styles.modelItem}>
-                      <Text style={styles.modelName}>{name.toUpperCase()}</Text>
-                      <Text style={[styles.modelProb, { color: getConfidenceColor(prob || 0) }]}>
-                        {(prob || 0)?.toFixed(0)}%
+                  {Object.entries(signal.model_probabilities).map(([model, prob]) => (
+                    <View key={model} style={styles.modelItem}>
+                      <Text style={styles.modelName}>{model.toUpperCase()}</Text>
+                      <Text style={[styles.modelProb, { color: prob > 50 ? colors.success : colors.error }]}>
+                        {prob.toFixed(0)}%
                       </Text>
                     </View>
                   ))}
                 </View>
-                {signal.models_agree !== undefined && (
-                  <View style={[styles.agreeRow, { backgroundColor: signal.models_agree ? "#10B98120" : "#F59E0B20" }]}>
-                    <Text style={[styles.agreeText, { color: signal.models_agree ? "#10B981" : "#F59E0B" }]}>
-                      {signal.models_agree ? "✓ Загварууд санал нийлж байна" : "⚠ Загварууд санал зөрж байна"}
+                
+                {signal.models_agree && (
+                  <View style={[styles.agreeRow, { backgroundColor: colors.success + '20' }]}>
+                    <Text style={[styles.agreeText, { color: colors.success }]}>
+                      ✓ Бүх загварууд санал нэг байна
                     </Text>
                   </View>
                 )}
               </View>
             )}
+
+            {/* Market Analysis Section */}
+            <View style={styles.signalCard}>
+                <Text style={styles.cardTitle}>MARKET ANALYSIS</Text>
+                
+                {loadingAnalysis ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : aiAnalysis ? (
+                  <>
+                    <View style={styles.analysisRow}>
+                      <Text style={styles.analysisLabel}>Outlook</Text>
+                      <Text style={[styles.analysisValue, { 
+                        color: (aiAnalysis.outlook?.includes('Bullish') || aiAnalysis.outlook?.includes('Өсөх')) ? colors.success : 
+                               (aiAnalysis.outlook?.includes('Bearish') || aiAnalysis.outlook?.includes('Унах')) ? colors.error : colors.warning 
+                      }]}>
+                        {aiAnalysis.outlook || aiAnalysis.market_sentiment || 'Neutral'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.analysisSection}>
+                      <Text style={styles.analysisSubTitle}>Summary</Text>
+                      <Text style={styles.analysisText}>{aiAnalysis.summary}</Text>
+                    </View>
+
+                    {aiAnalysis.forecast && (
+                      <View style={styles.analysisSection}>
+                        <Text style={styles.analysisSubTitle}>Forecast</Text>
+                        <Text style={styles.analysisText}>{aiAnalysis.forecast}</Text>
+                      </View>
+                    )}
+
+                    {aiAnalysis.risk_factors && aiAnalysis.risk_factors.length > 0 && (
+                      <View style={styles.analysisSection}>
+                        <Text style={styles.analysisSubTitle}>Risk Factors</Text>
+                        {aiAnalysis.risk_factors.map((risk, index) => (
+                          <Text key={index} style={styles.riskText}>• {risk}</Text>
+                        ))}
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text style={styles.analysisText}>Analysis unavailable</Text>
+                )}
+              </View>
 
             {/* Info Row */}
             <View style={styles.infoRow}>
@@ -514,10 +578,10 @@ const SignalScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -525,7 +589,7 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 16,
     paddingHorizontal: 16,
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
   },
   backBtn: {
     width: 38,
@@ -536,7 +600,7 @@ const styles = StyleSheet.create({
   },
   backIcon: {
     fontSize: 18,
-    color: "#FFFFFF",
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   headerCenter: {
@@ -546,15 +610,15 @@ const styles = StyleSheet.create({
   pairName: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.textPrimary,
   },
   pairSub: {
     fontSize: 12,
-    color: "#94A3B8",
+    color: colors.textSecondary,
     marginTop: 2,
   },
   thresholdBtn: {
-    backgroundColor: "#10B981",
+    backgroundColor: colors.success,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
@@ -565,7 +629,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   demoBadge: {
-    backgroundColor: "#F59E0B",
+    backgroundColor: colors.warning,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
@@ -577,26 +641,26 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   mockWarning: {
-    backgroundColor: "#F59E0B20",
+    backgroundColor: colors.warning + '20',
     borderWidth: 1,
-    borderColor: "#F59E0B40",
+    borderColor: colors.warning + '40',
     borderRadius: 10,
     padding: 12,
     marginBottom: 16,
   },
   mockWarningText: {
-    color: "#F59E0B",
+    color: colors.warning,
     fontSize: 13,
     textAlign: "center",
     fontWeight: "500",
   },
   marketClosedBox: {
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: colors.border,
   },
   marketClosedHeader: {
     flexDirection: "row",
@@ -607,7 +671,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: "#3B82F620",
+    backgroundColor: colors.primary + '20',
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
@@ -621,16 +685,16 @@ const styles = StyleSheet.create({
   marketClosedTitle: {
     fontSize: 16,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   marketClosedText: {
     fontSize: 13,
-    color: "#94A3B8",
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   marketClosedInfo: {
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 12,
   },
@@ -642,12 +706,12 @@ const styles = StyleSheet.create({
   },
   marketInfoLabel: {
     fontSize: 13,
-    color: "#64748B",
+    color: colors.textSecondary,
   },
   marketInfoValue: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#E2E8F0",
+    color: colors.textPrimary,
   },
   scrollView: {
     flex: 1,
@@ -661,7 +725,7 @@ const styles = StyleSheet.create({
     paddingVertical: 80,
   },
   loadingText: {
-    color: "#94A3B8",
+    color: colors.textSecondary,
     fontSize: 14,
     marginTop: 16,
   },
@@ -669,23 +733,23 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: "#EF444420",
+    backgroundColor: colors.error + '20',
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 16,
   },
   errorIconText: {
     fontSize: 28,
-    color: "#EF4444",
+    color: colors.error,
     fontWeight: "700",
   },
   errorText: {
-    color: "#EF4444",
+    color: colors.error,
     fontSize: 14,
     textAlign: "center",
   },
   retryBtn: {
-    backgroundColor: "#10B981",
+    backgroundColor: colors.success,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 25,
@@ -696,7 +760,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   signalCard: {
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -710,12 +774,12 @@ const styles = StyleSheet.create({
   signalLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.textSecondary,
     letterSpacing: 1,
   },
   updateTime: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
     marginTop: 4,
   },
   signalBadge: {
@@ -739,7 +803,7 @@ const styles = StyleSheet.create({
   },
   confLabel: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: colors.textSecondary,
   },
   confValue: {
     fontSize: 24,
@@ -747,7 +811,7 @@ const styles = StyleSheet.create({
   },
   progressBg: {
     height: 8,
-    backgroundColor: "#334155",
+    backgroundColor: colors.border,
     borderRadius: 4,
     overflow: "hidden",
   },
@@ -759,53 +823,53 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   entryItem: {
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
   },
   slItem: {
     borderWidth: 1,
-    borderColor: "#EF444440",
+    borderColor: colors.error + '40',
   },
   tpItem: {
     borderWidth: 1,
-    borderColor: "#10B98140",
+    borderColor: colors.success + '40',
   },
   entryLabel: {
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
     letterSpacing: 1,
     marginBottom: 6,
   },
   entryValue: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.textPrimary,
     fontVariant: ["tabular-nums"],
   },
   pipsText: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
     marginTop: 4,
   },
   holdBox: {
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     borderLeftWidth: 3,
-    borderLeftColor: "#F59E0B",
+    borderLeftColor: colors.warning,
   },
   holdLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: "#F59E0B",
+    color: colors.warning,
     letterSpacing: 1,
     marginBottom: 8,
   },
   holdText: {
     fontSize: 13,
-    color: "#94A3B8",
+    color: colors.textSecondary,
     lineHeight: 20,
   },
   rrBox: {
@@ -815,19 +879,19 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: "#334155",
+    borderTopColor: colors.border,
   },
   rrLabel: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: colors.textSecondary,
   },
   rrValue: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#10B981",
+    color: colors.success,
   },
   modelsCard: {
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -835,7 +899,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#64748B",
+    color: colors.textSecondary,
     letterSpacing: 1,
     marginBottom: 16,
   },
@@ -847,14 +911,14 @@ const styles = StyleSheet.create({
   modelItem: {
     flex: 1,
     minWidth: "30%",
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
     borderRadius: 10,
     padding: 14,
     alignItems: "center",
   },
   modelName: {
     fontSize: 10,
-    color: "#64748B",
+    color: colors.textSecondary,
     letterSpacing: 0.5,
     marginBottom: 6,
   },
@@ -874,7 +938,7 @@ const styles = StyleSheet.create({
   },
   infoRow: {
     flexDirection: "row",
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -885,17 +949,17 @@ const styles = StyleSheet.create({
   },
   infoLabel: {
     fontSize: 11,
-    color: "#64748B",
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   infoValue: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#E2E8F0",
+    color: colors.textPrimary,
   },
   disclaimer: {
     fontSize: 12,
-    color: "#64748B",
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 18,
   },
@@ -906,12 +970,12 @@ const styles = StyleSheet.create({
   comingSoonTitle: {
     fontSize: 22,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   comingSoonText: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 22,
   },
@@ -922,7 +986,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   modalBox: {
-    backgroundColor: "#1E293B",
+    backgroundColor: colors.card,
     borderRadius: 20,
     padding: 24,
     width: width * 0.85,
@@ -930,12 +994,12 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: "#FFFFFF",
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   modalSub: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: colors.textSecondary,
     marginBottom: 20,
   },
   optionList: {
@@ -947,26 +1011,65 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 16,
     borderRadius: 12,
-    backgroundColor: "#0F172A",
+    backgroundColor: colors.background,
   },
   optionActive: {
-    backgroundColor: "#10B98120",
+    backgroundColor: colors.success + '20',
     borderWidth: 1,
-    borderColor: "#10B981",
+    borderColor: colors.success,
   },
   optionText: {
     fontSize: 16,
-    color: "#E2E8F0",
+    color: colors.textPrimary,
     fontWeight: "500",
   },
   optionTextActive: {
-    color: "#10B981",
+    color: colors.success,
     fontWeight: "700",
   },
   checkIcon: {
     fontSize: 18,
-    color: "#10B981",
+    color: colors.success,
     fontWeight: "700",
+  },
+  analysisRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  analysisLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  analysisValue: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  analysisSection: {
+    marginBottom: 16,
+  },
+  analysisSubTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginBottom: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  analysisText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 22,
+  },
+  riskText: {
+    fontSize: 13,
+    color: colors.error,
+    lineHeight: 20,
+    marginBottom: 4,
   },
 });
 

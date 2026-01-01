@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import HomeScreen from "../screens/HomeScreen";
+import NewsScreen from "../screens/NewsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
@@ -24,6 +25,12 @@ const TabIcon = ({ name, focused, colors }) => {
           <View style={[styles.bar, styles.bar1, { backgroundColor: iconColor }]} />
           <View style={[styles.bar, styles.bar2, { backgroundColor: iconColor }]} />
           <View style={[styles.bar, styles.bar3, { backgroundColor: iconColor }]} />
+        </View>
+      ) : name === 'NewsTab' ? (
+        // News icon - simple document
+        <View style={[styles.newsIcon, { borderColor: iconColor }]}>
+           <View style={[styles.newsLine, { backgroundColor: iconColor }]} />
+           <View style={[styles.newsLine, { backgroundColor: iconColor, width: '60%' }]} />
         </View>
       ) : (
         // Profile icon - person silhouette
@@ -75,6 +82,13 @@ const MainTabs = () => {
         }}
       />
       <Tab.Screen
+        name="NewsTab"
+        component={NewsScreen}
+        options={{
+          tabBarLabel: "NEWS",
+        }}
+      />
+      <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
@@ -111,6 +125,21 @@ const styles = StyleSheet.create({
   },
   bar3: {
     height: 10,
+  },
+  // News icon styles
+  newsIcon: {
+    width: 18,
+    height: 18,
+    borderWidth: 2,
+    borderRadius: 3,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 3,
+  },
+  newsLine: {
+    height: 2,
+    width: '80%',
+    borderRadius: 1,
   },
   // Profile icon styles (head + body)
   profileIcon: {
