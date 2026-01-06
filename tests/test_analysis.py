@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 # Add backend to path
-sys.path.append(str(Path(__file__).resolve().parent / 'backend'))
+sys.path.append(str(Path(__file__).resolve().parent.parent / 'backend'))
 
 from utils.market_analyst import market_analyst
 
