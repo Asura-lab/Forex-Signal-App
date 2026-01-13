@@ -7,14 +7,11 @@ import { API_BASE_URL } from "../config/api";
 
 /**
  * Multi-timeframe prediction авах (15min, 30min, 60min)
- * @param {string} currencyPair - Валютын хослол (e.g., "EUR/USD")
- * @param {boolean} forceRefresh - Кэшийг давж шинэчлэх эсэх
- * @returns {Promise<object>} - Prediction үр дүн
  */
 export const getMultiTimeframePrediction = async (
-  currencyPair,
-  forceRefresh = false
-) => {
+  currencyPair: string,
+  forceRefresh: boolean = false
+): Promise<any> => {
   try {
     const response = await fetch(`${API_BASE_URL}/predict_multi_timeframe`, {
       method: "POST",
@@ -43,8 +40,8 @@ export const getMultiTimeframePrediction = async (
 /**
  * Signal name-ийг монгол хэл рүү хөрвүүлэх
  */
-export const getSignalNameMongolian = (signalName) => {
-  const translations = {
+export const getSignalNameMongolian = (signalName: string): string => {
+  const translations: Record<string, string> = {
     STRONG_BUY: "Хүчтэй Худалдаж Авах",
     BUY: "Худалдаж Авах",
     NEUTRAL: "Төвийг Сахих",

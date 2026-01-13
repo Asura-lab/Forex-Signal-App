@@ -15,23 +15,28 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { registerUser } from "../services/api";
+import { NavigationProp } from "@react-navigation/native";
+
+interface SignUpScreenProps {
+  navigation: NavigationProp<any>;
+}
 
 /**
  * SignUp Screen - Professional minimal design
  */
-const SignUpScreen = ({ navigation }) => {
+const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
 
   const handleSignUp = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {

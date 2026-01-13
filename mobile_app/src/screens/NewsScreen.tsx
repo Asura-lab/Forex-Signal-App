@@ -17,24 +17,24 @@ import { useTheme } from '../context/ThemeContext';
 import { getColors } from '../config/theme';
 import { API_URL } from '../config/api';
 
-const NewsScreen = () => {
+const NewsScreen: React.FC = () => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
   
-  const [activeTab, setActiveTab] = useState('upcoming'); // 'past' | 'upcoming' | 'outlook'
-  const [news, setNews] = useState([]);
-  const [majorImpacts, setMajorImpacts] = useState([]);
-  const [analysis, setAnalysis] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>('upcoming'); // 'past' | 'upcoming' | 'outlook'
+  const [news, setNews] = useState<any[]>([]);
+  const [majorImpacts, setMajorImpacts] = useState<any[]>([]);
+  const [analysis, setAnalysis] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   
   // Analysis Modal State
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [analysisLoading, setAnalysisLoading] = useState(false);
-  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState<any>(null);
+  const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string>('');
 
-  const handleEventPress = async (item) => {
+  const handleEventPress = async (item: any) => {
     setSelectedEvent(item);
     setAiAnalysis('');
     setAnalysisLoading(true);
@@ -254,36 +254,96 @@ const NewsScreen = () => {
   const renderOutlook = () => {
     if (!analysis) return <Text style={styles.emptyText}>Мэдээлэл байхгүй байна</Text>;
     
+    // Determine colors for Outlook
+    const outlookLower = analysis.outlook?.toLowerCase() || '';
+    let outlookColor = '#2196f3'; // Neutral - Blue
+    let outlookBg = 'rgba(33, 150, 243, 0.1)';
+    
+    if (outlookLower.includes('bullish') || outlookLower.includes('өсөх')) {
+      outlookColor = '#4caf50';
+      outlookBg = 'rgba(76, 175, 80, 0.1)';
+    } else if (outlookLower.includes('bearish') || outlookLower.includes('унах')) {
+      outlookColor = '#ef5350';
+      outlookBg = 'rgba(239, 83, 80, 0.1)';
+    }
+
     return (
       <ScrollView 
         contentContainerStyle={styles.outlookScroll}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.outlookSection}>
-          <View style={styles.insightHeader}>
-            <Text style={[styles.insightTitle, { color: colors.primary }]}>AI ДҮГНЭЛТ</Text>
-          </View>
           
-          <View style={[styles.sectionBlock, styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.insightSummary, { color: colors.textPrimary }]}>
-              {analysis.gpt_summary || "AI дүгнэлт хийгдэж байна..."}
+          {/* 1. Main Outlook Card */}
+          <View style={[styles.mainOutcomeCard, { backgroundColor: outlookBg, borderColor: outlookColor }]}>
+            <Text style={[styles.outcomeTitle, { color: outlookColor }]}>
+              {analysis.outlook || "ТОДОРХОЙГҮЙ"}
+            </Text>
+            <Text style={[styles.outcomeSubtitle, { color: colors.textSecondary }]}>
+              Зах зээлийн үндсэн хандлага
             </Text>
           </View>
 
-          {analysis.smart_analysis && analysis.smart_analysis.length > 0 && (
+          {/* 2. Market Sentiment */}
+          {analysis.market_sentiment && (
+            <View style={[styles.sentimentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+               <View style={styles.cardHeaderRow}>
+                  <View style={[styles.indicatorDot, { backgroundColor: colors.secondary }]} />
+                  <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>ЭРСДЭЛИЙН ТӨЛӨВ</Text>
+               </View>
+               <Text style={[styles.sentimentText, { color: colors.textSecondary }]}>
+                 {analysis.market_sentiment}
+               </Text>
+            </View>
+          )}
+          
+          {/* 3. Summary */}
+          <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.cardHeaderRow}>
+               <Text style={[styles.cardTitle, { color: colors.primary }]}>ЗАХ ЗЭЭЛИЙН ТОЙМ</Text>
+            </View>
+            <Text style={[styles.insightSummary, { color: colors.textPrimary }]}>
+              {analysis.summary || "AI дүгнэлт хийгдэж байна..."}
+            </Text>
+          </View>
+
+          {/* 4. Forecast */}
+          {analysis.forecast && (
+            <View style={[styles.forecastCard, { backgroundColor: isDark ? '#1e293b' : '#f0f9ff', borderColor: colors.border }]}>
+              <Text style={[styles.cardTitle, { color: colors.textPrimary, marginBottom: 8 }]}>ТААМАГЛАЛ (24H)</Text>
+              <Text style={[styles.analysisText, { color: colors.textPrimary }]}>
+                {analysis.forecast}
+              </Text>
+            </View>
+          )}
+
+          {/* 5. Risk Factors */}
+          {analysis.risk_factors && analysis.risk_factors.length > 0 && (
+             <View style={styles.sectionBlock}>
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginLeft: 4 }]}>ЭРСДЭЛҮҮД</Text>
+              {analysis.risk_factors.map((risk, index) => (
+                <View key={index} style={styles.riskRow}>
+                  <Text style={{color: '#ef5350', marginRight: 10, fontSize: 16}}>•</Text>
+                  <Text style={[styles.analysisText, { color: colors.textPrimary, flex: 1, marginBottom: 0 }]}>{risk}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
+          {analysis.weekly_analysis && analysis.weekly_analysis.length > 0 && (
             <View style={styles.sectionBlock}>
-              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>УХААЛАГ ШИНЖИЛГЭЭ</Text>
-              {analysis.smart_analysis.map((item, index) => (
+              <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ОНЦЛОХ МЭДЭЭНҮҮД</Text>
+              {analysis.weekly_analysis.map((item, index) => (
                 <View key={index} style={[styles.analysisCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.analysisHeader}>
-                    <Text style={[styles.analysisTitle, { color: colors.textPrimary }]}>{item.name}</Text>
+                    <Text style={[styles.analysisTitle, { color: colors.textPrimary, flex: 1, marginRight: 8 }]}>
+                      {item.title}
+                    </Text>
+                    <Text style={[styles.impactDate, { fontSize: 12, color: colors.textSecondary }]}>
+                      {item.date.replace('T', ' ').substring(0, 16)}
+                    </Text>
                   </View>
-                  <Text style={[styles.analysisText, { color: colors.textSecondary }]}>{item.analysis}</Text>
-                  {item.machine_learning && (
-                    <View style={styles.mlBadge}>
-                      <Text style={[styles.mlText, { color: colors.primary }]}>AI: {item.machine_learning}</Text>
-                    </View>
-                  )}
+                  <Text style={[styles.analysisText, { color: colors.textSecondary }]}>{item.impact_analysis}</Text>
                 </View>
               ))}
             </View>
@@ -541,29 +601,55 @@ const createStyles = (colors) => StyleSheet.create({
   outlookSection: {
     padding: 20,
   },
-  insightHeader: {
+  mainOutcomeCard: {
+    padding: 20,
+    borderRadius: 16,
     marginBottom: 20,
-    alignItems: 'flex-start',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  insightTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 1.5,
-    marginBottom: 8,
+  outcomeTitle: {
+    fontSize: 24,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  outcomeSubtitle: {
+    fontSize: 12,
+    fontWeight: '500',
     opacity: 0.8,
   },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+  sentimentCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff9800',
   },
-  badgeText: {
-    color: '#fff',
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  indicatorDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 8,
+  },
+  cardTitle: {
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
+  },
+  sentimentText: {
+    fontSize: 14,
+    lineHeight: 22,
+    fontWeight: '400',
   },
   sectionBlock: {
     marginBottom: 20,
@@ -576,16 +662,28 @@ const createStyles = (colors) => StyleSheet.create({
     textTransform: 'uppercase',
     opacity: 0.7,
   },
+  summaryCard: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 20,
+  },
   insightSummary: {
     fontSize: 15,
     lineHeight: 24,
     fontWeight: '400',
   },
-  summaryCard: {
+  forecastCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    marginBottom: 24,
+    marginBottom: 20,
+  },
+  riskRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+    paddingRight: 10,
   },
   analysisCard: {
     marginBottom: 12,
@@ -605,23 +703,7 @@ const createStyles = (colors) => StyleSheet.create({
   analysisText: {
     fontSize: 13,
     lineHeight: 20,
-    marginBottom: 8,
-  },
-  mlBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(33, 150, 243, 0.1)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-  },
-  mlText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  sentimentText: {
-    fontSize: 14,
-    lineHeight: 22,
-    fontStyle: 'italic',
+    marginBottom: 4,
   },
   // Modal Styles
   modalOverlay: {

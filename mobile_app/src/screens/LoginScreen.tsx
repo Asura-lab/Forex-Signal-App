@@ -14,18 +14,23 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { loginUser } from "../services/api";
+import { NavigationProp } from "@react-navigation/native";
+
+interface LoginScreenProps {
+  navigation: NavigationProp<any>;
+}
 
 /**
  * Login Screen - Professional minimal design
  */
-const LoginScreen = ({ navigation }) => {
+const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState<string>("");
+  const [password, setPassword] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showPassword, setShowPassword] = useState<boolean>(false);
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {

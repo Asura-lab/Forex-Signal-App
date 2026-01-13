@@ -1,10 +1,19 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { CurrencyPair } from "../utils/helpers";
+
+interface CurrencyCardProps {
+  pair: CurrencyPair;
+  liveRate: any;
+  onPress: () => void;
+  loading: boolean;
+  colors: any;
+}
 
 /**
  * Currency Card - Professional trading style row
  */
-const CurrencyCard = ({ pair, liveRate, onPress, loading, colors }) => {
+const CurrencyCard: React.FC<CurrencyCardProps> = ({ pair, liveRate, onPress, loading, colors }) => {
   // Default colors if not passed
   const c = colors || {
     background: "#0D1421",
@@ -19,15 +28,15 @@ const CurrencyCard = ({ pair, liveRate, onPress, loading, colors }) => {
   
   // Get rate data
   const rateData = typeof liveRate === "object" ? liveRate : { rate: liveRate };
-  const rate = rateData?.rate || 0;
-  const change = rateData?.change || 0;
-  const changePercent = rateData?.change_percent || 0;
+  const rate: number = rateData?.rate || 0;
+  const change: number = rateData?.change || 0;
+  const changePercent: number = rateData?.change_percent || 0;
 
   const isPositive = change > 0;
   const isNegative = change < 0;
   const changeColor = isPositive ? c.success : isNegative ? c.error : c.textSecondary;
 
-  const formatRate = (value) => {
+  const formatRate = (value: number | undefined) => {
     if (!value) return "-.-----";
     if (pair.name.includes("JPY")) {
       return value.toFixed(3);
@@ -35,19 +44,19 @@ const CurrencyCard = ({ pair, liveRate, onPress, loading, colors }) => {
     return value.toFixed(5);
   };
 
-  const formatChange = (value) => {
+  const formatChange = (value: number | undefined) => {
     if (!value && value !== 0) return "-";
-    const prefix = value > 0 ? "+" : "";
+    const prefix = value! > 0 ? "+" : "";
     if (pair.name.includes("JPY")) {
-      return prefix + value.toFixed(3);
+      return prefix + value!.toFixed(3);
     }
-    return prefix + value.toFixed(5);
+    return prefix + value!.toFixed(5);
   };
 
-  const formatChangePercent = (value) => {
+  const formatChangePercent = (value: number | undefined) => {
     if (!value && value !== 0) return "-";
-    const prefix = value > 0 ? "+" : "";
-    return prefix + value.toFixed(2) + "%";
+    const prefix = value! > 0 ? "+" : "";
+    return prefix + value!.toFixed(2) + "%";
   };
 
   const styles = createStyles(c);

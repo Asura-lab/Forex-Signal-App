@@ -39,6 +39,17 @@ MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 VERIFICATION_CODE_EXPIRY_MINUTES = 10
 RESET_CODE_EXPIRY_MINUTES = 10
 
+# AI Configuration
+GEMINI_API_KEYS = [
+    os.getenv('GEMINI_API_KEY_1'),
+    os.getenv('GEMINI_API_KEY_2'),
+    os.getenv('GEMINI_API_KEY_3'),
+    os.getenv('GEMINI_API_KEY_4'),
+    os.getenv('GEMINI_API_KEY_5')
+]
+# Filter out None values
+GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]
+
 # API Configuration
 API_HOST = os.getenv('API_HOST', '0.0.0.0')
 API_PORT = int(os.getenv('API_PORT', 5000))

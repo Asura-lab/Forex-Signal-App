@@ -2,15 +2,27 @@ import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { SIGNAL_TYPES } from "../utils/helpers";
 
+interface TrendDetail {
+  count: number;
+}
+
+interface StatisticsData {
+  [trendName: string]: TrendDetail;
+}
+
+interface StatisticsChartProps {
+  statistics: StatisticsData | null;
+}
+
 /**
  * Статистикийн график компонент
  */
-const StatisticsChart = ({ statistics }) => {
+const StatisticsChart: React.FC<StatisticsChartProps> = ({ statistics }) => {
   if (!statistics) return null;
 
   // Нийт дүнг тооцоолох
   const total = Object.values(statistics).reduce(
-    (sum, stat) => sum + stat.count,
+    (sum: number, stat: TrendDetail) => sum + stat.count,
     0
   );
 
@@ -21,9 +33,9 @@ const StatisticsChart = ({ statistics }) => {
       {Object.entries(statistics).map(([trendName, data]) => {
         // Ангилалын label олох
         const label = Object.keys(SIGNAL_TYPES).find(
-          (key) => SIGNAL_TYPES[key].name === trendName
+          (key) => SIGNAL_TYPES[Number(key)].name === trendName
         );
-        const signal = SIGNAL_TYPES[label];
+        const signal = SIGNAL_TYPES[Number(label)];
         const percentage = (data.count / total) * 100;
 
         return (

@@ -9,10 +9,16 @@ import ProfileScreen from "../screens/ProfileScreen";
 
 const Tab = createBottomTabNavigator();
 
+interface TabIconProps {
+  name: string;
+  focused: boolean;
+  colors: any; // Using any for colors since it comes from theme context
+}
+
 /**
  * Simple Tab Icon - Using SF Symbols-like Unicode
  */
-const TabIcon = ({ name, focused, colors }) => {
+const TabIcon: React.FC<TabIconProps> = ({ name, focused, colors }) => {
   const activeColor = colors.success;
   const inactiveColor = colors.textSecondary;
   const iconColor = focused ? activeColor : inactiveColor;

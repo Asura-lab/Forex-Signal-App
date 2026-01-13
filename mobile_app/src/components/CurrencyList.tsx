@@ -1,12 +1,19 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import CurrencyCard from "./CurrencyCard";
-import { CURRENCY_PAIRS } from "../utils/helpers";
+import { CURRENCY_PAIRS, CurrencyPair } from "../utils/helpers";
+
+interface CurrencyListProps {
+  liveRates: Record<string, any>;
+  onPairPress: (pair: CurrencyPair) => void;
+  loading: boolean;
+  colors: any;
+}
 
 /**
  * Currency List Component - Professional style
  */
-const CurrencyList = ({ liveRates, onPairPress, loading, colors }) => {
+const CurrencyList: React.FC<CurrencyListProps> = ({ liveRates, onPairPress, loading, colors }) => {
   const styles = createStyles(colors);
   
   return (
@@ -25,7 +32,7 @@ const CurrencyList = ({ liveRates, onPairPress, loading, colors }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors?.background || "#0D1421",

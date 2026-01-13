@@ -29,6 +29,8 @@ from config.settings import (
     MAIL_USERNAME, MAIL_PASSWORD, MAIL_DEFAULT_SENDER,
     VERIFICATION_CODE_EXPIRY_MINUTES, RESET_CODE_EXPIRY_MINUTES
 )
+import threading
+import time
 
 # Import Twelve Data handler (real-time + historical forex data)
 from utils.twelvedata_handler import (
@@ -98,16 +100,74 @@ def preload_historical_data():
         print("📥 Preloading historical data...")
         df = get_twelvedata_dataframe(interval="1min", outputsize=500)
         if df is not None and len(df) >= 200:
-            print(f"✓ Historical data preloaded: {len(df)} bars")
+            print(f"[OK] Historical data preloaded: {len(df)} bars")
             return True
         else:
-            print(f"⚠️ Historical data preload: got {len(df) if df is not None else 0} bars")
+            print(f"[WARN] Historical data preload: got {len(df) if df is not None else 0} bars")
     except Exception as e:
-        print(f"⚠️ Historical data preload failed: {e}")
+        print(f"[WARN] Historical data preload failed: {e}")
     return False
 
 # Preload on startup
 preload_historical_data()
+
+# ==================== NEWS CACHE SYSTEM ====================
+
+class NewsCache:
+    def __init__(self):
+        self.cache = {
+            'history': None,
+            'upcoming': None,
+            'outlook': None,
+            'latest': None
+        }
+        self.last_updated = None
+        self.lock = threading.Lock()
+
+    def update(self):
+        """Update all news categories in cache"""
+        print("[INFO] Updating news cache...")
+        try:
+            # Fetch latest data
+            history = market_analyst.get_news_history()
+            upcoming = market_analyst.get_upcoming_news()
+            outlook = market_analyst.get_market_outlook()
+            latest = market_analyst.get_latest_news()
+
+            with self.lock:
+                self.cache['history'] = history
+                self.cache['upcoming'] = upcoming
+                self.cache['outlook'] = outlook
+                self.cache['latest'] = latest
+                self.last_updated = datetime.now()
+            print("[OK] News cache updated successfully")
+        except Exception as e:
+            print(f"[ERROR] News cache update failed: {e}")
+
+    def get(self, key):
+        """Get data from cache"""
+        with self.lock:
+            return self.cache.get(key)
+        
+    def is_ready(self):
+        with self.lock:
+            return self.last_updated is not None
+
+news_cache = NewsCache()
+
+def news_updater_task():
+    """Background task to update news every 30 minutes"""
+    print("[INFO] Starting background news updater...")
+    # Initial update
+    news_cache.update()
+    
+    while True:
+        # Sleep for 30 minutes (1800 seconds)
+        time.sleep(1800)
+        news_cache.update()
+
+# Start background updater
+threading.Thread(target=news_updater_task, daemon=True).start()
 
 # ==================== AUTH HELPERS ====================
 
@@ -448,6 +508,7 @@ def get_signal_v2():
     
     Query params:
         min_confidence: Minimum confidence threshold (default: 85 for V10)
+        pair: Currency pair (default: EUR/USD)
     """
     try:
         if signal_generator is None or not signal_generator.is_loaded:
@@ -457,21 +518,23 @@ def get_signal_v2():
             }), 500
         
         min_confidence = float(request.args.get('min_confidence', 85))
+        pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
         
         # Get historical data from Twelve Data API (NON-BLOCKING)
-        df = get_twelvedata_dataframe(interval="1min", outputsize=500)
+        df = get_twelvedata_dataframe(interval="1min", outputsize=500, symbol=pair)
         
         if df is None or len(df) < 200:
             # Rate limited and no cached data
             return jsonify({
                 'success': False,
                 'error': 'rate_limited',
-                'message': 'Rate limited. Data not available yet.',
+                'message': f'Rate limited or no data for {pair}.',
                 'data_count': len(df) if df is not None else 0,
                 'required': 200
             }), 429
         
         # Check data timestamps
+
         data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
         data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
         
@@ -547,13 +610,7 @@ def predict():
     """Main prediction endpoint - uses V2 Signal Generator"""
     try:
         data = request.json or {}
-        pair = data.get('pair', 'EUR_USD')
-        
-        if pair != 'EUR_USD':
-            return jsonify({
-                'success': False,
-                'error': 'Зөвхөн EUR_USD дэмжигддэг'
-            }), 400
+        pair = data.get('pair', 'EUR_USD').replace('_', '/')
         
         # Get signal from V10
         if signal_generator is None or not signal_generator.is_loaded:
@@ -562,7 +619,7 @@ def predict():
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
         
-        df = get_twelvedata_dataframe(interval="1min", count=500)
+        df = get_twelvedata_dataframe(interval="1min", count=500, symbol=pair)
         
         if df is None or len(df) < 200:
             return jsonify({
@@ -770,10 +827,26 @@ def get_signals_stats():
 
 @app.route('/api/news', methods=['GET'])
 def get_news():
-    """Мэдээний жагсаалт авах (History, Upcoming, Outlook)"""
+    """Мэдээний жагсаалт авах (History, Upcoming, Outlook) - Cached"""
     try:
         news_type = request.args.get('type', 'latest')
         
+        # Determine cache key
+        cache_key = 'latest'
+        if news_type in ['history', 'upcoming', 'outlook']:
+            cache_key = news_type
+            
+        # Try to get from cache
+        cached_data = news_cache.get(cache_key)
+        
+        if cached_data:
+            return jsonify({
+                "status": "success",
+                "data": cached_data,
+                "cached": True
+            }), 200
+            
+        # Fallback to direct fetch if cache is empty
         if news_type == 'history':
             data = market_analyst.get_news_history()
         elif news_type == 'upcoming':
@@ -781,12 +854,13 @@ def get_news():
         elif news_type == 'outlook':
             data = market_analyst.get_market_outlook()
         else:
-            # Default to latest/upcoming mixed or just upcoming
+            # Default to latest
             data = market_analyst.get_latest_news()
         
         return jsonify({
             "status": "success",
-            "data": data
+            "data": data,
+            "cached": False
         }), 200
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -895,7 +969,7 @@ if __name__ == '__main__':
     print(f"✓ Signal Generator V10: {'Loaded (7-Model Ensemble)' if (signal_generator and signal_generator.is_loaded) else 'Not loaded'}")
     print(f"✓ Twelve Data API: Enabled")
     print(f"✓ Port: {PORT}")
-    print(f"\n🚀 API Endpoints:")
+    print(f"\n[+] API Endpoints:")
     print(f"  POST /auth/register, /auth/login")
     print(f"  GET  /rates/live, /rates/specific")
     print(f"  GET  /signal/v2, /signal/v2/demo")
@@ -905,5 +979,5 @@ if __name__ == '__main__':
     
     # Use waitress for production-ready server (more stable on Windows)
     from waitress import serve
-    print(f"\n🚀 Server starting with Waitress on http://0.0.0.0:{PORT}")
+    print(f"\n[+] Server starting with Waitress on http://0.0.0.0:{PORT}")
     serve(app, host='0.0.0.0', port=PORT, threads=4)

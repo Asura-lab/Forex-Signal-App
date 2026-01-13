@@ -1,14 +1,26 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import { useTheme } from "../context/ThemeContext";
-import { getColors } from "../config/theme";
+import { getColors, lightColors } from "../config/theme";
 import { getSignalText } from "../utils/helpers";
+
+interface PredictionData {
+  latest_prediction?: {
+    label?: number;
+    trend?: string;
+    confidence?: number;
+  };
+}
+
+interface SignalCardProps {
+  prediction: PredictionData | null;
+}
 
 /**
  * Сигнал картын компонент
  */
-const SignalCard = ({ prediction }) => {
-  const { isDark } = useTheme();
+const SignalCard: React.FC<SignalCardProps> = ({ prediction }) => {
+  const { isDark } = useTheme() as { isDark: boolean };
   const colors = getColors(isDark);
 
   if (
@@ -49,7 +61,7 @@ const SignalCard = ({ prediction }) => {
   );
 };
 
-const createStyles = (colors, badgeColor) =>
+const createStyles = (colors: typeof lightColors, badgeColor: string) =>
   StyleSheet.create({
     card: {
       backgroundColor: colors.card,

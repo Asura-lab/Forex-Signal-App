@@ -31,9 +31,9 @@ def test_analysis():
         required_keys = ['summary', 'outlook', 'forecast', 'risk_factors']
         for key in required_keys:
             if key in insight and insight[key]:
-                print(f"✅ {key}: Present")
+                print(f"[OK] {key}: Present")
             else:
-                print(f"❌ {key}: Missing or Empty")
+                print(f"[MISSING] {key}: Missing or Empty")
                 
     except Exception as e:
         print(f"Error: {e}")

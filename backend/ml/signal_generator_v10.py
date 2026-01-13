@@ -472,8 +472,8 @@ if __name__ == "__main__":
     # Test
     generator = ForexSignalGeneratorV10()
     if generator.load_models():
-        print("\n✅ V10 Signal Generator Ready")
+        print("\n[+] V10 Signal Generator Ready")
         print(f"   Models: {list(generator.models.keys())}")
         print(f"   Features: {len(generator.feature_cols)}")
     else:
-        print("\n❌ Failed to load V10 models")
+        print("\n[!] Failed to load V10 models")

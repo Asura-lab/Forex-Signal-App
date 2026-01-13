@@ -1,7 +1,14 @@
 /**
  * Валютын хослолын мэдээлэл - 20 алдартай forex хослол
  */
-export const CURRENCY_PAIRS = [
+export interface CurrencyPair {
+  id: string;
+  name: string;
+  displayName: string;
+  color: string;
+}
+
+export const CURRENCY_PAIRS: CurrencyPair[] = [
   // Major Pairs
   {
     id: "EUR_USD",
@@ -126,14 +133,24 @@ export const CURRENCY_PAIRS = [
   },
 ];
 
+export interface SignalType {
+  name: string;
+  shortName: string;
+  emoji: string;
+  color: string;
+  textColor: string;
+  action: "BUY" | "SELL" | "HOLD";
+  strength: "STRONG" | "MEDIUM" | "NEUTRAL";
+}
+
 /**
  * Сигналын ангилал
  */
-export const SIGNAL_TYPES = {
+export const SIGNAL_TYPES: Record<number, SignalType> = {
   0: {
     name: "High volatility down",
     shortName: "STRONG SELL",
-    emoji: "📉💥",
+    emoji: "[vv]",
     color: "#D32F2F",
     textColor: "#FFFFFF",
     action: "SELL",
@@ -142,7 +159,7 @@ export const SIGNAL_TYPES = {
   1: {
     name: "Medium volatility down",
     shortName: "SELL",
-    emoji: "📉",
+    emoji: "[v]",
     color: "#F44336",
     textColor: "#FFFFFF",
     action: "SELL",
@@ -151,7 +168,7 @@ export const SIGNAL_TYPES = {
   2: {
     name: "No trend",
     shortName: "HOLD",
-    emoji: "➡️",
+    emoji: "[-]",
     color: "#FFC107",
     textColor: "#000000",
     action: "HOLD",
@@ -160,7 +177,7 @@ export const SIGNAL_TYPES = {
   3: {
     name: "Medium volatility up",
     shortName: "BUY",
-    emoji: "📈",
+    emoji: "[^]",
     color: "#4CAF50",
     textColor: "#FFFFFF",
     action: "BUY",
@@ -169,7 +186,7 @@ export const SIGNAL_TYPES = {
   4: {
     name: "High volatility up",
     shortName: "STRONG BUY",
-    emoji: "📈🚀",
+    emoji: "[^^]",
     color: "#2E7D32",
     textColor: "#FFFFFF",
     action: "BUY",
@@ -180,15 +197,15 @@ export const SIGNAL_TYPES = {
 /**
  * Форматлах функцууд
  */
-export const formatNumber = (num, decimals = 2) => {
+export const formatNumber = (num: number | undefined | null, decimals: number = 2): string => {
   return num?.toFixed(decimals) || "0.00";
 };
 
-export const formatPercent = (num) => {
+export const formatPercent = (num: number | undefined | null): string => {
   return `${formatNumber(num, 1)}%`;
 };
 
-export const formatDate = (date) => {
+export const formatDate = (date: string | Date | number): string => {
   return new Date(date).toLocaleString("mn-MN", {
     year: "numeric",
     month: "short",
@@ -201,28 +218,28 @@ export const formatDate = (date) => {
 /**
  * Сигналын өнгө авах
  */
-export const getSignalColor = (label) => {
+export const getSignalColor = (label: number): string => {
   return SIGNAL_TYPES[label]?.color || "#9E9E9E";
 };
 
 /**
  * Сигналын текст авах
  */
-export const getSignalText = (label) => {
+export const getSignalText = (label: number): string => {
   return SIGNAL_TYPES[label]?.shortName || "UNKNOWN";
 };
 
 /**
  * Сигналын emoji авах
  */
-export const getSignalEmoji = (label) => {
+export const getSignalEmoji = (label: number): string => {
   return SIGNAL_TYPES[label]?.emoji || "❓";
 };
 
 /**
  * Итгэлцлийн түвшинг үнэлэх
  */
-export const getConfidenceLevel = (confidence) => {
+export const getConfidenceLevel = (confidence: number): { text: string; color: string } => {
   if (confidence >= 70) return { text: "Өндөр", color: "#4CAF50" };
   if (confidence >= 50) return { text: "Дунд", color: "#FFC107" };
   return { text: "Бага", color: "#F44336" };
@@ -231,33 +248,33 @@ export const getConfidenceLevel = (confidence) => {
 /**
  * Худалдааны зөвлөмж үүсгэх
  */
-export const getTradingAdvice = (label, confidence) => {
+export const getTradingAdvice = (label: number, confidence: number): string => {
   const signal = SIGNAL_TYPES[label];
   const confLevel = getConfidenceLevel(confidence);
 
-  if (signal.action === "BUY") {
+  if (signal?.action === "BUY") {
     if (signal.strength === "STRONG" && confidence >= 60) {
-      return "✅ Худалдан авах сайн боломж";
+      return "Худалдан авах сайн боломж";
     } else if (signal.strength === "MEDIUM") {
-      return "🟢 Жижиг позиц нээж болно";
+      return "Жижиг позиц нээж болно";
     }
-  } else if (signal.action === "SELL") {
+  } else if (signal?.action === "SELL") {
     if (signal.strength === "STRONG" && confidence >= 60) {
-      return "⛔ Зарах сайн боломж";
+      return "Зарах сайн боломж";
     } else if (signal.strength === "MEDIUM") {
-      return "🔴 Жижиг short позиц нээж болно";
+      return "Жижиг short позиц нээж болно";
     }
   }
 
-  return "⚠️ Хүлээж, зах зээлийг ажиглах";
+  return "Хүлээж, зах зээлийг ажиглах";
 };
 
 /**
  * Get time-based greeting
- * @param {string} language - Language code ('mn' for Mongolian, 'en' for English)
- * @returns {string} Greeting message
+ * @param language - Language code ('mn' for Mongolian, 'en' for English)
+ * @returns Greeting message
  */
-export const getTimeBasedGreeting = (language = "mn") => {
+export const getTimeBasedGreeting = (language: "mn" | "en" = "mn"): string => {
   const hour = new Date().getHours();
 
   if (language === "en") {

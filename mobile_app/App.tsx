@@ -7,6 +7,7 @@ import {
 import { NavigationContainer } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { getColors } from "./src/config/theme";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -17,12 +18,14 @@ import MainTabs from "./src/navigation/MainTabs";
 import SignalScreen from "./src/screens/SignalScreen";
 
 const Stack = createStackNavigator();
+const queryClient = new QueryClient();
 
 function AppContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const { isDark } = useTheme();
   const colors = getColors(isDark);
+
 
   useEffect(() => {
     checkAuthStatus();
@@ -117,8 +120,10 @@ function AppContent() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AppContent />
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <AppContent />
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

@@ -13,100 +13,115 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getBestSignal, saveSignal, getMarketAnalysis } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NavigationProp, RouteProp } from "@react-navigation/native";
+import { CurrencyPair } from "../utils/helpers";
 
 const { width } = Dimensions.get("window");
 
-// Mock signal data for non-EUR/USD pairs
-const generateMockSignal = (pairName, threshold = 80) => {
-  const confidence = 55 + Math.random() * 40; // 55-95%
-  
-  let randomSignal = "HOLD";
-  if (confidence >= threshold) {
-    randomSignal = Math.random() > 0.5 ? "BUY" : "SELL";
-  }
-
-  // Mock prices based on pair
-  const mockPrices = {
-    "GBP/USD": { price: 1.2650, pip: 0.0001 },
-    "USD/JPY": { price: 149.50, pip: 0.01 },
-    "USD/CHF": { price: 0.8820, pip: 0.0001 },
-    "AUD/USD": { price: 0.6520, pip: 0.0001 },
-    "USD/CAD": { price: 1.3580, pip: 0.0001 },
-    "NZD/USD": { price: 0.5890, pip: 0.0001 },
-    "EUR/GBP": { price: 0.8350, pip: 0.0001 },
-    "EUR/JPY": { price: 163.20, pip: 0.01 },
-    "GBP/JPY": { price: 189.50, pip: 0.01 },
-    "AUD/JPY": { price: 97.80, pip: 0.01 },
-    "EUR/AUD": { price: 1.6250, pip: 0.0001 },
-    "EUR/CAD": { price: 1.4720, pip: 0.0001 },
-    "EUR/CHF": { price: 0.9380, pip: 0.0001 },
-    "GBP/AUD": { price: 1.9450, pip: 0.0001 },
-    "GBP/CAD": { price: 1.7180, pip: 0.0001 },
-    "GBP/CHF": { price: 1.1150, pip: 0.0001 },
-    "CAD/JPY": { price: 110.20, pip: 0.01 },
-    "CHF/JPY": { price: 169.50, pip: 0.01 },
-    "NZD/JPY": { price: 88.40, pip: 0.01 },
-  };
-  
-  const pairData = mockPrices[pairName] || { price: 1.0000, pip: 0.0001 };
-  const slPips = 15 + Math.floor(Math.random() * 20);
-  const tpPips = slPips * (1.5 + Math.random());
-  
-  const isJPY = pairName.includes("JPY");
-  const digits = isJPY ? 2 : 5;
-  
-  return {
-    signal: randomSignal,
-    confidence: confidence,
-    entry_price: pairData.price,
-    stop_loss: randomSignal === "BUY" 
-      ? pairData.price - (slPips * pairData.pip)
-      : pairData.price + (slPips * pairData.pip),
-    take_profit: randomSignal === "BUY"
-      ? pairData.price + (tpPips * pairData.pip)
-      : pairData.price - (tpPips * pairData.pip),
-    sl_pips: slPips,
-    tp_pips: Math.round(tpPips),
-    risk_reward: `1:${(tpPips / slPips).toFixed(1)}`,
-    atr_pips: 8 + Math.random() * 12,
-    model_probabilities: {
-      technical: 50 + Math.random() * 45,
-      sentiment: 45 + Math.random() * 50,
-      pattern: 40 + Math.random() * 55,
-    },
-    models_agree: Math.random() > 0.4,
-    isMock: true,
-    digits: digits,
-  };
+type RootStackParamList = {
+  Signal: { pair: CurrencyPair };
 };
 
+type SignalScreenRouteProp = RouteProp<RootStackParamList, 'Signal'>;
+
+interface SignalScreenProps {
+  route: SignalScreenRouteProp;
+  navigation: NavigationProp<any>;
+}
+
 /**
- * Signal Screen - EUR/USD = Real AI, Others = Mock
+ * Signal Screen - AI Analysis & Signals
  */
-const SignalScreen = ({ route, navigation }) => {
+const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
   const { pair } = route.params || {};
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
-
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [signal, setSignal] = useState(null);
-  const [error, setError] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(80);
-  const [showThresholdModal, setShowThresholdModal] = useState(false);
   
-  // AI Analysis State
-  const [aiAnalysis, setAiAnalysis] = useState(null);
-  const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(80);
+  const [showThresholdModal, setShowThresholdModal] = useState<boolean>(false);
+  const [lastUpdate, setLastUpdate] = useState<string>(new Date().toLocaleTimeString());
 
-  const isRealAI = pair?.name === "EUR/USD";
+  // React Query - Get Signal
+  const { 
+    data: signalData, 
+    isLoading: loading, 
+    error: signalError,
+    refetch: refetchSignal 
+  } = useQuery({
+    queryKey: ['signal', pair?.name, confidenceThreshold],
+    queryFn: async () => {
+      const pairName = pair?.name || "EUR/USD";
+      const result = await getBestSignal(confidenceThreshold, pairName);
+      if (!result.success) throw new Error(result.error);
+      
+      const isJPY = pairName.includes("JPY");
+      return { 
+        ...result.data, 
+        isMock: false, 
+        digits: isJPY ? 2 : 5,
+        dataInfo: result.data.data_info 
+      };
+    },
+    refetchInterval: 60000, // Auto refetch every 1 min
+    retry: 2
+  });
+
+  // React Query - Market Analysis
+  const {
+    data: aiAnalysis,
+    isLoading: loadingAnalysis
+  } = useQuery({
+    queryKey: ['analysis', pair?.name],
+    queryFn: async () => {
+      if (!pair?.name) return null;
+      const result = await getMarketAnalysis(pair.name);
+      if (result.success) return result.data;
+      return null;
+    },
+    enabled: !!pair?.name, // Only run if pair name exists
+  });
+
+  // Save Signal Mutation
+  const saveSignalMutation = useMutation({
+    mutationFn: (signalToSave) => saveSignal(signalToSave),
+    onSuccess: (data) => {
+      if (data.success) console.log("+ Signal saved:", data.data.signal_id);
+    }
+  });
+
+  // Effect to save signal when new data comes in
+  useEffect(() => {
+    if (signalData?.signal && signalData?.signal !== "HOLD") {
+      const pairName = pair?.name || "EUR/USD";
+      saveSignalMutation.mutate({
+        pair: pairName.replace('/', '_'),
+        signal: signalData.signal,
+        confidence: signalData.confidence,
+        entry_price: signalData.entry_price,
+        stop_loss: signalData.stop_loss,
+        take_profit: signalData.take_profit,
+        sl_pips: signalData.sl_pips,
+        tp_pips: signalData.tp_pips,
+        risk_reward: signalData.risk_reward,
+        model_probabilities: signalData.model_probabilities,
+        models_agree: signalData.models_agree,
+        atr_pips: signalData.atr_pips,
+      });
+    }
+    setLastUpdate(new Date().toLocaleTimeString("en-US", { hour12: false }));
+  }, [signalData]);
+
+  const signal = signalData;
+  const error = signalError?.message;
+  const refreshing = loading; // Map React Query loading to refreshing state
 
   // Check if market is closed from API response or local calculation
   const isMarketClosedFromAPI = signal?.dataInfo?.market_closed === true;
+
   
   // Get next market open time in local timezone
   const getNextMarketOpen = () => {
@@ -151,17 +166,6 @@ const SignalScreen = ({ route, navigation }) => {
     loadThreshold();
   }, []);
 
-  useEffect(() => {
-    loadSignal();
-    fetchAnalysis();
-    
-    const interval = setInterval(() => {
-      loadSignal(false);
-    }, isRealAI ? 5 * 60 * 1000 : 30 * 1000); // Real: 5min, Mock: 30sec
-    
-    return () => clearInterval(interval);
-  }, [pair, confidenceThreshold]);
-
   const loadThreshold = async () => {
     try {
       const saved = await AsyncStorage.getItem("@confidence_threshold");
@@ -174,82 +178,13 @@ const SignalScreen = ({ route, navigation }) => {
       await AsyncStorage.setItem("@confidence_threshold", value.toString());
       setConfidenceThreshold(value);
       setShowThresholdModal(false);
-      loadSignal();
+      refetchSignal();
     } catch (e) {}
   };
 
-  const loadSignal = async (showLoading = true) => {
-    if (showLoading) setLoading(true);
-    setError(null);
-    
-    try {
-      if (isRealAI) {
-        // EUR/USD - Real AI analysis (Best Model)
-        const result = await getBestSignal(confidenceThreshold);
-        
-        if (result.success) {
-          setSignal({ 
-            ...result.data, 
-            isMock: false, 
-            digits: 5,
-            dataInfo: result.data.data_info // Include data info from API
-          });
-          setLastUpdate(new Date().toLocaleTimeString("en-US", { hour12: false }));
-          
-          if (result.data.signal && result.data.signal !== "HOLD") {
-            const saveResult = await saveSignal({
-              pair: "EUR_USD",
-              signal: result.data.signal,
-              confidence: result.data.confidence,
-              entry_price: result.data.entry_price,
-              stop_loss: result.data.stop_loss,
-              take_profit: result.data.take_profit,
-              sl_pips: result.data.sl_pips,
-              tp_pips: result.data.tp_pips,
-              risk_reward: result.data.risk_reward,
-              model_probabilities: result.data.model_probabilities,
-              models_agree: result.data.models_agree,
-              atr_pips: result.data.atr_pips,
-            });
-            if (saveResult.success) console.log("✓ Signal saved:", saveResult.data.signal_id);
-          }
-        } else {
-          setError(result.error || "Signal авахад алдаа гарлаа");
-        }
-      } else {
-        // Other pairs - Mock data
-        const mockSignal = generateMockSignal(pair?.name, confidenceThreshold);
-        setSignal(mockSignal);
-        setLastUpdate(new Date().toLocaleTimeString("en-US", { hour12: false }));
-      }
-    } catch (err) {
-      setError("Сервертэй холбогдоход алдаа гарлаа");
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const fetchAnalysis = async () => {
-    if (!pair?.name) return;
-    setLoadingAnalysis(true);
-    try {
-      const result = await getMarketAnalysis(pair.name);
-      if (result.success) {
-        setAiAnalysis(result.data);
-      }
-    } catch (e) {
-      console.error("Analysis fetch error:", e);
-    } finally {
-      setLoadingAnalysis(false);
-    }
-  };
-
   const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    loadSignal(false);
-    fetchAnalysis();
-  }, [pair, confidenceThreshold]);
+    refetchSignal();
+  }, [refetchSignal]);
 
   const getSignalColor = (type) => {
     if (type === "BUY") return colors.success;
@@ -270,28 +205,20 @@ const SignalScreen = ({ route, navigation }) => {
           style={styles.backBtn} 
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.backIcon}>&lt;</Text>
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>
           <Text style={styles.pairName}>{pair?.name || "EUR/USD"}</Text>
-          <Text style={styles.pairSub}>
-            {isRealAI ? "AI Powered Analysis" : "Technical Analysis"}
-          </Text>
+          <Text style={styles.pairSub}>AI Шинжилгээ</Text>
         </View>
 
-        {isRealAI ? (
-          <TouchableOpacity 
-            style={styles.thresholdBtn}
-            onPress={() => setShowThresholdModal(true)}
-          >
-            <Text style={styles.thresholdText}>{confidenceThreshold}%+</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.demoBadge}>
-            <Text style={styles.demoText}>DEMO</Text>
-          </View>
-        )}
+        <TouchableOpacity 
+          style={styles.thresholdBtn}
+          onPress={() => setShowThresholdModal(true)}
+        >
+          <Text style={styles.thresholdText}>{confidenceThreshold}%+</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -301,21 +228,12 @@ const SignalScreen = ({ route, navigation }) => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
-        {/* Mock Warning */}
-        {!isRealAI && (
-          <View style={styles.mockWarning}>
-            <Text style={styles.mockWarningText}>
-              Дохио (Signal) нь туршилтын (mock) өгөгдөл. Харин зах зээлийн анализ нь бодит AI дээр суурилсан.
-            </Text>
-          </View>
-        )}
-
         {/* Market Closed Warning */}
         {marketClosed && (
           <View style={styles.marketClosedBox}>
             <View style={styles.marketClosedHeader}>
               <View style={styles.marketClosedIconBox}>
-                <Text style={styles.marketClosedIcon}>🌙</Text>
+                <Text style={styles.marketClosedIcon}>X</Text>
               </View>
               <View style={styles.marketClosedContent}>
                 <Text style={styles.marketClosedTitle}>Зах зээл хаалттай байна</Text>
@@ -358,7 +276,7 @@ const SignalScreen = ({ route, navigation }) => {
               <Text style={styles.errorIconText}>!</Text>
             </View>
             <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => loadSignal()}>
+            <TouchableOpacity style={styles.retryBtn} onPress={() => refetchSignal()}>
               <Text style={styles.retryText}>Дахин оролдох</Text>
             </TouchableOpacity>
           </View>
@@ -368,18 +286,20 @@ const SignalScreen = ({ route, navigation }) => {
             <View style={styles.signalCard}>
               <View style={styles.signalTop}>
                 <View>
-                  <Text style={styles.signalLabel}>SIGNAL</Text>
-                  <Text style={styles.updateTime}>Updated: {lastUpdate}</Text>
+                  <Text style={styles.signalLabel}>ДОХИО</Text>
+                  <Text style={styles.updateTime}>Шинэчлэгдсэн: {lastUpdate}</Text>
                 </View>
                 <View style={[styles.signalBadge, { backgroundColor: getSignalColor(signal.signal) }]}>
-                  <Text style={styles.signalBadgeText}>{signal.signal}</Text>
+                  <Text style={styles.signalBadgeText}>
+                    {signal.signal === 'BUY' ? 'BUY [UP]' : signal.signal === 'SELL' ? 'SELL [DOWN]' : 'HOLD [WAIT]'}
+                  </Text>
                 </View>
               </View>
 
               {/* Confidence Meter */}
               <View style={styles.confidenceBox}>
                 <View style={styles.confidenceRow}>
-                  <Text style={styles.confLabel}>Confidence Score</Text>
+                  <Text style={styles.confLabel}>Итгэлцүүр</Text>
                   <Text style={[styles.confValue, { color: getSignalColor(signal.signal) }]}>
                     {signal.confidence?.toFixed(1)}%
                   </Text>
@@ -401,18 +321,21 @@ const SignalScreen = ({ route, navigation }) => {
               {(signal.signal === "BUY" || signal.signal === "SELL") && (
                 <View style={styles.entryGrid}>
                   <View style={styles.entryItem}>
-                    <Text style={styles.entryLabel}>ENTRY</Text>
+                    <Text style={styles.entryLabel}>ОРНО (ENTRY)</Text>
                     <Text style={styles.entryValue}>{signal.entry_price?.toFixed(priceDigits)}</Text>
                   </View>
-                  <View style={[styles.entryItem, styles.slItem]}>
-                    <Text style={[styles.entryLabel, { color: colors.error }]}>STOP LOSS</Text>
-                    <Text style={[styles.entryValue, { color: colors.error }]}>{signal.stop_loss?.toFixed(priceDigits)}</Text>
-                    <Text style={styles.pipsText}>-{signal.sl_pips} pips</Text>
-                  </View>
-                  <View style={[styles.entryItem, styles.tpItem]}>
-                    <Text style={[styles.entryLabel, { color: colors.success }]}>TAKE PROFIT</Text>
-                    <Text style={[styles.entryValue, { color: colors.success }]}>{signal.take_profit?.toFixed(priceDigits)}</Text>
-                    <Text style={styles.pipsText}>+{signal.tp_pips} pips</Text>
+                  
+                  <View style={{flexDirection: 'row', gap: 12}}>
+                    <View style={[styles.entryItem, styles.slItem, {flex: 1}]}>
+                      <Text style={[styles.entryLabel, { color: colors.error }]}>STOP LOSS</Text>
+                      <Text style={[styles.entryValue, { color: colors.error }]}>{signal.stop_loss?.toFixed(priceDigits)}</Text>
+                      <Text style={styles.pipsText}>-{signal.sl_pips} pips</Text>
+                    </View>
+                    <View style={[styles.entryItem, styles.tpItem, {flex: 1}]}>
+                      <Text style={[styles.entryLabel, { color: colors.success }]}>TAKE PROFIT</Text>
+                      <Text style={[styles.entryValue, { color: colors.success }]}>{signal.take_profit?.toFixed(priceDigits)}</Text>
+                      <Text style={styles.pipsText}>+{signal.tp_pips} pips</Text>
+                    </View>
                   </View>
                 </View>
               )}
@@ -433,7 +356,7 @@ const SignalScreen = ({ route, navigation }) => {
               {/* Risk Reward */}
               {(signal.signal === "BUY" || signal.signal === "SELL") && (
                 <View style={styles.rrBox}>
-                  <Text style={styles.rrLabel}>Risk/Reward</Text>
+                  <Text style={styles.rrLabel}>Эрсдэл/Өгөөж</Text>
                   <Text style={styles.rrValue}>{signal.risk_reward}</Text>
                 </View>
               )}
@@ -443,7 +366,7 @@ const SignalScreen = ({ route, navigation }) => {
             {signal.model_probabilities && (
               <View style={styles.modelsCard}>
                 <Text style={styles.cardTitle}>
-                  {signal.isMock ? "🤖 ШИНЖИЛГЭЭ (DEMO)" : "🤖 AI ЗАГВАРУУДЫН ШИНЖИЛГЭЭ"}
+                  AI ЗАГВАРУУДЫН ШИНЖИЛГЭЭ
                 </Text>
                 <View style={styles.modelGrid}>
                   {Object.entries(signal.model_probabilities).map(([model, prob]) => (
@@ -459,7 +382,7 @@ const SignalScreen = ({ route, navigation }) => {
                 {signal.models_agree && (
                   <View style={[styles.agreeRow, { backgroundColor: colors.success + '20' }]}>
                     <Text style={[styles.agreeText, { color: colors.success }]}>
-                      ✓ Бүх загварууд санал нэг байна
+                      + Бүх загварууд санал нэг байна
                     </Text>
                   </View>
                 )}
@@ -468,14 +391,14 @@ const SignalScreen = ({ route, navigation }) => {
 
             {/* Market Analysis Section */}
             <View style={styles.signalCard}>
-                <Text style={styles.cardTitle}>MARKET ANALYSIS</Text>
+                <Text style={styles.cardTitle}>ЗАХ ЗЭЭЛИЙН ШИНЖИЛГЭЭ</Text>
                 
                 {loadingAnalysis ? (
                   <ActivityIndicator color={colors.primary} />
                 ) : aiAnalysis ? (
                   <>
                     <View style={styles.analysisRow}>
-                      <Text style={styles.analysisLabel}>Outlook</Text>
+                      <Text style={styles.analysisLabel}>Төлөв (Outlook)</Text>
                       <Text style={[styles.analysisValue, { 
                         color: (aiAnalysis.outlook?.includes('Bullish') || aiAnalysis.outlook?.includes('Өсөх')) ? colors.success : 
                                (aiAnalysis.outlook?.includes('Bearish') || aiAnalysis.outlook?.includes('Унах')) ? colors.error : colors.warning 
@@ -485,20 +408,20 @@ const SignalScreen = ({ route, navigation }) => {
                     </View>
 
                     <View style={styles.analysisSection}>
-                      <Text style={styles.analysisSubTitle}>Summary</Text>
+                      <Text style={styles.analysisSubTitle}>Дүгнэлт</Text>
                       <Text style={styles.analysisText}>{aiAnalysis.summary}</Text>
                     </View>
 
                     {aiAnalysis.forecast && (
                       <View style={styles.analysisSection}>
-                        <Text style={styles.analysisSubTitle}>Forecast</Text>
+                        <Text style={styles.analysisSubTitle}>Таамаглал</Text>
                         <Text style={styles.analysisText}>{aiAnalysis.forecast}</Text>
                       </View>
                     )}
 
                     {aiAnalysis.risk_factors && aiAnalysis.risk_factors.length > 0 && (
                       <View style={styles.analysisSection}>
-                        <Text style={styles.analysisSubTitle}>Risk Factors</Text>
+                        <Text style={styles.analysisSubTitle}>Эрсдэлт хүчин зүйлс</Text>
                         {aiAnalysis.risk_factors.map((risk, index) => (
                           <Text key={index} style={styles.riskText}>• {risk}</Text>
                         ))}
@@ -506,7 +429,7 @@ const SignalScreen = ({ route, navigation }) => {
                     )}
                   </>
                 ) : (
-                  <Text style={styles.analysisText}>Analysis unavailable</Text>
+                  <Text style={styles.analysisText}>Шинжилгээ хийгдээгүй байна</Text>
                 )}
               </View>
 
@@ -514,7 +437,7 @@ const SignalScreen = ({ route, navigation }) => {
             <View style={styles.infoRow}>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Төрөл</Text>
-                <Text style={styles.infoValue}>{isRealAI ? "Бодит AI" : "Demo"}</Text>
+                <Text style={styles.infoValue}>AI Signal</Text>
               </View>
               <View style={styles.infoItem}>
                 <Text style={styles.infoLabel}>Хэлбэлзэл</Text>
@@ -530,10 +453,7 @@ const SignalScreen = ({ route, navigation }) => {
 
             {/* Disclaimer */}
             <Text style={styles.disclaimer}>
-              {signal.isMock 
-                ? "⚠️ Demo signal - Зохиомол дата, бодит арилжаанд ашиглахгүй"
-                : "⚠️ Зөвхөн мэдээллийн зорилготой. Санхүүгийн зөвлөгөө биш."
-              }
+              [!] Зөвхөн мэдээллийн зорилготой. Санхүүгийн зөвлөгөө биш.
             </Text>
           </>
         )}
@@ -552,7 +472,7 @@ const SignalScreen = ({ route, navigation }) => {
           onPress={() => setShowThresholdModal(false)}
         >
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>⚙️ Итгэлцүүрийн босго</Text>
+            <Text style={styles.modalTitle}>Итгэлцүүрийн босго</Text>
             <Text style={styles.modalSub}>
               Дохио өгөх хамгийн бага итгэлцүүрийн хэмжээ
             </Text>
@@ -567,7 +487,7 @@ const SignalScreen = ({ route, navigation }) => {
                   <Text style={[styles.optionText, confidenceThreshold === val && styles.optionTextActive]}>
                     {val}%
                   </Text>
-                  {confidenceThreshold === val && <Text style={styles.checkIcon}>✓</Text>}
+                  {confidenceThreshold === val && <Text style={styles.checkIcon}>+</Text>}
                 </TouchableOpacity>
               ))}
             </View>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,86 +6,76 @@ import {
   ScrollView,
   RefreshControl,
   ActivityIndicator,
-  Alert,
   StatusBar,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import CurrencyList from "../components/CurrencyList";
 import { checkApiStatus, getLiveRates } from "../services/api";
-import { API_URL } from "../config/api";
+import { CurrencyPair } from "../utils/helpers";
+import { NavigationProp } from "@react-navigation/native";
+import { useQuery } from "@tanstack/react-query";
+
+interface HomeScreenProps {
+  navigation: NavigationProp<any>;
+}
+
+interface LiveRatesMap {
+  [key: string]: any;
+}
 
 /**
  * Home Screen - Professional TradingView style
  */
-const HomeScreen = ({ navigation }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [apiConnected, setApiConnected] = useState(false);
-  const [liveRates, setLiveRates] = useState({});
-  const [lastUpdateTime, setLastUpdateTime] = useState(null);
+  // Status Query
+  const { data: statusData } = useQuery({
+    queryKey: ["apiStatus"],
+    queryFn: checkApiStatus,
+    refetchInterval: 30000, 
+  });
 
-  useEffect(() => {
-    loadData();
+  const apiConnected = statusData?.success || false;
 
-    const ratesInterval = setInterval(() => {
-      fetchLiveRates();
-    }, 60000);
-
-    return () => clearInterval(ratesInterval);
-  }, []);
-
-  const fetchLiveRates = async () => {
-    try {
+  // Live Rates Query
+  const { 
+    data: liveRates, 
+    isLoading, 
+    refetch 
+  } = useQuery({
+    queryKey: ["liveRates"],
+    queryFn: async () => {
       const result = await getLiveRates();
       if (result.success) {
-        const ratesMap = {};
+        const ratesMap: LiveRatesMap = {};
         const rates = result.data.rates || {};
         Object.keys(rates).forEach((key) => {
           const pairName = key.replace("_", "/");
           ratesMap[pairName] = rates[key];
         });
-        setLiveRates(ratesMap);
-        setLastUpdateTime(new Date().toLocaleTimeString("en-US", { hour12: false }));
+        return ratesMap;
       }
-    } catch (error) {
-      console.error("Live rates error:", error);
-    }
-  };
+      return {};
+    },
+    refetchInterval: 60000,
+  });
 
-  const loadData = async () => {
-    const statusResult = await checkApiStatus();
-    setApiConnected(statusResult.success);
-
-    if (!statusResult.success) {
-      Alert.alert(
-        "Connection Error",
-        "Cannot connect to API server.",
-        [{ text: "OK" }]
-      );
-      setLoading(false);
-      return;
-    }
-
-    await fetchLiveRates();
-    setLoading(false);
-  };
+  const lastUpdateTime = new Date().toLocaleTimeString("en-US", { hour12: false });
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchLiveRates();
-    setRefreshing(false);
+    await refetch();
   };
 
-  const handlePairPress = (pair) => {
+  const handlePairPress = (pair: CurrencyPair) => {
     navigation.navigate("Signal", { pair });
   };
 
-  if (loading) {
+
+  if (isLoading && !liveRates) {
     return (
       <View style={styles.loadingContainer}>
         <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
@@ -117,7 +107,7 @@ const HomeScreen = ({ navigation }) => {
         style={styles.scrollView}
         refreshControl={
           <RefreshControl 
-            refreshing={refreshing} 
+            refreshing={isLoading} 
             onRefresh={onRefresh}
             tintColor={colors.success}
             colors={[colors.success]}
@@ -144,7 +134,7 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

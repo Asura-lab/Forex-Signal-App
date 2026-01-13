@@ -1,4 +1,4 @@
-# 📈 Forex Signal App
+# Forex Signal App
 
 **EUR/USD BUY Signal Generator** | **Ensemble ML** | **React Native** | **MongoDB + JWT**
 
@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 Тойм
+## Тойм
 
 Энэ систем нь **Ensemble Machine Learning** ашиглан Forex зах зээл дээр BUY дохио таамаглах production-level аппликейшн юм.
 
@@ -21,20 +21,20 @@
 
 ### Онцлог:
 
-- 🎯 **BUY-Only Strategy**: SELL сигнал хассан (28% accuracy), зөвхөн BUY (80% accuracy)
-- 📊 **Ensemble Model**: XGBoost (40%) + LightGBM (35%) + Random Forest (25%)
-- 📈 **70 Technical Indicators**: RSI, MACD, Bollinger, ATR, SMA, EMA гэх мэт
-- 🔐 **JWT Authentication**: MongoDB + secure token-based auth
-- 📱 **Mobile App**: React Native + Expo (iOS & Android)
-- ⚡ **Real-time Data**: Twelve Data API integration
+- [BUY] **BUY-Only Strategy**: SELL сигнал хассан (28% accuracy), зөвхөн BUY (80% accuracy)
+- [AI] **Ensemble Model**: XGBoost (40%) + LightGBM (35%) + Random Forest (25%)
+- [Technical] **70 Technical Indicators**: RSI, MACD, Bollinger, ATR, SMA, EMA гэх мэт
+- [Security] **JWT Authentication**: MongoDB + secure token-based auth
+- [Mobile] **Mobile App**: React Native + Expo (iOS & Android)
+- [Data] **Real-time Data**: Twelve Data API integration
 
 ---
 
-## 🏗️ Архитектур
+## Архитектур
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                 📱 REACT NATIVE MOBILE APP                   │
+│                 [MOBILE] REACT NATIVE MOBILE APP             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   Login/     │  │    Signal    │  │   Profile    │      │
 │  │   Register   │  │    Screen    │  │   Settings   │      │
@@ -42,7 +42,7 @@
 └─────────────────────────────────────────────────────────────┘
                             ↕ REST API (JWT)
 ┌─────────────────────────────────────────────────────────────┐
-│              🐍 FLASK + WAITRESS BACKEND                     │
+│              [BACKEND] FLASK + WAITRESS BACKEND              │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │  Authentication      Signal V2         Market Data   │   │
 │  │  - /auth/register    - /signal/v2      - /rates/live │   │
@@ -52,7 +52,7 @@
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
-│                  🤖 ENSEMBLE ML ENGINE                       │
+│                  [ML] ENSEMBLE ML ENGINE                     │
 │  ┌─────────────┬─────────────────┬──────────────────┐      │
 │  │   XGBoost   │    LightGBM     │  Random Forest   │      │
 │  │    (40%)    │      (35%)      │      (25%)       │      │
@@ -61,7 +61,7 @@
 └─────────────────────────────────────────────────────────────┘
                             ↕
 ┌─────────────────────────────────────────────────────────────┐
-│                      💾 DATA LAYER                           │
+│                      [DATA] DATA LAYER                       │
 │  ┌──────────────────┐  ┌──────────────────┐                │
 │  │  MongoDB Atlas   │  │  Twelve Data API │                │
 │  │  - users         │  │  - Live rates    │                │
@@ -73,7 +73,7 @@
 
 ---
 
-## 🛠️ Технологи
+## Технологи
 
 ### Backend:
 - **Python 3.11+**
@@ -96,7 +96,7 @@
 
 ---
 
-## 📁 Файлын бүтэц
+## Файлын бүтэц
 
 ```
 Forex-Signal-App/
@@ -137,14 +137,14 @@ Forex-Signal-App/
 │
 ├── 📂 diplom/                     # Diploma thesis (LaTeX)
 │
-├── forex_signal_v2.ipynb          # 🔥 Model training notebook
+├── forex_signal_v2.ipynb          # Model training notebook
 ├── requirements.txt               # Python dependencies
 └── README.md                      # This file
 ```
 
 ---
 
-## 🚀 Суулгах
+## Суулгах
 
 ### Backend:
 
@@ -182,7 +182,7 @@ npx expo start
 
 ---
 
-## 📡 API Endpoints
+## API Endpoints
 
 ### Authentication:
 | Method | Endpoint | Description |
@@ -240,7 +240,7 @@ curl "http://localhost:5000/signal/v2?min_confidence=80"
 
 ---
 
-## 🤖 Model Training
+## Model Training
 
 ### Notebook: `forex_signal_v2.ipynb`
 
@@ -260,7 +260,7 @@ curl "http://localhost:5000/signal/v2?min_confidence=80"
 
 ---
 
-## 📊 Performance
+## Performance
 
 | Metric | Value |
 |--------|-------|
@@ -273,31 +273,31 @@ curl "http://localhost:5000/signal/v2?min_confidence=80"
 
 ---
 
-## 🔒 Security
+## Security
 
-- ✅ Bcrypt password hashing
-- ✅ JWT token authentication
-- ✅ Email verification (6-digit code)
-- ✅ CORS protection
-- ✅ Environment variables for secrets
+- [OK] Bcrypt password hashing
+- [OK] JWT token authentication
+- [OK] Email verification (6-digit code)
+- [OK] CORS protection
+- [OK] Environment variables for secrets
 
 ---
 
-## 📄 License
+## License
 
 Educational and research purposes only.
 
 ---
 
-## 👨‍💻 Author
+## Author
 
 **Asura-lab**
 - GitHub: [@Asura-lab](https://github.com/Asura-lab)
 
 ---
 
-**⚠️ Disclaimer**: Энэ систем нь зөвхөн боловсрол, судалгааны зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү!
+**[!] Disclaimer**: Энэ систем нь зөвхөн боловсрол, судалгааны зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү!
 
 ---
 
-**Made with ❤️ in Mongolia 🇲🇳**
+**Made in Mongolia**

@@ -1,40 +1,40 @@
-# 🚀 EUR/USD Single-Pair Training Strategy
+# EUR/USD Single-Pair Training Strategy
 
 ## Хамгийн тохиромжтой сонголт: EUR/USD
 
-### 🏆 Яагаад EUR/USD вэ?
+### Яагаад EUR/USD вэ?
 
 #### 1. **Дэлхийн хамгийн их арилжаалагддаг хос**
 
-- 📊 Forex market-ийн 24% эзэлдэг
-- 💧 Хамгийн өндөр ликвидтэй (liquid)
-- ⚡ Tight spreads (0.1-0.3 pips)
-- 🎯 Minimal slippage
+- Forex market-ийн 24% эзэлдэг
+- Хамгийн өндөр ликвидтэй (liquid)
+- Tight spreads (0.1-0.3 pips)
+- Minimal slippage
 
 #### 2. **Machine Learning-д хамгийн тохиромжтой**
 
-- 📈 Clear trends & patterns
-- 🔄 Predictable seasonal behavior
-- 📊 Богатый өгөгдөл (decades of data)
-- 🎯 Өндөр accuracy гаргадаг
+- Clear trends & patterns
+- Predictable seasonal behavior
+- Богатый өгөгдөл (decades of data)
+- Өндөр accuracy гаргадаг
 
 #### 3. **Тогтвортой волатильност**
 
-- 📉 Moderate volatility (40-80 pips/day)
-- 🎯 Noise багатай, trend тодорхой
-- 💪 Robust pattern learning
-- ⚡ Fast execution
+- Moderate volatility (40-80 pips/day)
+- Noise багатай, trend тодорхой
+- Robust pattern learning
+- Fast execution
 
 #### 4. **Эдийн засгийн өгөгдөл элбэг**
 
-- 🏦 ECB + Federal Reserve data
-- 📊 NFP, CPI, GDP reports
-- 📰 Clear fundamental drivers
-- 🎯 News impact таамаглахад хялбар
+- ECB + Federal Reserve data
+- NFP, CPI, GDP reports
+- Clear fundamental drivers
+- News impact таамаглахад хялбар
 
 ---
 
-## 🔧 UniRate API Integration
+## UniRate API Integration
 
 ### Setup
 
@@ -45,7 +45,7 @@ pip install requests pandas
 # No API key required (using ExchangeRate.host - free tier)
 ```
 
-### 📥 Өгөгдөл татах
+### Өгөгдөл татах
 
 #### 1. **Түүхэн өгөгдөл** (Сургалтад)
 
@@ -56,10 +56,10 @@ python download_unirate.py
 
 **Features:**
 
-- ✅ 2 жилийн өгөгдөл (24 months default)
-- ✅ Daily OHLCV data
-- ✅ Автоматаар `data/train/EUR_USD_1min.csv` үүсгэх
-- ✅ Rate limiting built-in
+- 2 жилийн өгөгдөл (24 months default)
+- Daily OHLCV data
+- Автоматаар `data/train/EUR_USD_1min.csv` үүсгэх
+- Rate limiting built-in
 
 #### 2. **Бодит цагийн өгөгдөл** (Production-д)
 
@@ -73,14 +73,14 @@ print(result['rate'])  # 1.08456
 
 **Features:**
 
-- ✅ 5-секундын cache (rate limiting)
-- ✅ Bid/Ask spread estimate
-- ✅ ISO timestamp
-- ✅ Error handling
+- 5-секундын cache (rate limiting)
+- Bid/Ask spread estimate
+- ISO timestamp
+- Error handling
 
 ---
 
-## 🎯 Backend Integration
+## Backend Integration
 
 ### API Endpoints Updated
 
@@ -134,7 +134,7 @@ curl http://localhost:5000/rates/specific?pair=EUR_USD
 
 ---
 
-## 📊 Training Strategy (Single Model)
+## Training Strategy (Single Model)
 
 ### Week 1-4: Universal Direction Predictor
 
@@ -153,14 +153,14 @@ model = build_hybrid_direction_model(
 
 **Advantages:**
 
-- ✅ 100% model capacity зөвхөн EUR/USD-д зориулагдсан
-- ✅ Pair-specific patterns сайн сурна
-- ✅ EUR/USD-ийн өвөрмөц correlation (EUR/GBP, DXY, Gold)
-- ✅ Хурдан training (1 pair vs 6 pairs)
+- 100% model capacity зөвхөн EUR/USD-д зориулагдсан
+- Pair-specific patterns сайн сурна
+- EUR/USD-ийн өвөрмөц correlation (EUR/GBP, DXY, Gold)
+- Хурдан training (1 pair vs 6 pairs)
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Өгөгдөл татах
 
@@ -195,14 +195,14 @@ curl http://localhost:5000/rates/specific?pair=EUR_USD
 
 ---
 
-## 📈 Expected Performance
+## Expected Performance
 
 ### EUR/USD ML Benchmarks
 
-- 🎯 Direction accuracy: **82-89%** (industry average)
-- 📊 Sharpe ratio: **1.5-2.5** (attainable)
-- 💰 Win rate: **60-70%** (realistic)
-- 📉 Max drawdown: **<12%** (with proper risk)
+- Direction accuracy: **82-89%** (industry average)
+- Sharpe ratio: **1.5-2.5** (attainable)
+- Win rate: **60-70%** (realistic)
+- Max drawdown: **<12%** (with proper risk)
 
 ### Why better than multi-pair?
 
@@ -213,7 +213,7 @@ curl http://localhost:5000/rates/specific?pair=EUR_USD
 
 ---
 
-## 🎓 Training Tips
+## Training Tips
 
 ### Feature Engineering for EUR/USD
 
@@ -249,35 +249,35 @@ time_barrier = 60  # 1 hour
 
 ---
 
-## 🏁 Next Steps
+## Next Steps
 
 ### Immediate Actions:
 
-1. ✅ **EUR/USD сонгосон** (optimal choice)
-2. ✅ **UniRate API холбосон** (data source)
-3. ⏳ **Өгөгдөл татах** → `python scripts/download_unirate.py`
-4. ⏳ **Backend test** → `python backend/utils/unirate_handler.py`
-5. ⏳ **Week 1 эхлэх** → Feature engineering (45+ indicators)
+1. [OK] **EUR/USD сонгосон** (optimal choice)
+2. [OK] **UniRate API холбосон** (data source)
+3. [WAIT] **Өгөгдөл татах** → `python scripts/download_unirate.py`
+4. [WAIT] **Backend test** → `python backend/utils/unirate_handler.py`
+5. [WAIT] **Week 1 эхлэх** → Feature engineering (45+ indicators)
 
 ---
 
-## 💡 Pro Tips
+## Pro Tips
 
 ### EUR/USD Trading Insights
 
-- 🕐 **Best hours**: London open (08:00-12:00 GMT)
-- 📊 **Best days**: Tuesday-Thursday
-- 📰 **Key reports**: NFP, FOMC, ECB meetings
-- 🎯 **Typical range**: 40-80 pips/day
-- ⚡ **Best volatility**: EU-US overlap (12:00-16:00 GMT)
+- **Best hours**: London open (08:00-12:00 GMT)
+- **Best days**: Tuesday-Thursday
+- **Key reports**: NFP, FOMC, ECB meetings
+- **Typical range**: 40-80 pips/day
+- **Best volatility**: EU-US overlap (12:00-16:00 GMT)
 
 ### Model Training
 
-- 🎯 Focus on **London + NY sessions** data
-- 📊 Train separate models for **trending vs ranging**
-- ⚡ Use **time-of-day features** (hour, day_of_week)
-- 🔄 **Resample** imbalanced classes (BUY/SELL/HOLD)
+- Focus on **London + NY sessions** data
+- Train separate models for **trending vs ranging**
+- Use **time-of-day features** (hour, day_of_week)
+- **Resample** imbalanced classes (BUY/SELL/HOLD)
 
 ---
 
-**🚀 Бэлэн болсон! EUR/USD-д зориулсан Universal Model сургаж эхэлцгээе!**
+**Бэлэн болсон! EUR/USD-д зориулсан Universal Model сургаж эхэлцгээе!**

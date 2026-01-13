@@ -39,7 +39,7 @@ def download_data(timeframe):
         expected_file = DATA_DIR / f"{PAIR}_{timeframe}.csv"
         
         if expected_file.exists():
-            print(f"✅ Successfully downloaded {expected_file}")
+            print(f"[OK] Successfully downloaded {expected_file}")
             df = pd.read_csv(expected_file)
             # Dukascopy format usually: time, open, high, low, close, volume
             # We want: time, open, high, low, close, tick_volume (or volume)
@@ -57,13 +57,13 @@ def download_data(timeframe):
             
             # Save back
             df.to_csv(output_file, index=False)
-            print(f"✅ Processed {output_file}")
+            print(f"[OK] Processed {output_file}")
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error downloading {timeframe}: {e}")
+        print(f"[ERROR] Error downloading {timeframe}: {e}")
 
 def main():
-    print("🚀 Starting Dukascopy Data Download...")
+    print("Starting Dukascopy Data Download...")
     print(f"Pair: {PAIR}")
     print(f"Range: {START_DATE} - {END_DATE}")
     

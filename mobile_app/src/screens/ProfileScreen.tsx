@@ -18,32 +18,43 @@ import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { logoutUser } from "../services/api";
 import { API_ENDPOINTS } from "../config/api";
+import { NavigationProp } from "@react-navigation/native";
+
+interface UserData {
+  name: string;
+  email: string;
+  [key: string]: any;
+}
+
+interface ProfileScreenProps {
+  navigation: NavigationProp<any>;
+}
 
 /**
  * Profile Screen - Хэрэглэгчийн профайл
  */
-const ProfileScreen = ({ navigation }) => {
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { isDark, themeMode, setTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
 
-  const [userData, setUserData] = useState(null);
-  const [editMode, setEditMode] = useState(false);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [notifications, setNotifications] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [showPasswordModal, setShowPasswordModal] = useState(false);
-  const [oldPassword, setOldPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [currentDocument, setCurrentDocument] = useState(null);
-  const [showThemeModal, setShowThemeModal] = useState(false);
+  const [userData, setUserData] = useState<UserData | null>(null);
+  const [editMode, setEditMode] = useState<boolean>(false);
+  const [name, setName] = useState<string>("");
+  const [email, setEmail] = useState<string>("");
+  const [notifications, setNotifications] = useState<boolean>(true);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
+  const [oldPassword, setOldPassword] = useState<string>("");
+  const [newPassword, setNewPassword] = useState<string>("");
+  const [confirmPassword, setConfirmPassword] = useState<string>("");
+  const [showDocumentModal, setShowDocumentModal] = useState<boolean>(false);
+  const [currentDocument, setCurrentDocument] = useState<any>(null);
+  const [showThemeModal, setShowThemeModal] = useState<boolean>(false);
   const [stats, setStats] = useState({
     daysUsed: 0,
     signalsReceived: 0,
-    lastActive: null,
+    lastActive: null as string | null,
   });
 
   useEffect(() => {
@@ -243,26 +254,26 @@ const ProfileScreen = ({ navigation }) => {
     const documents = {
       help: {
         title: "Тусламж",
-        content: `🚀 Форекс Сигнал Апп
+        content: `Форекс Сигнал Апп
 
 Энэ апп нь Hidden Markov Model (HMM) машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах боломж олгодог.
 
-📊 Үндсэн функцүүд:
+Үндсэн функцүүд:
 • 6 валютын хос (EUR/USD, GBP/USD, USD/CAD, USD/CHF, USD/JPY, XAU/USD)
 • 5 төрлийн сигнал (STRONG BUY, BUY, NEUTRAL, SELL, STRONG SELL)
 • Real-time магадлал
 • Өдрийн тойм статистик
 
-⚠️ Анхааруулга:
+[!] Анхааруулга:
 Энэ апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш. Бүх арилжааны шийдвэр таны хувийн хариуцлага юм.
 
-📞 Холбоо барих:
+Холбоо барих:
 • Email: support@predictrix.com
 • GitHub: github.com/Asura-lab/Predictrix`,
       },
       terms: {
         title: "Үйлчилгээний нөхцөл",
-        content: `📋 ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ
+        content: `ҮЙЛЧИЛГЭЭНИЙ НӨХЦӨЛ
 
 1. ХҮЛЭЭН ЗӨВШӨӨРӨХ
 Апп-г ашиглаж эхлэхдээ та эдгээр үйлчилгээний нөхцөлтэй бүрэн танилцаж, хүлээн зөвшөөрч байна.
@@ -272,7 +283,7 @@ const ProfileScreen = ({ navigation }) => {
 • Техникийн шинжилгээний мэдээлэл өгөх
 • Валютын хосын мэдээлэл харуулах
 
-⚠️ БИД САНАЛ, ЗӨВЛӨМЖ ӨГДӨГГҮЙ
+[!] БИД САНАЛ, ЗӨВЛӨМЖ ӨГДӨГГҮЙ
 Манай апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш.
 
 3. ЭРСДЭЛИЙН АНХААРУУЛГА
@@ -287,10 +298,10 @@ const ProfileScreen = ({ navigation }) => {
 • Өөрийн хөрөнгө оруулалтын шийдвэр өөрөө гаргах
 
 5. ХОРИОТОЙ ҮЙЛДЛҮҮД
-❌ Системийг хакердах
-❌ Бусад хэрэглэгчийн данс руу нэвтрэх
-❌ Автоматжуулсан систем ашиглах
-❌ Апп-ын код хуулах
+- Системийг хакердах
+- Бусад хэрэглэгчийн данс руу нэвтрэх
+- Автоматжуулсан систем ашиглах
+- Апп-ын код хуулах
 
 6. ХАРИУЦЛАГЫН ХЯЗГААРЛАЛТ
 Бид дараах зүйлд хариуцлага хүлээхгүй:
@@ -302,17 +313,17 @@ const ProfileScreen = ({ navigation }) => {
       },
       privacy: {
         title: "Нууцлалын бодлого",
-        content: `🔒 НУУЦЛАЛЫН БОДЛОГО
+        content: `НУУЦЛАЛЫН БОДЛОГО
 
 1. ЦУГЛУУЛАХ МЭДЭЭЛЭЛ
 
-✅ Бид цуглуулдаг:
++ Бид цуглуулдаг:
 • Нэр, имэйл хаяг
 • Нууц үг (hash хэлбэрээр)
 • Төхөөрөмжийн мэдээлэл
 • Апп ашиглалтын статистик
 
-❌ Бид цуглуулдаггүй:
+- Бид цуглуулдаггүй:
 • Санхүүгийн дансны мэдээлэл
 • Кредит карт
 • Арилжааны түүх
@@ -335,7 +346,7 @@ const ProfileScreen = ({ navigation }) => {
 
 4. ХАМГААЛАЛТ
 
-🔐 Техникийн:
+Техникийн:
 • HTTPS/TLS encryption
 • bcrypt password hashing
 • JWT токен (7 хоног)
@@ -344,7 +355,7 @@ const ProfileScreen = ({ navigation }) => {
 
 5. БИД ХУВААЛЦДАГГҮЙ
 
-✅ Бид таны мэдээллийг:
++ Бид таны мэдээллийг:
 • БОРЛУУЛДАГГҮЙ
 • ЗАРДАГГҮЙ
 • МАРКЕТИНГ ХИЙДЭГГҮЙ
@@ -355,33 +366,33 @@ const ProfileScreen = ({ navigation }) => {
 • Засах эрх - Апп → Профайл → "Мэдээлэл засах"
 • Устгах эрх - Апп → Профайл → "Бүртгэл устгах"
 
-⚠️ Устгасны дараа сэргээх боломжгүй!
+[!] Устгасны дараа сэргээх боломжгүй!
 
 7. ХОЛБОО БАРИХ
 
-📧 privacy@predictrix.com
-📧 support@predictrix.com
+Email: privacy@predictrix.com
+Email: support@predictrix.com
 
 Дэлгэрэнгүй: docs/PRIVACY_POLICY.md`,
       },
       about: {
         title: "Апп-ын тухай",
-        content: `ℹ️ ФОРЕКС СИГНАЛ АПП
+        content: `ФОРЕКС СИГНАЛ АПП
 
 Хувилбар: 1.1.1
 Шинэчилсэн: 2025.10.18
 
-🎯 Зорилго:
+Зорилго:
 Hidden Markov Model (HMM) машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах, хэрэглэгчдэд техникийн шинжилгээний мэдээлэл өгөх.
 
-🛠️ Технологи:
+Технологи:
 • Frontend: React Native + Expo
 • Backend: Python Flask
 • Database: MongoDB Atlas
 • ML Model: Hidden Markov Model
 • Security: JWT + bcrypt
 
-📊 Дэмждэг валютууд:
+Дэмждэг валютууд:
 • EUR/USD (Евро/Ам.доллар)
 • GBP/USD (Фунт/Ам.доллар)
 • USD/CAD (Ам.доллар/Канад доллар)
@@ -389,13 +400,13 @@ Hidden Markov Model (HMM) машин сургалт ашиглан форекс 
 • USD/JPY (Ам.доллар/Иен)
 • XAU/USD (Алт/Ам.доллар)
 
-🎓 Судалгааны ажил:
+Судалгааны ажил:
 Энэ апп нь судалгааны зориулалтаар хөгжүүлэгдсэн бөгөөд боловсролын зорилготой.
 
-⚠️ Санамж:
+[!] Санамж:
 Энэ нь санхүүгийн зөвлөгөө биш. Форекс арилжаа маш өндөр эрсдэлтэй бөгөөд таны бүх хөрөнгийг алдах магадлалтай.
 
-👨‍💻 Хөгжүүлэгч:
+Хөгжүүлэгч:
 GitHub: github.com/Asura-lab/Predictrix
 
 📄 Лиценз:

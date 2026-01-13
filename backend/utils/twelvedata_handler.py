@@ -40,7 +40,7 @@ class TwelveDataHandler:
         # Store previous close for calculating change
         self.previous_closes = {}
         
-        print("✅ TwelveDataHandler initialized (NON-BLOCKING)")
+        print("[OK] TwelveDataHandler initialized (NON-BLOCKING)")
         print(f"   Symbol: {self.symbol}")
         print(f"   Rate Limit: 1 request per {self.min_request_interval}s")
         print(f"   Cache TTL: {self.cache_ttl}s (live), {self.historical_cache_ttl}s (historical)")
@@ -152,11 +152,11 @@ class TwelveDataHandler:
             # Cache result
             self.cache[cache_key] = (result.copy(), time.time())
             
-            print(f"✅ Generated {len(rates)} pair rates")
+            print(f"[OK] Generated {len(rates)} pair rates")
             return result
             
         except Exception as e:
-            print(f"❌ Error generating rates: {e}")
+            print(f"[ERROR] Error generating rates: {e}")
             
             if cache_key in self.cache:
                 cached_data, _ = self.cache[cache_key]
@@ -207,14 +207,14 @@ class TwelveDataHandler:
             if not can_request:
                 # Rate limited - return cached data if available, or rate limit info
                 if cached_data:
-                    print(f"⏳ Rate limited ({wait_seconds:.0f}s), returning cached data")
+                    print(f"⏳ TwelveData Rate limited ({wait_seconds:.0f}s), returning cached data")
                     cached_data['cached'] = True
                     cached_data['cache_age'] = round(cache_age, 1)
                     cached_data['next_update_in'] = round(wait_seconds, 1)
                     cached_data['rate_limited'] = True
                     return cached_data
                 else:
-                    print(f"⏳ Rate limited ({wait_seconds:.0f}s), no cached data")
+                    print(f"⏳ TwelveData Rate limited ({wait_seconds:.0f}s), no cached data")
                     return {
                         'success': False,
                         'error': 'rate_limited',
@@ -261,11 +261,11 @@ class TwelveDataHandler:
                 # Cache result
                 self.cache[cache_key] = (result.copy(), time.time())
                 
-                print(f"✅ EUR/USD: {result['rate']:.5f} (fresh)")
+                print(f"[OK] EUR/USD: {result['rate']:.5f} (fresh)")
                 return result
             else:
                 error_msg = data.get('message', 'Unknown error')
-                print(f"❌ Twelve Data error: {error_msg}")
+                print(f"[ERROR] Twelve Data error: {error_msg}")
                 
                 # If API error, return cached data if available
                 if cached_data:
@@ -279,7 +279,7 @@ class TwelveDataHandler:
                 }
                 
         except Exception as e:
-            print(f"❌ Twelve Data API error: {e}")
+            print(f"[ERROR] Twelve Data API error: {e}")
             
             # Return cached data if available
             if cache_key in self.cache:
@@ -293,20 +293,22 @@ class TwelveDataHandler:
                 'error': str(e)
             }
     
-    def get_historical_data(self, interval: str = "1min", outputsize: int = 500) -> pd.DataFrame:
+    def get_historical_data(self, interval: str = "1min", outputsize: int = 500, symbol: str = None) -> pd.DataFrame:
         """
         Түүхэн OHLCV өгөгдөл авах (NON-BLOCKING)
         
         Args:
             interval: "1min", "5min", "15min", "30min", "1h", "4h", "1day"
             outputsize: Хэдэн bar авах (max 5000)
+            symbol: Валютын хослол (default: EUR/USD)
         
         Returns:
             pd.DataFrame: OHLCV data with columns [time, open, high, low, close, volume]
         """
         try:
+            target_symbol = symbol or self.symbol
             # Check cache first (with longer TTL for historical data)
-            cache_key = f'historical_{interval}_{outputsize}'
+            cache_key = f'historical_{target_symbol}_{interval}_{outputsize}'
             now = time.time()
             
             cached_df = None
@@ -337,7 +339,7 @@ class TwelveDataHandler:
             
             url = f"{self.base_url}/time_series"
             params = {
-                'symbol': self.symbol,
+                'symbol': target_symbol,
                 'interval': interval,
                 'outputsize': min(outputsize, 5000),
                 'apikey': self.api_key
@@ -371,7 +373,7 @@ class TwelveDataHandler:
                 # Sort by time ascending (oldest first)
                 df = df.sort_values('time').reset_index(drop=True)
                 
-                print(f"✅ Got {len(df)} bars (fresh)")
+                print(f"[OK] Got {len(df)} bars (fresh)")
                 print(f"   From: {df['time'].iloc[0]}")
                 print(f"   To: {df['time'].iloc[-1]}")
                 
@@ -381,7 +383,7 @@ class TwelveDataHandler:
                 return df
             else:
                 error_msg = data.get('message', 'No data returned')
-                print(f"❌ Twelve Data error: {error_msg}")
+                print(f"[ERROR] Twelve Data error: {error_msg}")
                 
                 # Return cached if available
                 if cached_df is not None and not cached_df.empty:
@@ -390,7 +392,7 @@ class TwelveDataHandler:
                 return pd.DataFrame()
                 
         except Exception as e:
-            print(f"❌ Twelve Data historical error: {e}")
+            print(f"[ERROR] Twelve Data historical error: {e}")
             import traceback
             traceback.print_exc()
             
@@ -457,15 +459,14 @@ def get_twelvedata_historical(count: int = 500) -> list:
     return twelvedata_handler.get_historical_bars(count)
 
 
-def get_twelvedata_dataframe(symbol: str = "EUR/USD", interval: str = "1min", outputsize: int = 500) -> pd.DataFrame:
+def get_twelvedata_dataframe(interval: str = "1min", outputsize: int = 500, symbol: str = "EUR/USD", count: int = None) -> pd.DataFrame:
     """
     DataFrame хэлбэрээр түүхэн өгөгдөл авах
     """
-    # Update symbol if provided
-    if symbol and symbol != twelvedata_handler.symbol:
-        twelvedata_handler.symbol = symbol
-        
-    return twelvedata_handler.get_historical_data(interval, outputsize)
+    # Support 'count' as alias for outputsize for compatibility
+    size = count if count is not None else outputsize
+    
+    return twelvedata_handler.get_historical_data(interval=interval, outputsize=size, symbol=symbol)
 
 
 # Test
@@ -477,25 +478,25 @@ if __name__ == "__main__":
     handler = TwelveDataHandler()
     
     # Test live rate
-    print("\n1️⃣ Testing live rate...")
+    print("\n[1] Testing live rate...")
     result = handler.get_live_rate()
     if result['success']:
-        print(f"✅ EUR/USD: {result['rate']:.5f}")
+        print(f"[OK] EUR/USD: {result['rate']:.5f}")
         print(f"   Bid: {result['bid']:.5f}")
         print(f"   Ask: {result['ask']:.5f}")
     else:
-        print(f"❌ Error: {result.get('error')}")
+        print(f"[ERROR] Error: {result.get('error')}")
     
     # Test historical data
-    print("\n2️⃣ Testing historical data (300 bars)...")
+    print("\n[2] Testing historical data (300 bars)...")
     df = handler.get_historical_data(interval="1min", outputsize=300)
     if not df.empty:
-        print(f"✅ Got {len(df)} bars")
+        print(f"[OK] Got {len(df)} bars")
         print(f"   Columns: {list(df.columns)}")
         print(f"   Latest close: {df['close'].iloc[-1]:.5f}")
     else:
-        print("❌ No data returned")
+        print("[ERROR] No data returned")
     
     print("\n" + "=" * 60)
-    print("✅ Test complete!")
+    print("[OK] Test complete!")
     print("=" * 60)

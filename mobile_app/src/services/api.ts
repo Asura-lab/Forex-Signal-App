@@ -1,8 +1,23 @@
-import axios from "axios";
+import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
 
-const apiClient = axios.create({
+export interface UserData {
+  id: string;
+  name: string;
+  email: string;
+  is_verified?: boolean;
+}
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  token?: string;
+  user?: UserData;
+}
+
+const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000, // 30 секунд
   headers: {
@@ -12,14 +27,14 @@ const apiClient = axios.create({
 
 // Request interceptor - Token автоматаар нэмэх
 apiClient.interceptors.request.use(
-  async (config) => {
+  async (config: InternalAxiosRequestConfig) => {
     const token = await AsyncStorage.getItem("userToken");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
+  (error: any) => {
     return Promise.reject(error);
   }
 );
@@ -29,7 +44,7 @@ apiClient.interceptors.request.use(
 /**
  * Бүртгүүлэх (Имэйл баталгаажуулалттай)
  */
-export const registerUser = async (name, email, password) => {
+export const registerUser = async (name: string, email: string, password: string): Promise<ApiResponse> => {
   try {
     const response = await apiClient.post("/auth/register", {
       name,
@@ -37,7 +52,7 @@ export const registerUser = async (name, email, password) => {
       password,
     });
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -48,7 +63,7 @@ export const registerUser = async (name, email, password) => {
 /**
  * Имэйл баталгаажуулах
  */
-export const verifyEmail = async (email, code) => {
+export const verifyEmail = async (email: string, code: string): Promise<ApiResponse> => {
   try {
     const response = await apiClient.post("/auth/verify-email", {
       email,
@@ -65,7 +80,7 @@ export const verifyEmail = async (email, code) => {
     }
 
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -76,13 +91,13 @@ export const verifyEmail = async (email, code) => {
 /**
  * Баталгаажуулалтын код дахин илгээх
  */
-export const resendVerificationCode = async (email) => {
+export const resendVerificationCode = async (email: string): Promise<ApiResponse> => {
   try {
     const response = await apiClient.post("/auth/resend-verification", {
       email,
     });
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -93,7 +108,7 @@ export const resendVerificationCode = async (email) => {
 /**
  * Нэвтрэх
  */
-export const loginUser = async (email, password) => {
+export const loginUser = async (email: string, password: string): Promise<ApiResponse> => {
   try {
     const response = await apiClient.post("/auth/login", {
       email,
@@ -224,15 +239,16 @@ export const getLiveRates = async () => {
 /**
  * Get Best Signal (Currently V10)
  * @param {number} minConfidence - Minimum confidence threshold (default: 80)
+ * @param {string} pair - Currency pair (default: "EUR/USD")
  * @returns Signal object with entry, SL, TP, confidence
  */
-export const getBestSignal = async (minConfidence = 80) => {
+export const getBestSignal = async (minConfidence: number = 80, pair: string = "EUR/USD") => {
   try {
     const response = await apiClient.get(
-      `/signal/best?min_confidence=${minConfidence}`
+      `/signal/best?min_confidence=${minConfidence}&pair=${pair}`
     );
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signal авах алдаа:", error.message);
     return {
       success: false,
@@ -244,15 +260,16 @@ export const getBestSignal = async (minConfidence = 80) => {
 /**
  * V2 Signal Generator - BUY-only mode with 80%+ accuracy
  * @param {number} minConfidence - Minimum confidence threshold (default: 80)
+ * @param {string} pair - Currency pair (default: "EUR/USD")
  * @returns Signal object with entry, SL, TP, confidence
  */
-export const getSignalV2 = async (minConfidence = 80) => {
+export const getSignalV2 = async (minConfidence: number = 80, pair: string = "EUR/USD") => {
   try {
     const response = await apiClient.get(
-      `/signal/v2?min_confidence=${minConfidence}`
+      `/signal/v2?min_confidence=${minConfidence}&pair=${pair}`
     );
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signal V2 авах алдаа:", error.message);
     return {
       success: false,
