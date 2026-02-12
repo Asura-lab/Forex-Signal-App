@@ -46,6 +46,13 @@ models/**/*.h5
 data/train/*.csv
 data/test/*.csv
 *.csv
+*.csv.gz
+*.pkl
+*.parquet
+model & backtest result/data/**/*.csv
+model & backtest result/data/**/*.csv.gz
+model & backtest result/data/**/*.pkl
+model & backtest result/data/**/*.parquet
 
 # IDE
 .vscode/

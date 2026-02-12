@@ -26,6 +26,7 @@ flask-cors>=4.0.0
 flask-mail>=0.9.1
 
 # === БУСАД ===
+MetaTrader5>=5.0.0
 jupyter>=1.0.0
 ipykernel>=6.25.0
 

@@ -6,7 +6,7 @@
 import { Platform } from "react-native";
 
 // WiFi IP хаяг - утас болон компьютер ижил WiFi-д байх ёстой
-const WIFI_IP = "192.168.1.138";
+const WIFI_IP = "192.168.20.115";
 
 // Автоматаар тогтоох
 const getApiUrl = () => {
