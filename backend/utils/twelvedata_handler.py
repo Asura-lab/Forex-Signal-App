@@ -469,6 +469,84 @@ def get_twelvedata_dataframe(interval: str = "1min", outputsize: int = 500, symb
     return twelvedata_handler.get_historical_data(interval=interval, outputsize=size, symbol=symbol)
 
 
+def get_twelvedata_multitf(symbol: str = "EUR/USD", base_bars: int = 5000) -> dict:
+    """
+    Multi-timeframe дата авах (GBDT моделд зориулсан).
+    
+    Стратеги:
+    1. 1min дата татаж бусад timeframe руу resample хийнэ (нэг API call)
+    2. Хэрвээ дээд TF-д хангалттай бар байхгүй бол тус бүрийг тусад нь татна (cache-тэй)
+    
+    Args:
+        symbol: Валютын хослол
+        base_bars: 1min бар-ын тоо (5000 ≈ 3.5 trading days)
+    
+    Returns:
+        dict: {"1min": df, "5min": df, "15min": df, "30min": df, "1H": df, "4H": df}
+               Бүх df нь [time, open, high, low, close, volume] columns-тай
+    """
+    # Get 1min data first (primary - always available)
+    df_1min = twelvedata_handler.get_historical_data(
+        interval="1min", outputsize=base_bars, symbol=symbol
+    )
+    
+    if df_1min is None or df_1min.empty or len(df_1min) < 100:
+        print(f"[MULTITF] Not enough 1min data: {len(df_1min) if df_1min is not None else 0}")
+        return None
+    
+    print(f"[MULTITF] Got {len(df_1min)} bars of 1min data")
+    
+    # Resample to higher timeframes
+    resample_map = {
+        "5min": "5min",
+        "15min": "15min",
+        "30min": "30min",
+        "1H": "1h",
+        "4H": "4h",
+    }
+    
+    # Required minimum bars for good feature computation (rolling(50) + buffer)
+    MIN_BARS_NEEDED = 55
+    
+    result = {"1min": df_1min}
+    df_indexed = df_1min.copy().set_index("time")
+    
+    for tf_name, resample_freq in resample_map.items():
+        try:
+            # First try resampling from 1min
+            resampled = df_indexed.resample(resample_freq).agg({
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume": "sum"
+            }).dropna().reset_index()
+            
+            if len(resampled) >= MIN_BARS_NEEDED:
+                result[tf_name] = resampled
+                print(f"[MULTITF] {tf_name}: {len(resampled)} bars (resampled)")
+            else:
+                # Not enough bars from resampling, try fetching separately from API
+                # This uses cache, so won't hit rate limit if already cached
+                api_interval = resample_freq.replace('min', 'min').replace('h', 'h')
+                df_tf = twelvedata_handler.get_historical_data(
+                    interval=api_interval, outputsize=200, symbol=symbol
+                )
+                
+                if df_tf is not None and not df_tf.empty and len(df_tf) > len(resampled):
+                    result[tf_name] = df_tf
+                    print(f"[MULTITF] {tf_name}: {len(df_tf)} bars (API fetch)")
+                else:
+                    # Use what we have from resampling
+                    result[tf_name] = resampled
+                    print(f"[MULTITF] {tf_name}: {len(resampled)} bars (resampled, limited)")
+                    
+        except Exception as e:
+            print(f"[MULTITF] Error with {tf_name}: {e}")
+    
+    return result
+
+
 # Test
 if __name__ == "__main__":
     print("=" * 60)

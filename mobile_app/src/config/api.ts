@@ -6,7 +6,7 @@
 import { Platform } from "react-native";
 
 // WiFi IP хаяг - утас болон компьютер ижил WiFi-д байх ёстой
-const WIFI_IP = "192.168.20.115";
+const WIFI_IP = "192.168.1.138";  // Updated to match current computer IP
 
 // Автоматаар тогтоох
 const getApiUrl = () => {
@@ -32,6 +32,12 @@ export const API_ENDPOINTS = {
   ME: `${API_BASE_URL}/auth/me`,
   UPDATE: `${API_BASE_URL}/auth/update`,
   CHANGE_PASSWORD: `${API_BASE_URL}/auth/change-password`,
+
+  // Notifications
+  NOTIFICATION_REGISTER: `${API_BASE_URL}/notifications/register`,
+  NOTIFICATION_UNREGISTER: `${API_BASE_URL}/notifications/unregister`,
+  NOTIFICATION_PREFERENCES: `${API_BASE_URL}/notifications/preferences`,
+  NOTIFICATION_TEST: `${API_BASE_URL}/notifications/test`,
 
   // Health check
   HEALTH: `${API_BASE_URL}/health`,

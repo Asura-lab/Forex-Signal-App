@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   StatusBar,
   ActivityIndicator,
   View,
 } from "react-native";
-import { NavigationContainer } from "@react-navigation/native";
+import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -16,6 +16,10 @@ import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import SignalScreen from "./src/screens/SignalScreen";
+import {
+  initializePushNotifications,
+  setupNotificationListeners,
+} from "./src/services/notificationService";
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -25,11 +29,48 @@ function AppContent() {
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const { isDark } = useTheme();
   const colors = getColors(isDark);
-
+  const navigationRef = useRef<NavigationContainerRef<any>>(null);
 
   useEffect(() => {
     checkAuthStatus();
   }, []);
+
+  // Initialize push notifications after auth check
+  useEffect(() => {
+    if (!isLoading && userLoggedIn) {
+      initializePushNotifications().then((token) => {
+        if (token) {
+          console.log("[OK] Push notifications initialized");
+        }
+      });
+
+      // Set up notification listeners
+      const cleanup = setupNotificationListeners(
+        // Foreground notification received
+        (notification) => {
+          console.log("[NOTIFICATION]", notification.request.content.title);
+        },
+        // User tapped a notification
+        (response) => {
+          const data = response.notification.request.content.data;
+          // Navigate to appropriate screen based on notification type
+          if (data?.screen && navigationRef.current) {
+            try {
+              if (data.screen === "Signal") {
+                navigationRef.current.navigate("Signal");
+              } else if (data.screen === "News") {
+                navigationRef.current.navigate("Main", { screen: "News" });
+              }
+            } catch (e) {
+              console.log("[WARN] Navigation from notification failed:", e);
+            }
+          }
+        }
+      );
+
+      return cleanup;
+    }
+  }, [isLoading, userLoggedIn]);
 
   const checkAuthStatus = async () => {
     try {
@@ -63,7 +104,7 @@ function AppContent() {
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={colors.primary}
       />
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={userLoggedIn ? "Main" : "Login"}
           screenOptions={{

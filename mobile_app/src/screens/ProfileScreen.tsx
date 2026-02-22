@@ -19,6 +19,12 @@ import { getColors } from "../config/theme";
 import { logoutUser } from "../services/api";
 import { API_ENDPOINTS } from "../config/api";
 import { NavigationProp } from "@react-navigation/native";
+import {
+  getNotificationPreferences,
+  updateNotificationPreferences,
+  initializePushNotifications,
+  unregisterPushTokenFromServer,
+} from "../services/notificationService";
 
 interface UserData {
   name: string;
@@ -43,6 +49,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
   const [notifications, setNotifications] = useState<boolean>(true);
+  const [signalNotifications, setSignalNotifications] = useState<boolean>(true);
+  const [newsNotifications, setNewsNotifications] = useState<boolean>(true);
   const [loading, setLoading] = useState<boolean>(false);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [oldPassword, setOldPassword] = useState<string>("");
@@ -79,12 +87,21 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const loadSettings = async () => {
     try {
+      // Load local notification master toggle
       const savedNotifications = await AsyncStorage.getItem(
         "@notification_settings"
       );
 
       if (savedNotifications !== null) {
         setNotifications(JSON.parse(savedNotifications));
+      }
+
+      // Load server-side notification preferences
+      const prefs = await getNotificationPreferences();
+      setSignalNotifications(prefs.signal_notifications ?? true);
+      setNewsNotifications(prefs.news_notifications ?? true);
+      if (prefs.notifications_enabled !== undefined) {
+        setNotifications(prefs.notifications_enabled);
       }
     } catch (error) {
       console.error("Load settings error:", error);
@@ -211,15 +228,42 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
-  const handleNotificationToggle = async (value) => {
+  const handleNotificationToggle = async (value: boolean) => {
     setNotifications(value);
     try {
       await AsyncStorage.setItem(
         "@notification_settings",
         JSON.stringify(value)
       );
+      // Sync with backend
+      await updateNotificationPreferences({ notifications_enabled: value });
+      if (value) {
+        // Re-register push token when enabling
+        await initializePushNotifications();
+      } else {
+        // Unregister when disabling
+        await unregisterPushTokenFromServer();
+      }
     } catch (error) {
       console.error("Save notification settings error:", error);
+    }
+  };
+
+  const handleSignalNotificationToggle = async (value: boolean) => {
+    setSignalNotifications(value);
+    try {
+      await updateNotificationPreferences({ signal_notifications: value });
+    } catch (error) {
+      console.error("Save signal notification settings error:", error);
+    }
+  };
+
+  const handleNewsNotificationToggle = async (value: boolean) => {
+    setNewsNotifications(value);
+    try {
+      await updateNotificationPreferences({ news_notifications: value });
+    } catch (error) {
+      console.error("Save news notification settings error:", error);
     }
   };
 
@@ -566,7 +610,7 @@ GitHub: github.com/Asura-lab/Predictrix
               <View style={styles.infoContent}>
                 <Text style={styles.infoLabel}>NOTIFICATIONS</Text>
                 <Text style={styles.infoDescription}>
-                  Get signal alerts
+                  Enable push notifications
                 </Text>
               </View>
               <Switch
@@ -576,6 +620,44 @@ GitHub: github.com/Asura-lab/Predictrix
                 thumbColor={notifications ? "#FFFFFF" : "#6B7280"}
               />
             </View>
+
+            {notifications && (
+              <>
+                <View style={styles.divider} />
+
+                <View style={styles.infoRow}>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>SIGNAL ALERTS</Text>
+                    <Text style={styles.infoDescription}>
+                      High-confidence trading signals
+                    </Text>
+                  </View>
+                  <Switch
+                    value={signalNotifications}
+                    onValueChange={handleSignalNotificationToggle}
+                    trackColor={{ false: "#1E293B", true: "#FFD700" }}
+                    thumbColor={signalNotifications ? "#FFFFFF" : "#6B7280"}
+                  />
+                </View>
+
+                <View style={styles.divider} />
+
+                <View style={styles.infoRow}>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>NEWS ALERTS</Text>
+                    <Text style={styles.infoDescription}>
+                      Major economic news events
+                    </Text>
+                  </View>
+                  <Switch
+                    value={newsNotifications}
+                    onValueChange={handleNewsNotificationToggle}
+                    trackColor={{ false: "#1E293B", true: "#FF5252" }}
+                    thumbColor={newsNotifications ? "#FFFFFF" : "#6B7280"}
+                  />
+                </View>
+              </>
+            )}
 
             <View style={styles.divider} />
 

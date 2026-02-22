@@ -39,6 +39,19 @@ apiClient.interceptors.request.use(
   }
 );
 
+// Response interceptor - 401 token expiry автоматаар зохицуулах
+apiClient.interceptors.response.use(
+  (response) => response,
+  async (error: any) => {
+    if (error?.response?.status === 401) {
+      // Token expired or invalid — clear it so the user can re-authenticate
+      await AsyncStorage.removeItem("userToken");
+      console.warn("[WARN] apiClient: 401 received, cleared stored token.");
+    }
+    return Promise.reject(error);
+  }
+);
+
 // ==================== AUTH ENDPOINTS ====================
 
 /**

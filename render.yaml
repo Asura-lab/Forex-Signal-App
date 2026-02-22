@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: forex-signal-backend
+    env: python
+    region: singapore  # Монголд хамгийн ойр
+    plan: free
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: MONGO_URI
+        sync: false          # Render dashboard-аас оруулна
+      - key: SECRET_KEY
+        sync: false
+      - key: MAIL_SERVER
+        value: smtp.gmail.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USE_TLS
+        value: "True"
+      - key: MAIL_USE_SSL
+        value: "False"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        sync: false
+      - key: GEMINI_API_KEY_1
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
+      - key: GEMINI_API_KEY_3
+        sync: false
+      - key: GEMINI_API_KEY_4
+        sync: false
+      - key: GEMINI_API_KEY_5
+        sync: false
+      - key: API_HOST
+        value: "0.0.0.0"
+      - key: DEBUG
+        value: "False"

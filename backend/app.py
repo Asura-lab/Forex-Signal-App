@@ -37,14 +37,18 @@ from utils.twelvedata_handler import (
     get_twelvedata_live_rate, 
     get_twelvedata_historical, 
     get_twelvedata_dataframe,
+    get_twelvedata_multitf,
     get_all_forex_rates
 )
 
 # Import Market Analyst (News & AI)
 from utils.market_analyst import market_analyst
 
-# Import V10 Signal Generator (Best performing model)
-from ml.signal_generator_v10 import get_signal_generator_v10
+# Import GBDT Signal Generator (trained multi-timeframe model)
+from ml.signal_generator_gbdt import get_signal_generator_gbdt
+
+# Import Push Notification Service
+from utils.push_notifications import push_service
 
 app = Flask(__name__)
 CORS(app)
@@ -74,20 +78,26 @@ except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
     exit(1)
 
-# ==================== V10 SIGNAL GENERATOR ====================
+# ==================== SIGNAL GENERATORS ====================
 
-signal_generator = None
+signal_generator = None  # GBDT trained model
 
 def load_signal_generator():
     global signal_generator
+    
     try:
-        signal_generator = get_signal_generator_v10()
+        signal_generator = get_signal_generator_gbdt()
         if signal_generator.is_loaded:
-            print("✓ V10 Signal Generator ачаалагдлаа (7-Model Ensemble)")
+            print("✓ GBDT Signal Generator ачаалагдлаа (Trained Multi-TF Ensemble)")
             return True
+        else:
+            print("⚠ GBDT model file олдсонгүй")
+            signal_generator = None
+            return False
     except Exception as e:
-        print(f"✗ V10 Signal Generator алдаа: {e}")
-    return False
+        print(f"⚠ GBDT Signal Generator алдаа: {e}")
+        signal_generator = None
+        return False
 
 # Load on startup
 load_signal_generator()
@@ -134,7 +144,14 @@ class NewsCache:
             outlook = market_analyst.get_market_outlook()
             latest = market_analyst.get_latest_news()
 
+            # Detect high-impact upcoming news and send push notifications
+            try:
+                self._check_and_notify_news(upcoming)
+            except Exception as notif_err:
+                print(f"[WARN] News notification error: {notif_err}")
+
             with self.lock:
+                old_upcoming = self.cache.get('upcoming')
                 self.cache['history'] = history
                 self.cache['upcoming'] = upcoming
                 self.cache['outlook'] = outlook
@@ -143,6 +160,38 @@ class NewsCache:
             print("[OK] News cache updated successfully")
         except Exception as e:
             print(f"[ERROR] News cache update failed: {e}")
+
+    def _check_and_notify_news(self, upcoming):
+        """Томоохон мэдээ илэрвэл push notification илгээх"""
+        if not upcoming:
+            return
+        
+        # upcoming нь dict эсвэл list байж болно
+        events = []
+        if isinstance(upcoming, dict):
+            events = upcoming.get('events', upcoming.get('data', []))
+        elif isinstance(upcoming, list):
+            events = upcoming
+        
+        if not events or not isinstance(events, list):
+            return
+        
+        for event in events:
+            if not isinstance(event, dict):
+                continue
+            impact = str(event.get('impact', '')).lower()
+            # Only notify for high impact events
+            if impact in ('high', 'red', '3', 'critical'):
+                threading.Thread(
+                    target=push_service.send_news_notification,
+                    args=({
+                        'title': event.get('title', event.get('event', 'High Impact News')),
+                        'impact': 'high',
+                        'currency': event.get('currency', event.get('country', 'USD')),
+                        'description': event.get('forecast', event.get('description', '')),
+                    },),
+                    daemon=True
+                ).start()
 
     def get(self, key):
         """Get data from cache"""
@@ -430,6 +479,115 @@ def reset_password():
     
     return jsonify({'success': True, 'message': 'Нууц үг амжилттай солигдлоо'})
 
+# ==================== PUSH NOTIFICATION ENDPOINTS ====================
+
+@app.route('/notifications/register', methods=['POST'])
+def register_push_token():
+    """Push notification token бүртгэх"""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+    
+    data = request.json or {}
+    push_token = data.get('push_token', '').strip()
+    platform = data.get('platform', 'unknown')
+    
+    if not push_token:
+        return jsonify({'error': 'Push token шаардлагатай'}), 400
+    
+    success = push_service.register_token(payload['user_id'], push_token, platform)
+    
+    if success:
+        return jsonify({'success': True, 'message': 'Push token бүртгэгдлээ'})
+    return jsonify({'error': 'Push token бүртгэж чадсангүй'}), 500
+
+@app.route('/notifications/unregister', methods=['POST'])
+def unregister_push_token():
+    """Push notification token устгах"""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+    
+    push_service.unregister_token(payload['user_id'])
+    return jsonify({'success': True, 'message': 'Push token устгагдлаа'})
+
+@app.route('/notifications/preferences', methods=['GET'])
+def get_notification_preferences():
+    """Мэдэгдлийн тохиргоо авах"""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+    
+    prefs = push_service.get_preferences(payload['user_id'])
+    return jsonify({'success': True, 'preferences': prefs})
+
+@app.route('/notifications/preferences', methods=['PUT'])
+def update_notification_preferences():
+    """Мэдэгдлийн тохиргоо шинэчлэх"""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+    
+    data = request.json or {}
+    success = push_service.update_preferences(payload['user_id'], data)
+    
+    if success:
+        return jsonify({'success': True, 'message': 'Тохиргоо хадгалагдлаа'})
+    return jsonify({'error': 'Тохиргоо хадгалж чадсангүй'}), 500
+
+@app.route('/notifications/test', methods=['POST'])
+def test_push_notification():
+    """Тест мэдэгдэл илгээх (debug зорилгоор)"""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+    
+    # Send a test notification to this user only
+    doc = push_service.push_tokens.find_one({"user_id": payload['user_id']})
+    if not doc or not doc.get('push_token'):
+        return jsonify({'error': 'Push token бүртгэгдээгүй'}), 404
+    
+    from utils.push_notifications import EXPO_PUSH_URL
+    import requests as req
+    result = req.post(
+        EXPO_PUSH_URL,
+        json=[{
+            "to": doc['push_token'],
+            "title": "🔔 Predictrix Test",
+            "body": "Push notification амжилттай ажиллаж байна!",
+            "sound": "default",
+            "data": {"type": "test"}
+        }],
+        headers={"Content-Type": "application/json"},
+        timeout=10
+    )
+    
+    return jsonify({
+        'success': True,
+        'message': 'Тест мэдэгдэл илгээгдлээ',
+        'expo_response': result.json() if result.status_code == 200 else result.text
+    })
+
 # ==================== LIVE RATES (Twelve Data) ====================
 
 @app.route('/rates/live', methods=['GET'])
@@ -489,25 +647,27 @@ def get_specific_rate():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ==================== V2 SIGNAL GENERATOR ====================
+# ==================== SIGNAL GENERATOR ENDPOINTS ====================
 
 @app.route('/signal/best', methods=['GET'])
 def get_signal_best():
     """
-    Best Signal Generator (Currently V10)
-    - 7-Model Ensemble with Agreement Bonus
-    - Returns the best available signal
+    Best Signal Generator
+    - Uses GBDT trained model (multi-timeframe) if available
+    - Falls back to V10 (7-Model Ensemble)
     """
     return get_signal_v2()
 
 @app.route('/signal/v2', methods=['GET'])
 def get_signal_v2():
     """
-    V10 Signal Generator - 7-Model Ensemble with Agreement Bonus
+    Signal Generator Endpoint
+    - GBDT: Multi-timeframe ensemble (primary, if model file exists)
+    - V10: 7-Model Ensemble (fallback)
     NON-BLOCKING: Returns cached data if rate limited
     
     Query params:
-        min_confidence: Minimum confidence threshold (default: 85 for V10)
+        min_confidence: Minimum confidence threshold (default depends on model)
         pair: Currency pair (default: EUR/USD)
     """
     try:
@@ -517,55 +677,142 @@ def get_signal_v2():
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
         
-        min_confidence = float(request.args.get('min_confidence', 85))
+        # Determine which model is active
+        is_gbdt = hasattr(signal_generator, 'CLASS_MAP')  # GBDT has CLASS_MAP attribute
+        
+        # Default confidence threshold differs by model
+        default_conf = 60 if is_gbdt else 85
+        min_confidence = float(request.args.get('min_confidence', default_conf))
         pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
         
-        # Get historical data from Twelve Data API (NON-BLOCKING)
-        df = get_twelvedata_dataframe(interval="1min", outputsize=500, symbol=pair)
-        
-        if df is None or len(df) < 200:
-            # Rate limited and no cached data
+        if is_gbdt:
+            # GBDT model: fetch multi-timeframe data (resample from 1min)
+            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+            
+            if multi_tf is None or "1min" not in multi_tf:
+                return jsonify({
+                    'success': False,
+                    'error': 'rate_limited',
+                    'message': f'Rate limited or no data for {pair}.',
+                    'data_count': 0,
+                    'required': 100
+                }), 429
+            
+            df = multi_tf["1min"]
+            
+            if len(df) < 100:
+                return jsonify({
+                    'success': False,
+                    'error': 'rate_limited',
+                    'message': f'Not enough data: {len(df)} bars (need 100+)',
+                    'data_count': len(df),
+                    'required': 100
+                }), 429
+            
+            # Data timestamps
+            data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
+            data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
+            
+            # Market closed check
+            from datetime import datetime
+            now = datetime.now()
+            day = now.weekday()
+            hour = now.hour
+            is_weekend = day >= 5
+            is_monday_early = day == 0 and hour < 8
+            market_closed = is_weekend or is_monday_early
+            
+            # Generate signal with multi-TF data
+            # GBDT confidence is 0-1 scale, convert from percentage input
+            conf_threshold = min_confidence / 100.0 if min_confidence > 1 else min_confidence
+            signal = signal_generator.generate_signal(
+                df_1min=df,
+                multi_tf_data=multi_tf,
+                min_confidence=conf_threshold,
+                symbol=pair.replace('/', '')
+            )
+            
+            # Push notification for high-confidence signals (BUY/SELL only)
+            try:
+                sig_type = signal.get('signal_type', 'HOLD').upper()
+                sig_conf = signal.get('confidence', 0)
+                # Notify if confidence >= 70% and not HOLD
+                if sig_type in ('BUY', 'SELL') and sig_conf >= 0.70:
+                    threading.Thread(
+                        target=push_service.send_signal_notification,
+                        args=({
+                            'signal_type': sig_type,
+                            'pair': pair,
+                            'confidence': sig_conf,
+                            'entry_price': signal.get('entry_price'),
+                            'sl': signal.get('sl'),
+                            'tp': signal.get('tp'),
+                        },),
+                        daemon=True
+                    ).start()
+            except Exception as notif_err:
+                print(f"[WARN] Signal notification error: {notif_err}")
+            
+            # Data info with multi-TF details
+            tf_info = {tf: len(tf_df) for tf, tf_df in multi_tf.items()}
+            
             return jsonify({
-                'success': False,
-                'error': 'rate_limited',
-                'message': f'Rate limited or no data for {pair}.',
-                'data_count': len(df) if df is not None else 0,
-                'required': 200
-            }), 429
+                'success': True,
+                'pair': pair.replace('/', '_'),
+                'data_info': {
+                    'from': data_from,
+                    'to': data_to,
+                    'bars': len(df),
+                    'timeframes': tf_info,
+                    'market_closed': market_closed,
+                    'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
+                },
+                **signal
+            })
         
-        # Check data timestamps
-
-        data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
-        data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
-        
-        # Check if market is closed (Saturday & Sunday, Monday before 8am local)
-        from datetime import datetime
-        now = datetime.now()  # Local time
-        day = now.weekday()  # 0=Monday, 5=Saturday, 6=Sunday
-        hour = now.hour
-        
-        is_weekend = day >= 5  # Saturday or Sunday
-        is_monday_early = day == 0 and hour < 8  # Monday before 8:00 local
-        market_closed = is_weekend or is_monday_early
-        
-        # Generate signal directly from DataFrame
-        signal = signal_generator.generate_signal(df, min_confidence)
-        
-        return jsonify({
-            'success': True,
-            'pair': 'EUR_USD',
-            'data_info': {
-                'from': data_from,
-                'to': data_to,
-                'bars': len(df),
-                'market_closed': market_closed,
-                'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
-            },
-            **signal
-        })
+        else:
+            # V10 fallback: single timeframe
+            df = get_twelvedata_dataframe(interval="1min", outputsize=500, symbol=pair)
+            
+            if df is None or len(df) < 200:
+                return jsonify({
+                    'success': False,
+                    'error': 'rate_limited',
+                    'message': f'Rate limited or no data for {pair}.',
+                    'data_count': len(df) if df is not None else 0,
+                    'required': 200
+                }), 429
+            
+            data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
+            data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
+            
+            from datetime import datetime
+            now = datetime.now()
+            day = now.weekday()
+            hour = now.hour
+            is_weekend = day >= 5
+            is_monday_early = day == 0 and hour < 8
+            market_closed = is_weekend or is_monday_early
+            
+            signal = signal_generator.generate_signal(df, min_confidence)
+            
+            return jsonify({
+                'success': True,
+                'pair': pair.replace('/', '_'),
+                'data_info': {
+                    'from': data_from,
+                    'to': data_to,
+                    'bars': len(df),
+                    'market_closed': market_closed,
+                    'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
+                },
+                **signal
+            })
         
     except Exception as e:
-        print(f"Signal V2 error: {e}")
+        print(f"Signal error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/signal/v2/demo', methods=['GET'])
@@ -603,31 +850,50 @@ def get_signal_v2_demo():
         print(f"Signal V2 demo error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ==================== PREDICT (V2 Signal wrapper) ====================
+# ==================== PREDICT (Signal wrapper) ====================
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Main prediction endpoint - uses V2 Signal Generator"""
+    """Main prediction endpoint - uses GBDT or V10 Signal Generator"""
     try:
         data = request.json or {}
         pair = data.get('pair', 'EUR_USD').replace('_', '/')
         
-        # Get signal from V10
         if signal_generator is None or not signal_generator.is_loaded:
             return jsonify({
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
         
-        df = get_twelvedata_dataframe(interval="1min", count=500, symbol=pair)
+        is_gbdt = hasattr(signal_generator, 'CLASS_MAP')
         
-        if df is None or len(df) < 200:
-            return jsonify({
-                'success': False,
-                'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
-            })
-        
-        signal = signal_generator.generate_signal(df, min_confidence=85)
+        if is_gbdt:
+            # GBDT: multi-timeframe data
+            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+            
+            if multi_tf is None or "1min" not in multi_tf or len(multi_tf["1min"]) < 100:
+                return jsonify({
+                    'success': False,
+                    'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
+                })
+            
+            signal = signal_generator.generate_signal(
+                df_1min=multi_tf["1min"],
+                multi_tf_data=multi_tf,
+                min_confidence=0.60,
+                symbol=pair.replace('/', '')
+            )
+        else:
+            # V10: single timeframe
+            df = get_twelvedata_dataframe(interval="1min", count=500, symbol=pair)
+            
+            if df is None or len(df) < 200:
+                return jsonify({
+                    'success': False,
+                    'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
+                })
+            
+            signal = signal_generator.generate_signal(df, min_confidence=85)
         
         return jsonify({
             'success': True,
@@ -648,6 +914,72 @@ def predict():
     except Exception as e:
         print(f"Predict error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ==================== DATA COMPATIBILITY CHECK ====================
+
+@app.route('/signal/check', methods=['GET'])
+def check_signal_data():
+    """
+    Check if API data is compatible with the loaded model.
+    Returns feature compatibility info and data quality metrics.
+    """
+    try:
+        is_gbdt = signal_generator is not None and hasattr(signal_generator, 'CLASS_MAP')
+        
+        result = {
+            'model_type': 'GBDT (Multi-TF Ensemble)' if is_gbdt else 'V10 (7-Model Ensemble)',
+            'model_loaded': signal_generator is not None and signal_generator.is_loaded,
+        }
+        
+        if not result['model_loaded']:
+            result['error'] = 'Model not loaded'
+            return jsonify(result)
+        
+        if is_gbdt:
+            result['expected_features'] = signal_generator.feature_cols
+            result['feature_count'] = len(signal_generator.feature_cols)
+            result['models'] = list(signal_generator.models.keys())
+            result['has_calibrator'] = signal_generator.calibrator is not None
+            
+            # Try to fetch and validate data
+            pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
+            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+            
+            if multi_tf is not None and "1min" in multi_tf:
+                from ml.signal_generator_gbdt import build_features_from_data
+                
+                tf_info = {tf: len(df) for tf, df in multi_tf.items()}
+                result['data_available'] = True
+                result['timeframe_bars'] = tf_info
+                
+                # Build features and check compatibility
+                try:
+                    df_features = build_features_from_data(multi_tf)
+                    compat = signal_generator.check_features(df_features)
+                    result['feature_check'] = compat
+                    result['data_rows_after_features'] = len(df_features)
+                    
+                    if compat['compatible']:
+                        result['status'] = 'COMPATIBLE'
+                        result['message'] = 'API data is fully compatible with the model'
+                    else:
+                        result['status'] = 'INCOMPATIBLE'
+                        result['message'] = f"Missing {len(compat['missing_features'])} features"
+                except Exception as e:
+                    result['feature_check_error'] = str(e)
+                    result['status'] = 'ERROR'
+            else:
+                result['data_available'] = False
+                result['status'] = 'NO_DATA'
+                result['message'] = 'Could not fetch API data (rate limited?)'
+        else:
+            result['status'] = 'V10_ACTIVE'
+            result['message'] = 'V10 model active (GBDT model not loaded)'
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 # ==================== SIGNAL STORAGE ====================
 
@@ -951,6 +1283,7 @@ def index():
         'status': 'running',
         'endpoints': {
             'auth': ['/auth/register', '/auth/login', '/auth/verify-email', '/auth/me'],
+            'notifications': ['/notifications/register', '/notifications/unregister', '/notifications/preferences', '/notifications/test'],
             'rates': ['/rates/live', '/rates/specific'],
             'signal': ['/signal/v2', '/signal/v2/demo', '/predict'],
             'system': ['/health']
