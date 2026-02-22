@@ -5,20 +5,8 @@
 
 import { Platform } from "react-native";
 
-// WiFi IP хаяг - утас болон компьютер ижил WiFi-д байх ёстой
-const WIFI_IP = "192.168.1.138";  // Updated to match current computer IP
-
-// Автоматаар тогтоох
 const getApiUrl = () => {
-  // Android Emulator ашиглаж байгаа бол true болгоно уу
-  const IS_ANDROID_EMULATOR = false; 
-
-  if (Platform.OS === 'android' && IS_ANDROID_EMULATOR) {
-    return 'http://10.0.2.2:5000';
-  }
-  
-  // iOS simulator эсвэл physical device
-  return `http://${WIFI_IP}:5000`;
+  return 'https://forex-signal-back.onrender.com';
 };
 
 export const API_URL = getApiUrl(); // Export API_URL directly as well for convenience

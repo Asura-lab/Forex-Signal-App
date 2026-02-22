@@ -103,6 +103,8 @@ web-build/
 *.key
 *.mobileprovision
 *.orig.*
+*.keystore
+credentials.json
 
 # Metro
 .metro-health-check*

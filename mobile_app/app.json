@@ -44,6 +44,12 @@
           "sounds": []
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "86604e92-7568-4cff-9b3e-05d11921d46a"
+      }
+    },
+    "owner": "asura08"
   }
 }
