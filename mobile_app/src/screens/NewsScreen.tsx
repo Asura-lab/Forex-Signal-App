@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { getColors } from '../config/theme';
-import { API_URL } from '../config/api';
+import { getNews, analyzeNewsEvent } from '../services/api';
 
 const NewsScreen: React.FC = () => {
   const { isDark } = useTheme();
@@ -38,19 +38,11 @@ const NewsScreen: React.FC = () => {
     setSelectedEvent(item);
     setAiAnalysis('');
     setAnalysisLoading(true);
-    
+
     try {
-      const response = await fetch(`${API_URL}/api/news/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(item),
-      });
-      
-      const json = await response.json();
-      if (json.status === 'success') {
-        setAiAnalysis(json.analysis);
+      const result = await analyzeNewsEvent(item);
+      if (result.success && result.data?.status === 'success') {
+        setAiAnalysis(result.data.analysis);
       } else {
         setAiAnalysis('Дүгнэлт хийх боломжгүй байна.');
       }
@@ -80,17 +72,15 @@ const NewsScreen: React.FC = () => {
   const fetchNews = async (type = 'upcoming') => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/api/news?type=${type}`);
-      const json = await response.json();
-      
-      if (json.status === 'success') {
+      const result = await getNews(type);
+      if (result.success && result.data?.status === 'success') {
         if (type === 'upcoming') {
-          const grouped = groupNewsByDate(json.data);
+          const grouped = groupNewsByDate(result.data.data);
           setNews(grouped);
         } else if (type === 'past') {
-          setMajorImpacts(json.data);
+          setMajorImpacts(result.data.data);
         } else if (type === 'outlook') {
-          setAnalysis(json.data);
+          setAnalysis(result.data.data);
         }
       }
     } catch (error) {

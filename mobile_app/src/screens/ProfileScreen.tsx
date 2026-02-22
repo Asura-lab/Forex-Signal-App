@@ -16,8 +16,7 @@ import {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
-import { logoutUser } from "../services/api";
-import { API_ENDPOINTS } from "../config/api";
+import { logoutUser, updateUserProfile, changeUserPassword } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
 import {
   getNotificationPreferences,
@@ -134,20 +133,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const token = await getAuthToken();
+      const result = await updateUserProfile(name);
 
-      const response = await fetch(API_ENDPOINTS.UPDATE, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ name }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      if (result.success) {
         // Update local storage
         const updatedUser = { ...userData, name };
         await AsyncStorage.setItem("@user_data", JSON.stringify(updatedUser));
@@ -157,7 +145,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           { text: "OK", onPress: () => setEditMode(false) },
         ]);
       } else {
-        Alert.alert("Алдаа", data.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
+        Alert.alert("Алдаа", result.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
       }
     } catch (error) {
       Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
@@ -189,23 +177,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
     setLoading(true);
     try {
-      const token = await getAuthToken();
+      const result = await changeUserPassword(oldPassword, newPassword);
 
-      const response = await fetch(API_ENDPOINTS.CHANGE_PASSWORD, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          oldPassword,
-          newPassword,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
+      if (result.success) {
         Alert.alert("Амжилттай", "Нууц үг амжилттай солигдлоо", [
           {
             text: "OK",
@@ -218,7 +192,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           },
         ]);
       } else {
-        Alert.alert("Алдаа", data.error || "Нууц үг солихоо алдаа гарлаа");
+        Alert.alert("Алдаа", result.error || "Нууц үг солихоо алдаа гарлаа");
       }
     } catch (error) {
       Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");

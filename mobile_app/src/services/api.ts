@@ -388,6 +388,74 @@ export const getMarketAnalysis = async (pair) => {
   }
 };
 
+/**
+ * Хэрэглэгчийн мэдээлэл шинэчлэх (нэр)
+ */
+export const updateUserProfile = async (name: string) => {
+  try {
+    const response = await apiClient.put("/auth/update", { name });
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("Profile шинэчлэх алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Нууц үг солих
+ */
+export const changeUserPassword = async (oldPassword: string, newPassword: string) => {
+  try {
+    const response = await apiClient.put("/auth/change-password", {
+      oldPassword,
+      newPassword,
+    });
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("Нууц үг солих алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * Мэдээ авах
+ * @param {string} type - 'upcoming' | 'past' | 'outlook'
+ */
+export const getNews = async (type: string = "upcoming") => {
+  try {
+    const response = await apiClient.get(`/api/news?type=${type}`);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("Мэдээ авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
+ * AI мэдээ дүн шинжилгээ хийх
+ */
+export const analyzeNewsEvent = async (eventData: any) => {
+  try {
+    const response = await apiClient.post("/api/news/analyze", eventData);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("Мэдээ дүн шинжилгээ алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
 export default {
   // Auth
   registerUser,
@@ -407,4 +475,8 @@ export default {
   getSignalsHistory,
   getSignalsStats,
   getMarketAnalysis,
+  updateUserProfile,
+  changeUserPassword,
+  getNews,
+  analyzeNewsEvent,
 };
