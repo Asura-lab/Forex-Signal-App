@@ -4,6 +4,7 @@ services:
     env: python
     region: singapore  # Монголд хамгийн ойр
     plan: free
+    rootDir: .
     buildCommand: pip install -r requirements-deploy.txt
     startCommand: cd backend && gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
     envVars:
