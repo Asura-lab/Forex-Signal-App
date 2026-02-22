@@ -19,7 +19,7 @@ export interface ApiResponse<T = any> {
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000, // 30 секунд
+  timeout: 65000, // 65 секунд — Render.com free tier cold start ~50s
   headers: {
     "Content-Type": "application/json",
   },
@@ -39,7 +39,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor - 401 token expiry автоматаар зохицуулах
+// Response interceptor - 401 token expiry болон retry зохицуулах
 apiClient.interceptors.response.use(
   (response) => response,
   async (error: any) => {
@@ -48,6 +48,20 @@ apiClient.interceptors.response.use(
       await AsyncStorage.removeItem("userToken");
       console.warn("[WARN] apiClient: 401 received, cleared stored token.");
     }
+
+    // Retry once on network/timeout errors (Render cold start)
+    const config = error?.config;
+    if (
+      config &&
+      !config.__retried &&
+      (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK" || !error.response)
+    ) {
+      config.__retried = true;
+      console.warn("[WARN] apiClient: Network error, retrying in 3s...", error.code);
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      return apiClient(config);
+    }
+
     return Promise.reject(error);
   }
 );
