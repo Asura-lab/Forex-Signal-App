@@ -117,7 +117,12 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
 
   const signal = signalData;
   const error = signalError?.message;
-  const refreshing = loading; // Map React Query loading to refreshing state
+  const [isManualRefreshing, setIsManualRefreshing] = React.useState(false);
+
+  // Clear manual-refresh spinner once loading finishes
+  React.useEffect(() => {
+    if (!loading) setIsManualRefreshing(false);
+  }, [loading]);
 
   // Check if market is closed from API response or local calculation
   const isMarketClosedFromAPI = signal?.dataInfo?.market_closed === true;
@@ -183,6 +188,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
   };
 
   const onRefresh = useCallback(() => {
+    setIsManualRefreshing(true);
     refetchSignal();
   }, [refetchSignal]);
 
@@ -225,7 +231,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
+          <RefreshControl refreshing={isManualRefreshing} onRefresh={onRefresh} tintColor={colors.primary} />
         }
       >
         {/* Market Closed Warning */}
