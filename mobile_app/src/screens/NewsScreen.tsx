@@ -46,15 +46,15 @@ const NewsScreen: React.FC = () => {
       } else {
         setAiAnalysis('Дүгнэлт хийх боломжгүй байна.');
       }
-    } catch (error) {
+    } catch (error: any) {
       setAiAnalysis('Холболтын алдаа гарлаа.');
     } finally {
       setAnalysisLoading(false);
     }
   };
 
-  const groupNewsByDate = (data) => {
-    const groups = {};
+  const groupNewsByDate = (data: any[]) => {
+    const groups: Record<string, any[]> = {};
     data.forEach(item => {
       const dateStr = item.date.split(' ')[0];
       if (!groups[dateStr]) {
@@ -83,7 +83,7 @@ const NewsScreen: React.FC = () => {
           setAnalysis(result.data.data);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching news:', error);
     } finally {
       setLoading(false);
@@ -104,7 +104,7 @@ const NewsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const getImpactColor = (impact) => {
+  const getImpactColor = (impact: string) => {
     switch(impact?.toLowerCase()) {
       case 'high': return '#ef5350'; // Red
       case 'medium': return '#ff9800'; // Orange
@@ -113,7 +113,7 @@ const NewsScreen: React.FC = () => {
     }
   };
 
-  const getSentimentColor = (sentiment) => {
+  const getSentimentColor = (sentiment: string) => {
     if (!sentiment) return colors.textSecondary;
     const s = sentiment.toLowerCase();
     if (s.includes('bullish')) return '#4caf50';
@@ -184,11 +184,11 @@ const NewsScreen: React.FC = () => {
   );
 
   // 1. Upcoming News (SectionList)
-  const renderNewsItem = ({ item }) => {
+  const renderNewsItem = ({ item }: { item: any }) => {
     const impactColor = getImpactColor(item.sentiment);
     const time = item.date.split(' ')[1] || item.date;
     
-    const summaryParts = item.summary.split('. ');
+    const summaryParts = (item.summary as string).split('. ');
     const actualPart = summaryParts.find(p => p.includes('Actual:'))?.replace('Actual: ', '') || '-';
     const forecastPart = summaryParts.find(p => p.includes('Forecast:'))?.replace('Forecast: ', '') || '-';
     const currency = item.title.split(' - ')[0];
@@ -219,14 +219,14 @@ const NewsScreen: React.FC = () => {
     );
   };
 
-  const renderSectionHeader = ({ section: { title } }) => (
+  const renderSectionHeader = ({ section: { title } }: { section: { title: string } }) => (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionHeaderText}>{title}</Text>
     </View>
   );
 
   // 2. Past News (FlatList of Major Impacts)
-  const renderPastNewsItem = ({ item }) => (
+  const renderPastNewsItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.pastNewsCard} onPress={() => handleEventPress(item)}>
       <View style={styles.impactHeader}>
         <Text style={styles.impactCardTitle} numberOfLines={2}>{item.title}</Text>
@@ -311,7 +311,7 @@ const NewsScreen: React.FC = () => {
           {analysis.risk_factors && analysis.risk_factors.length > 0 && (
              <View style={styles.sectionBlock}>
               <Text style={[styles.sectionLabel, { color: colors.textSecondary, marginLeft: 4 }]}>ЭРСДЭЛҮҮД</Text>
-              {analysis.risk_factors.map((risk, index) => (
+              {(analysis.risk_factors as any[]).map((risk: any, index: number) => (
                 <View key={index} style={styles.riskRow}>
                   <Text style={{color: '#ef5350', marginRight: 10, fontSize: 16}}>•</Text>
                   <Text style={[styles.analysisText, { color: colors.textPrimary, flex: 1, marginBottom: 0 }]}>{risk}</Text>
@@ -323,7 +323,7 @@ const NewsScreen: React.FC = () => {
           {analysis.weekly_analysis && analysis.weekly_analysis.length > 0 && (
             <View style={styles.sectionBlock}>
               <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ОНЦЛОХ МЭДЭЭНҮҮД</Text>
-              {analysis.weekly_analysis.map((item, index) => (
+              {(analysis.weekly_analysis as any[]).map((item: any, index: number) => (
                 <View key={index} style={[styles.analysisCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={styles.analysisHeader}>
                     <Text style={[styles.analysisTitle, { color: colors.textPrimary, flex: 1, marginRight: 8 }]}>
@@ -398,7 +398,7 @@ const NewsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

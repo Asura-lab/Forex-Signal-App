@@ -79,7 +79,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
       } else {
         Alert.alert("Error", result.error || "Registration failed");
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Error", "Registration failed. Please try again.");
     } finally {
       setLoading(false);
@@ -266,7 +266,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

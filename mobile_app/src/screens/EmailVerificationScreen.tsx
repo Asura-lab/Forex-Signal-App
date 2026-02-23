@@ -19,7 +19,7 @@ import { verifyEmail, resendVerificationCode } from "../services/api";
 /**
  * Email Verification Screen - consistent design with Login/SignUp/ForgotPassword
  */
-const EmailVerificationScreen = ({ route, navigation }) => {
+const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation: any }) => {
   const { email, name, verificationCode } = route.params;
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
@@ -30,7 +30,7 @@ const EmailVerificationScreen = ({ route, navigation }) => {
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
 
-  const inputRefs = useRef([]);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   useEffect(() => {
     if (countdown > 0) {
@@ -51,7 +51,7 @@ const EmailVerificationScreen = ({ route, navigation }) => {
     }
   }, [verificationCode]);
 
-  const handleCodeChange = (text, index) => {
+  const handleCodeChange = (text: string, index: number) => {
     if (text && !/^\d+$/.test(text)) return;
     const newCode = [...code];
     newCode[index] = text;
@@ -65,13 +65,13 @@ const EmailVerificationScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleKeyPress = (e, index) => {
+  const handleKeyPress = (e: any, index: number) => {
     if (e.nativeEvent.key === "Backspace" && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handleVerify = async (fullCode = null) => {
+  const handleVerify = async (fullCode: string | null = null) => {
     const verCode = fullCode || code.join("");
     if (verCode.length !== 6) {
       Alert.alert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
@@ -226,7 +226,7 @@ const EmailVerificationScreen = ({ route, navigation }) => {
   );
 };
 
-const createStyles = (colors) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,

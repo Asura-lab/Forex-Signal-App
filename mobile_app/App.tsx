@@ -148,7 +148,7 @@ function AppContent() {
           />
           <Stack.Screen
             name="Signal"
-            component={SignalScreen}
+            component={SignalScreen as any}
             options={{
               headerShown: false,
             }}

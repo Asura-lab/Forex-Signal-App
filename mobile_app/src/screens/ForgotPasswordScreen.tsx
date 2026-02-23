@@ -27,7 +27,7 @@ import {
  * Step 2: Verify Code
  * Step 3: New Password
  */
-const ForgotPasswordScreen = ({ navigation }) => {
+const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
@@ -42,7 +42,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [demoCode, setDemoCode] = useState(null);
 
-  const inputRefs = useRef([]);
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Step 1: Имэйл илгээх
   const handleSendEmail = async () => {
@@ -74,7 +74,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
       } else {
         Alert.alert("Алдаа", result.error || "Код илгээх амжилтгүй");
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Алдаа", "Код илгээх явцад алдаа гарлаа");
     } finally {
       setLoading(false);
@@ -104,7 +104,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Алдаа", "Код шалгах явцад алдаа гарлаа");
     } finally {
       setLoading(false);
@@ -143,14 +143,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
       } else {
         Alert.alert("Алдаа", result.error || "Нууц үг солих амжилтгүй");
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Алдаа", "Нууц үг солих явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCodeChange = (text, index) => {
+  const handleCodeChange = (text: string, index: number) => {
     if (text && !/^\d+$/.test(text)) return;
 
     const newCode = [...code];
@@ -162,7 +162,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     }
   };
 
-  const handleKeyPress = (e, index) => {
+  const handleKeyPress = (e: any, index: number) => {
     if (e.nativeEvent.key === "Backspace" && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -361,7 +361,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

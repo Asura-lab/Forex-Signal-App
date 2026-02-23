@@ -16,7 +16,7 @@ const USER_DATA_KEY = "@user_data";
  * @param {string} password - User password
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
-export const loginUser = async (email, password) => {
+export const loginUser = async (email: string, password: string) => {
   try {
     const response = await fetch(API_ENDPOINTS.LOGIN, {
       method: "POST",
@@ -43,7 +43,7 @@ export const loginUser = async (email, password) => {
       success: true,
       data: data,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Login error:", error);
     return {
       success: false,
@@ -59,7 +59,7 @@ export const loginUser = async (email, password) => {
  * @param {string} password - User password
  * @returns {Promise<{success: boolean, data?: any, error?: string}>}
  */
-export const registerUser = async (name, email, password) => {
+export const registerUser = async (name: string, email: string, password: string) => {
   try {
     const response = await fetch(API_ENDPOINTS.REGISTER, {
       method: "POST",
@@ -86,7 +86,7 @@ export const registerUser = async (name, email, password) => {
       success: true,
       data: data,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Register error:", error);
     return {
       success: false,
@@ -104,7 +104,7 @@ export const logoutUser = async () => {
     await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
     await AsyncStorage.removeItem(USER_DATA_KEY);
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     return { success: false };
   }
 };
@@ -128,12 +128,11 @@ export const isAuthenticated = async () => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ token }),
-      timeout: 5000, // 5 second timeout
-    });
+    } as RequestInit);
 
     const data = await response.json();
     return data.success && data.valid;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Auth check error:", error);
     // If network error, assume not authenticated and let user try to login
     // This prevents the app from getting stuck on network errors
@@ -148,7 +147,7 @@ export const isAuthenticated = async () => {
 export const getAuthToken = async () => {
   try {
     return await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-  } catch (error) {
+  } catch (error: any) {
     return null;
   }
 };
@@ -161,7 +160,7 @@ export const getUserData = async () => {
   try {
     const userData = await AsyncStorage.getItem(USER_DATA_KEY);
     return userData ? JSON.parse(userData) : null;
-  } catch (error) {
+  } catch (error: any) {
     return null;
   }
 };
@@ -179,7 +178,7 @@ export const checkAuthStatus = async () => {
       isAuthenticated: isAuth,
       userData: userData,
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Check auth status error:", error);
     return {
       isAuthenticated: false,

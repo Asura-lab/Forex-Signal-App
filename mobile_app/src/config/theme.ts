@@ -123,12 +123,12 @@ export const gradients = {
 };
 
 // Function to get colors based on theme
-export const getColors = (isDark) => {
+export const getColors = (isDark: boolean) => {
   return isDark ? darkColors : lightColors;
 };
 
 // Function to get gradients based on theme
-export const getGradients = (isDark) => {
+export const getGradients = (isDark: boolean) => {
   if (isDark) {
     return {
       ...gradients,
@@ -197,7 +197,7 @@ export const shadows = {
   },
 };
 
-export const getCommonStyles = (colors) => ({
+export const getCommonStyles = (colors: any) => ({
   // Container Styles
   container: {
     flex: 1,

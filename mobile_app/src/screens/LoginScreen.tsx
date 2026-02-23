@@ -72,7 +72,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           Alert.alert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
       let errorMessage = "Нэвтрэх явцад алдаа гарлаа.";
 
@@ -215,7 +215,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,

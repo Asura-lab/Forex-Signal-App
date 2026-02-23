@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   StatusBar,
   Platform,
+  Linking,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
@@ -79,7 +80,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         setName(parsed.name);
         setEmail(parsed.email);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Load user data error:", error);
     }
   };
@@ -102,7 +103,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       if (prefs.notifications_enabled !== undefined) {
         setNotifications(prefs.notifications_enabled);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Load settings error:", error);
     }
   };
@@ -120,7 +121,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           lastActive: new Date().toLocaleDateString("mn-MN"),
         }));
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Load stats error:", error);
     }
   };
@@ -139,7 +140,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         // Update local storage
         const updatedUser = { ...userData, name };
         await AsyncStorage.setItem("@user_data", JSON.stringify(updatedUser));
-        setUserData(updatedUser);
+        setUserData(updatedUser as UserData);
 
         Alert.alert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
           { text: "OK", onPress: () => setEditMode(false) },
@@ -147,7 +148,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       } else {
         Alert.alert("Алдаа", result.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
       console.error("Update error:", error);
     } finally {
@@ -194,7 +195,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       } else {
         Alert.alert("Алдаа", result.error || "Нууц үг солихоо алдаа гарлаа");
       }
-    } catch (error) {
+    } catch (error: any) {
       Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
       console.error("Password change error:", error);
     } finally {
@@ -218,7 +219,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         // Unregister when disabling
         await unregisterPushTokenFromServer();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save notification settings error:", error);
     }
   };
@@ -227,7 +228,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setSignalNotifications(value);
     try {
       await updateNotificationPreferences({ signal_notifications: value });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save signal notification settings error:", error);
     }
   };
@@ -236,15 +237,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setNewsNotifications(value);
     try {
       await updateNotificationPreferences({ news_notifications: value });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Save news notification settings error:", error);
     }
   };
 
-  const handleDarkModeToggle = async (value) => {
-    // 'light', 'dark', 'auto'
+  const handleDarkModeToggle = async (_value: boolean) => {
+    // Cycle through 'light' → 'dark' → 'auto'
     const newMode =
-      value === "light" ? "dark" : value === "dark" ? "auto" : "light";
+      themeMode === "light" ? "dark" : themeMode === "dark" ? "auto" : "light";
     setTheme(newMode);
   };
 
@@ -268,7 +269,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   };
 
   // Open document modal
-  const openDocument = (docType) => {
+  const openDocument = (docType: string) => {
     const documents = {
       help: {
         title: "Тусламж",
@@ -434,12 +435,12 @@ GitHub: github.com/Asura-lab/Predictrix
       },
     };
 
-    setCurrentDocument(documents[docType]);
+    setCurrentDocument(documents[docType as keyof typeof documents]);
     setShowDocumentModal(true);
   };
 
   // Open external link
-  const openExternalLink = (url) => {
+  const openExternalLink = (url: string) => {
     Alert.alert(
       "Холбоос нээх",
       "Та вэб хөтөч дээр нээхдээ итгэлтэй байна уу?",
@@ -904,7 +905,7 @@ GitHub: github.com/Asura-lab/Predictrix
   );
 };
 
-const createStyles = (colors) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
     container: {
       flex: 1,

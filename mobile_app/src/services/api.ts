@@ -15,6 +15,7 @@ export interface ApiResponse<T = any> {
   error?: string;
   token?: string;
   user?: UserData;
+  requiresVerification?: boolean;
 }
 
 const apiClient: AxiosInstance = axios.create({
@@ -152,7 +153,7 @@ export const loginUser = async (email: string, password: string): Promise<ApiRes
     }
 
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -165,11 +166,11 @@ export const loginUser = async (email: string, password: string): Promise<ApiRes
 /**
  * Нууц үг мартсан
  */
-export const forgotPassword = async (email) => {
+export const forgotPassword = async (email: string) => {
   try {
     const response = await apiClient.post("/auth/forgot-password", { email });
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -180,14 +181,14 @@ export const forgotPassword = async (email) => {
 /**
  * Сэргээх код шалгах
  */
-export const verifyResetCode = async (email, code) => {
+export const verifyResetCode = async (email: string, code: string) => {
   try {
     const response = await apiClient.post("/auth/verify-reset-code", {
       email,
       code,
     });
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -198,7 +199,7 @@ export const verifyResetCode = async (email, code) => {
 /**
  * Нууц үг сэргээх
  */
-export const resetPassword = async (email, code, newPassword) => {
+export const resetPassword = async (email: string, code: string, newPassword: string) => {
   try {
     const response = await apiClient.post("/auth/reset-password", {
       email,
@@ -206,7 +207,7 @@ export const resetPassword = async (email, code, newPassword) => {
       new_password: newPassword,
     });
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -222,7 +223,7 @@ export const logoutUser = async () => {
     await AsyncStorage.removeItem("userToken");
     await AsyncStorage.removeItem("userData");
     return { success: true };
-  } catch (error) {
+  } catch (error: any) {
     return { success: false, error: error.message };
   }
 };
@@ -236,7 +237,7 @@ export const checkApiStatus = async () => {
   try {
     const response = await apiClient.get("/health");
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("API холболт амжилтгүй:", error.message);
     return { success: false, error: error.message };
   }
@@ -252,7 +253,7 @@ export const getLiveRates = async () => {
   try {
     const response = await apiClient.get("/rates/live");
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Live rates авах алдаа:", error.message);
     return {
       success: false,
@@ -291,11 +292,11 @@ export const getSignal = async (minConfidence: number = 80, pair: string = "EUR/
  * @param {Object} signalData - Signal object
  * @returns {Object} { success, signal_id }
  */
-export const saveSignal = async (signalData) => {
+export const saveSignal = async (signalData: any) => {
   try {
     const response = await apiClient.post("/signal/save", signalData);
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signal хадгалах алдаа:", error.message);
     return {
       success: false,
@@ -309,18 +310,25 @@ export const saveSignal = async (signalData) => {
  * @param {Object} options - { pair, limit, signal_type, min_confidence }
  * @returns {Object} { success, signals }
  */
-export const getSignalsHistory = async (options = {}) => {
+interface SignalHistoryOptions {
+  pair?: string;
+  limit?: number;
+  signal_type?: string;
+  min_confidence?: number;
+}
+
+export const getSignalsHistory = async (options: SignalHistoryOptions = {}) => {
   try {
     const params = new URLSearchParams();
     if (options.pair) params.append("pair", options.pair);
-    if (options.limit) params.append("limit", options.limit);
+    if (options.limit) params.append("limit", String(options.limit));
     if (options.signal_type) params.append("signal_type", options.signal_type);
     if (options.min_confidence)
-      params.append("min_confidence", options.min_confidence);
+      params.append("min_confidence", String(options.min_confidence));
 
     const response = await apiClient.get(`/signals/history?${params.toString()}`);
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signal түүх авах алдаа:", error.message);
     return {
       success: false,
@@ -338,7 +346,7 @@ export const getSignalsStats = async (pair = "EUR_USD") => {
   try {
     const response = await apiClient.get(`/signals/stats?pair=${pair}`);
     return { success: true, data: response.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Signal stats авах алдаа:", error.message);
     return {
       success: false,
@@ -352,13 +360,13 @@ export const getSignalsStats = async (pair = "EUR_USD") => {
  * @param {string} pair - Currency pair (e.g. "EUR/USD")
  * @returns {Object} { success, data }
  */
-export const getMarketAnalysis = async (pair) => {
+export const getMarketAnalysis = async (pair: string) => {
   try {
     const response = await apiClient.get(`/api/market-analysis?pair=${pair}`);
     // Backend returns { status: "success", data: { ... } }
     // We want to return the inner data object
     return { success: true, data: response.data.data };
-  } catch (error) {
+  } catch (error: any) {
     console.error("Market analysis авах алдаа:", error.message);
     return {
       success: false,

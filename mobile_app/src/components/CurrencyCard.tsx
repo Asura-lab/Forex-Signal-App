@@ -101,7 +101,7 @@ const CurrencyCard: React.FC<CurrencyCardProps> = ({ pair, liveRate, onPress, lo
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   card: {
     backgroundColor: colors.background,
     flexDirection: "row",

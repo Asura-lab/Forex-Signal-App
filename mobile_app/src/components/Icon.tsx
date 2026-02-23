@@ -120,8 +120,15 @@ const iconMap = {
   "default": "•",
 };
 
-const Icon = ({ name, size = 24, color = "#000000", style }) => {
-  const symbol = iconMap[name] || iconMap["default"];
+interface IconProps {
+  name: string;
+  size?: number;
+  color?: string;
+  style?: any;
+}
+
+const Icon = ({ name, size = 24, color = "#000000", style }: IconProps) => {
+  const symbol = iconMap[name as keyof typeof iconMap] || iconMap["default"];
   
   return (
     <View style={[{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }, style]}>

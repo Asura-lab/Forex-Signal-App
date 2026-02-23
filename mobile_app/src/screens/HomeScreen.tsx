@@ -124,7 +124,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
         {/* Currency List */}
         <CurrencyList
-          liveRates={liveRates}
+          liveRates={liveRates ?? {}}
           onPairPress={handlePairPress}
           loading={false}
           colors={colors}

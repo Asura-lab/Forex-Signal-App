@@ -35,7 +35,7 @@ interface SignalScreenProps {
 /**
  * Signal Screen - AI Analysis & Signals
  */
-const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
+const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
   const { pair } = route.params || {};
   const { isDark } = useTheme();
   const colors = getColors(isDark);
@@ -87,7 +87,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
 
   // Save Signal Mutation
   const saveSignalMutation = useMutation({
-    mutationFn: (signalToSave) => saveSignal(signalToSave),
+    mutationFn: (signalToSave: any) => saveSignal(signalToSave),
     onSuccess: (data) => {
       if (data.success) console.log("+ Signal saved:", data.data.signal_id);
     }
@@ -173,7 +173,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
     } catch (e) {}
   };
 
-  const saveThreshold = async (value) => {
+  const saveThreshold = async (value: number) => {
     try {
       await AsyncStorage.setItem("@confidence_threshold", value.toString());
       setConfidenceThreshold(value);
@@ -186,7 +186,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
     refetchSignal();
   }, [refetchSignal]);
 
-  const getSignalColor = (type) => {
+  const getSignalColor = (type: string) => {
     if (type === "BUY") return colors.success;
     if (type === "SELL") return colors.error;
     return colors.warning;
@@ -372,8 +372,8 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
                   {Object.entries(signal.model_probabilities).map(([model, prob]) => (
                     <View key={model} style={styles.modelItem}>
                       <Text style={styles.modelName}>{model.toUpperCase()}</Text>
-                      <Text style={[styles.modelProb, { color: prob > 50 ? colors.success : colors.error }]}>
-                        {prob.toFixed(0)}%
+                      <Text style={[styles.modelProb, { color: (prob as number) > 50 ? colors.success : colors.error }]}>
+                        {(prob as number).toFixed(0)}%
                       </Text>
                     </View>
                   ))}
@@ -422,7 +422,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
                     {aiAnalysis.risk_factors && aiAnalysis.risk_factors.length > 0 && (
                       <View style={styles.analysisSection}>
                         <Text style={styles.analysisSubTitle}>Эрсдэлт хүчин зүйлс</Text>
-                        {aiAnalysis.risk_factors.map((risk, index) => (
+                        {(aiAnalysis.risk_factors as any[]).map((risk: any, index: number) => (
                           <Text key={index} style={styles.riskText}>• {risk}</Text>
                         ))}
                       </View>
@@ -498,7 +498,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors: any) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,

@@ -31,7 +31,7 @@ export const getMultiTimeframePrediction = async (
     }
 
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Multi-timeframe prediction error:", error);
     throw error;
   }
@@ -55,22 +55,22 @@ export const getSignalNameMongolian = (signalName: string): string => {
 /**
  * Signal-д тохирох өнгө авах
  */
-export const getSignalColor = (signalName) => {
+export const getSignalColor = (signalName: string) => {
   const colors = {
-    STRONG_BUY: "#00C853", // Dark green
-    BUY: "#69F0AE", // Light green
-    NEUTRAL: "#FFB74D", // Orange
-    SELL: "#FF5252", // Red
-    STRONG_SELL: "#D32F2F", // Dark red
+    STRONG_BUY: "#00C853",
+    BUY: "#69F0AE",
+    NEUTRAL: "#FFB74D",
+    SELL: "#FF5252",
+    STRONG_SELL: "#D32F2F",
   };
 
-  return colors[signalName] || "#757575";
+  return colors[signalName as keyof typeof colors] || "#757575";
 };
 
 /**
  * Signal-д тохирох icon авах
  */
-export const getSignalIcon = (signalName) => {
+export const getSignalIcon = (signalName: string) => {
   const icons = {
     STRONG_BUY: "trending-up",
     BUY: "arrow-up",
@@ -80,13 +80,13 @@ export const getSignalIcon = (signalName) => {
     STRONG_SELL: "trending-down",
   };
 
-  return icons[signalName] || "help";
+  return icons[signalName as keyof typeof icons] || "help";
 };
 
 /**
  * Confidence level-ийг текст болгох
  */
-export const getConfidenceLevel = (confidence) => {
+export const getConfidenceLevel = (confidence: number) => {
   if (confidence >= 0.9) return "Маш өндөр";
   if (confidence >= 0.75) return "Өндөр";
   if (confidence >= 0.6) return "Дунд";
@@ -97,8 +97,8 @@ export const getConfidenceLevel = (confidence) => {
 /**
  * Timeframe-ийн нэрийг монгол хэл рүү хөрвүүлэх
  */
-export const getTimeframeName = (timeframe) => {
-  const names = {
+export const getTimeframeName = (timeframe: string) => {
+  const names: Record<string, string> = {
     "15min": "15 минут",
     "30min": "30 минут",
     "60min": "1 цаг",
