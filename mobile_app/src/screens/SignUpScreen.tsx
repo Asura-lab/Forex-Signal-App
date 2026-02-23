@@ -12,7 +12,6 @@ import {
   ScrollView,
   StatusBar,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { registerUser } from "../services/api";
@@ -129,7 +128,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 <Text style={styles.backText}>{"<"} Back</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-                <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={22} color={colors.textSecondary} />
+                <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
               </TouchableOpacity>
             </View>
             <Text style={styles.title}>БҮРТГҮҮЛЭХ</Text>
@@ -276,6 +275,12 @@ const createStyles = (colors) => StyleSheet.create({
   },
   themeToggle: {
     padding: 8,
+  },
+  themeIcon: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
   },
   backButton: {
     padding: 4,

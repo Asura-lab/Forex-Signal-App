@@ -11,7 +11,6 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { loginUser } from "../services/api";
@@ -100,7 +99,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       <View style={styles.content}>
         {/* Theme Toggle */}
         <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-          <Ionicons name={isDark ? 'sunny-outline' : 'moon-outline'} size={22} color={colors.textSecondary} />
+          <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
         </TouchableOpacity>
 
         {/* Logo */}
@@ -213,6 +212,12 @@ const createStyles = (colors) =>
       alignSelf: 'flex-end',
       padding: 8,
       marginBottom: 8,
+    },
+    themeIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 1.5,
     },
     content: {
       flex: 1,

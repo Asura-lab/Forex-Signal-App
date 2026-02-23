@@ -11,7 +11,6 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { verifyEmail, resendVerificationCode } from "../services/api";
@@ -147,11 +146,7 @@ const EmailVerificationScreen = ({ route, navigation }) => {
             <Text style={styles.backText}>{"<"} Буцах</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-            <Ionicons
-              name={isDark ? "sunny-outline" : "moon-outline"}
-              size={22}
-              color={colors.textSecondary}
-            />
+            <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
           </TouchableOpacity>
         </View>
 
@@ -242,6 +237,12 @@ const createStyles = (colors) =>
     },
     themeToggle: {
       padding: 8,
+    },
+    themeIcon: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 1.5,
     },
     headerContainer: {
       alignItems: "center",
