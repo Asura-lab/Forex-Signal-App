@@ -129,7 +129,20 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 <Text style={styles.backText}>{"<"} Back</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-                <Text style={styles.themeIconText}>{isDark ? '☀' : '☽'}</Text>
+                {isDark ? (
+                  <View style={styles.sunIcon}>
+                    <View style={styles.sunCore} />
+                    <View style={[styles.sunRay, { top: 0, left: '50%', marginLeft: -1 }]} />
+                    <View style={[styles.sunRay, { bottom: 0, left: '50%', marginLeft: -1 }]} />
+                    <View style={[styles.sunRay, { left: 0, top: '50%', marginTop: -1, width: 5, height: 2 }]} />
+                    <View style={[styles.sunRay, { right: 0, top: '50%', marginTop: -1, width: 5, height: 2 }]} />
+                  </View>
+                ) : (
+                  <View style={styles.moonIcon}>
+                    <View style={styles.moonOuter} />
+                    <View style={[styles.moonInner, { backgroundColor: colors.background }]} />
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
             <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
@@ -278,22 +291,57 @@ const createStyles = (colors) => StyleSheet.create({
   themeToggle: {
     padding: 8,
   },
-  themeIconText: {
-    fontSize: 20,
-    color: colors.textSecondary,
+  sunIcon: {
+    width: 22,
+    height: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  themeIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
+  sunCore: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.textSecondary,
+  },
+  sunRay: {
+    position: 'absolute',
+    width: 2,
+    height: 5,
+    backgroundColor: colors.textSecondary,
+    borderRadius: 1,
+  },
+  moonIcon: {
+    width: 22,
+    height: 22,
+  },
+  moonOuter: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.textSecondary,
+    top: 2,
+    left: 0,
+  },
+  moonInner: {
+    position: 'absolute',
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    top: 0,
+    left: 6,
   },
   appIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 14,
+    width: 80,
+    height: 80,
+    borderRadius: 20,
     marginBottom: 16,
     alignSelf: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
   },
   backButton: {
     padding: 4,
