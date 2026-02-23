@@ -20,7 +20,7 @@ export interface ApiResponse<T = any> {
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 65000, // 65 секунд — Render.com free tier cold start ~50s
+  timeout: 30000, // 30 секунд — Azure App Service (24/7, cold start байхгүй)
   headers: {
     "Content-Type": "application/json",
   },
@@ -50,7 +50,7 @@ apiClient.interceptors.response.use(
       console.warn("[WARN] apiClient: 401 received, cleared stored token.");
     }
 
-    // Retry up to 3 times on network/timeout errors (Render free-tier cold start takes 50-90s)
+    // Retry up to 3 times on network/timeout errors
     // Delays: 5s → 15s → 30s  (total 50s covered before giving up)
     const RETRY_DELAYS = [5000, 15000, 30000];
     const config = error?.config;
