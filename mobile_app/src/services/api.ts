@@ -50,16 +50,22 @@ apiClient.interceptors.response.use(
       console.warn("[WARN] apiClient: 401 received, cleared stored token.");
     }
 
-    // Retry once on network/timeout errors (Render cold start)
+    // Retry up to 3 times on network/timeout errors (Render free-tier cold start takes 50-90s)
+    // Delays: 5s → 15s → 30s  (total 50s covered before giving up)
+    const RETRY_DELAYS = [5000, 15000, 30000];
     const config = error?.config;
     if (
       config &&
-      !config.__retried &&
+      (config.__retryCount ?? 0) < RETRY_DELAYS.length &&
       (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK" || !error.response)
     ) {
-      config.__retried = true;
-      console.warn("[WARN] apiClient: Network error, retrying in 3s...", error.code);
-      await new Promise((resolve) => setTimeout(resolve, 3000));
+      const attempt: number = config.__retryCount ?? 0;
+      config.__retryCount = attempt + 1;
+      const delay = RETRY_DELAYS[attempt];
+      console.warn(
+        `[WARN] apiClient: Network error (${error.code}), retry ${config.__retryCount}/${RETRY_DELAYS.length} in ${delay / 1000}s...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
       return apiClient(config);
     }
 
