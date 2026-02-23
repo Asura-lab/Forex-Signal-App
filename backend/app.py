@@ -447,17 +447,20 @@ def forgot_password():
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
     })
     
-    try:
-        msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
-        msg.html = f"""
-        <h2>Нууц үг сэргээх</h2>
-        <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
-        <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
-        """
-        mail.send(msg)
-    except:
-        pass
-    
+    def _send_reset():
+        with app.app_context():
+            try:
+                msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
+                msg.html = f"""
+                <h2>Нууц үг сэргээх</h2>
+                <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
+                <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
+                """
+                mail.send(msg)
+            except Exception as e:
+                print(f"Reset email алдаа: {e}")
+    threading.Thread(target=_send_reset, daemon=True).start()
+
     return jsonify({'success': True, 'message': 'Код илгээлээ'})
 
 @app.route('/auth/reset-password', methods=['POST'])
