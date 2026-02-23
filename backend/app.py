@@ -657,23 +657,14 @@ def get_specific_rate():
 
 @app.route('/signal/best', methods=['GET'])
 def get_signal_best():
-    """
-    Best Signal Generator
-    - Uses GBDT trained model (multi-timeframe) if available
-    - Falls back to V10 (7-Model Ensemble)
-    """
     return get_signal_v2()
 
 @app.route('/signal/v2', methods=['GET'])
 def get_signal_v2():
     """
-    Signal Generator Endpoint
-    - GBDT: Multi-timeframe ensemble (primary, if model file exists)
-    - V10: 7-Model Ensemble (fallback)
-    NON-BLOCKING: Returns cached data if rate limited
-    
+    Signal Generator Endpoint (GBDT Multi-Timeframe Ensemble)
     Query params:
-        min_confidence: Minimum confidence threshold (default depends on model)
+        min_confidence: Minimum confidence threshold (default: 60)
         pair: Currency pair (default: EUR/USD)
     """
     try:
@@ -682,139 +673,79 @@ def get_signal_v2():
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
-        
-        # Determine which model is active
-        is_gbdt = hasattr(signal_generator, 'CLASS_MAP')  # GBDT has CLASS_MAP attribute
-        
-        # Default confidence threshold differs by model
-        default_conf = 60 if is_gbdt else 85
-        min_confidence = float(request.args.get('min_confidence', default_conf))
+
+        min_confidence = float(request.args.get('min_confidence', 60))
         pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
-        
-        if is_gbdt:
-            # GBDT model: fetch multi-timeframe data (resample from 1min)
-            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
-            
-            if multi_tf is None or "1min" not in multi_tf:
-                return jsonify({
-                    'success': False,
-                    'error': 'rate_limited',
-                    'message': f'Rate limited or no data for {pair}.',
-                    'data_count': 0,
-                    'required': 100
-                }), 429
-            
-            df = multi_tf["1min"]
-            
-            if len(df) < 100:
-                return jsonify({
-                    'success': False,
-                    'error': 'rate_limited',
-                    'message': f'Not enough data: {len(df)} bars (need 100+)',
-                    'data_count': len(df),
-                    'required': 100
-                }), 429
-            
-            # Data timestamps
-            data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
-            data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
-            
-            # Market closed check
-            from datetime import datetime
-            now = datetime.now()
-            day = now.weekday()
-            hour = now.hour
-            is_weekend = day >= 5
-            is_monday_early = day == 0 and hour < 8
-            market_closed = is_weekend or is_monday_early
-            
-            # Generate signal with multi-TF data
-            # GBDT confidence is 0-1 scale, convert from percentage input
-            conf_threshold = min_confidence / 100.0 if min_confidence > 1 else min_confidence
-            signal = signal_generator.generate_signal(
-                df_1min=df,
-                multi_tf_data=multi_tf,
-                min_confidence=conf_threshold,
-                symbol=pair.replace('/', '')
-            )
-            
-            # Push notification for high-confidence signals (BUY/SELL only)
-            try:
-                sig_type = signal.get('signal_type', 'HOLD').upper()
-                sig_conf = signal.get('confidence', 0)
-                # Notify if confidence >= 70% and not HOLD
-                if sig_type in ('BUY', 'SELL') and sig_conf >= 0.70:
-                    threading.Thread(
-                        target=push_service.send_signal_notification,
-                        args=({
-                            'signal_type': sig_type,
-                            'pair': pair,
-                            'confidence': sig_conf,
-                            'entry_price': signal.get('entry_price'),
-                            'sl': signal.get('sl'),
-                            'tp': signal.get('tp'),
-                        },),
-                        daemon=True
-                    ).start()
-            except Exception as notif_err:
-                print(f"[WARN] Signal notification error: {notif_err}")
-            
-            # Data info with multi-TF details
-            tf_info = {tf: len(tf_df) for tf, tf_df in multi_tf.items()}
-            
+
+        multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+
+        if multi_tf is None or "1min" not in multi_tf:
             return jsonify({
-                'success': True,
-                'pair': pair.replace('/', '_'),
-                'data_info': {
-                    'from': data_from,
-                    'to': data_to,
-                    'bars': len(df),
-                    'timeframes': tf_info,
-                    'market_closed': market_closed,
-                    'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
-                },
-                **signal
-            })
-        
-        else:
-            # V10 fallback: single timeframe
-            df = get_twelvedata_dataframe(interval="1min", outputsize=500, symbol=pair)
-            
-            if df is None or len(df) < 200:
-                return jsonify({
-                    'success': False,
-                    'error': 'rate_limited',
-                    'message': f'Rate limited or no data for {pair}.',
-                    'data_count': len(df) if df is not None else 0,
-                    'required': 200
-                }), 429
-            
-            data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
-            data_to = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
-            
-            from datetime import datetime
-            now = datetime.now()
-            day = now.weekday()
-            hour = now.hour
-            is_weekend = day >= 5
-            is_monday_early = day == 0 and hour < 8
-            market_closed = is_weekend or is_monday_early
-            
-            signal = signal_generator.generate_signal(df, min_confidence)
-            
+                'success': False,
+                'error': 'rate_limited',
+                'message': f'Rate limited or no data for {pair}.',
+                'data_count': 0,
+                'required': 100
+            }), 429
+
+        df = multi_tf["1min"]
+
+        if len(df) < 100:
             return jsonify({
-                'success': True,
-                'pair': pair.replace('/', '_'),
-                'data_info': {
-                    'from': data_from,
-                    'to': data_to,
-                    'bars': len(df),
-                    'market_closed': market_closed,
-                    'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
-                },
-                **signal
-            })
-        
+                'success': False,
+                'error': 'rate_limited',
+                'message': f'Not enough data: {len(df)} bars (need 100+)',
+                'data_count': len(df),
+                'required': 100
+            }), 429
+
+        data_from = df['time'].iloc[0].isoformat() if hasattr(df['time'].iloc[0], 'isoformat') else str(df['time'].iloc[0])
+        data_to   = df['time'].iloc[-1].isoformat() if hasattr(df['time'].iloc[-1], 'isoformat') else str(df['time'].iloc[-1])
+
+        now = datetime.now()
+        market_closed = now.weekday() >= 5 or (now.weekday() == 0 and now.hour < 8)
+
+        conf_threshold = min_confidence / 100.0 if min_confidence > 1 else min_confidence
+        signal = signal_generator.generate_signal(
+            df_1min=df,
+            multi_tf_data=multi_tf,
+            min_confidence=conf_threshold,
+            symbol=pair.replace('/', '')
+        )
+
+        # Push notification for high-confidence signals
+        try:
+            sig_type = signal.get('signal', 'HOLD').upper()
+            sig_conf = signal.get('confidence', 0)
+            if sig_type in ('BUY', 'SELL') and sig_conf >= 70:
+                threading.Thread(
+                    target=push_service.send_signal_notification,
+                    args=({'signal_type': sig_type, 'pair': pair,
+                           'confidence': sig_conf,
+                           'entry_price': signal.get('entry_price'),
+                           'sl': signal.get('stop_loss'),
+                           'tp': signal.get('take_profit')},),
+                    daemon=True
+                ).start()
+        except Exception as notif_err:
+            print(f"[WARN] Signal notification error: {notif_err}")
+
+        tf_info = {tf: len(tf_df) for tf, tf_df in multi_tf.items()}
+
+        return jsonify({
+            'success': True,
+            'pair': pair.replace('/', '_'),
+            'data_info': {
+                'from': data_from,
+                'to': data_to,
+                'bars': len(df),
+                'timeframes': tf_info,
+                'market_closed': market_closed,
+                'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
+            },
+            **signal
+        })
+
     except Exception as e:
         print(f"Signal error: {e}")
         import traceback
@@ -860,47 +791,32 @@ def get_signal_v2_demo():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    """Main prediction endpoint - uses GBDT or V10 Signal Generator"""
+    """Main prediction endpoint - GBDT Multi-Timeframe Ensemble"""
     try:
         data = request.json or {}
         pair = data.get('pair', 'EUR_USD').replace('_', '/')
-        
+
         if signal_generator is None or not signal_generator.is_loaded:
             return jsonify({
                 'success': False,
                 'error': 'Signal Generator ачаалагдаагүй'
             }), 500
-        
-        is_gbdt = hasattr(signal_generator, 'CLASS_MAP')
-        
-        if is_gbdt:
-            # GBDT: multi-timeframe data
-            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
-            
-            if multi_tf is None or "1min" not in multi_tf or len(multi_tf["1min"]) < 100:
-                return jsonify({
-                    'success': False,
-                    'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
-                })
-            
-            signal = signal_generator.generate_signal(
-                df_1min=multi_tf["1min"],
-                multi_tf_data=multi_tf,
-                min_confidence=0.60,
-                symbol=pair.replace('/', '')
-            )
-        else:
-            # V10: single timeframe
-            df = get_twelvedata_dataframe(interval="1min", count=500, symbol=pair)
-            
-            if df is None or len(df) < 200:
-                return jsonify({
-                    'success': False,
-                    'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
-                })
-            
-            signal = signal_generator.generate_signal(df, min_confidence=85)
-        
+
+        multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+
+        if multi_tf is None or "1min" not in multi_tf or len(multi_tf["1min"]) < 100:
+            return jsonify({
+                'success': False,
+                'predictions': {pair: {'signal': 'HOLD', 'confidence': 0}}
+            })
+
+        signal = signal_generator.generate_signal(
+            df_1min=multi_tf["1min"],
+            multi_tf_data=multi_tf,
+            min_confidence=0.60,
+            symbol=pair.replace('/', '')
+        )
+
         return jsonify({
             'success': True,
             'predictions': {
@@ -916,7 +832,7 @@ def predict():
                 }
             }
         })
-        
+
     except Exception as e:
         print(f"Predict error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -926,64 +842,56 @@ def predict():
 @app.route('/signal/check', methods=['GET'])
 def check_signal_data():
     """
-    Check if API data is compatible with the loaded model.
+    Check if API data is compatible with the loaded GBDT model.
     Returns feature compatibility info and data quality metrics.
     """
     try:
-        is_gbdt = signal_generator is not None and hasattr(signal_generator, 'CLASS_MAP')
-        
         result = {
-            'model_type': 'GBDT (Multi-TF Ensemble)' if is_gbdt else 'Rule-Based (Fallback)',
+            'model_type': 'GBDT (Multi-TF Ensemble)',
             'model_loaded': signal_generator is not None and signal_generator.is_loaded,
         }
-        
+
         if not result['model_loaded']:
             result['error'] = 'Model not loaded'
             return jsonify(result)
-        
-        if is_gbdt:
-            result['expected_features'] = signal_generator.feature_cols
-            result['feature_count'] = len(signal_generator.feature_cols)
-            result['models'] = list(signal_generator.models.keys())
-            result['has_calibrator'] = signal_generator.calibrator is not None
-            
-            # Try to fetch and validate data
-            pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
-            multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
-            
-            if multi_tf is not None and "1min" in multi_tf:
-                from ml.signal_generator_gbdt import build_features_from_data
-                
-                tf_info = {tf: len(df) for tf, df in multi_tf.items()}
-                result['data_available'] = True
-                result['timeframe_bars'] = tf_info
-                
-                # Build features and check compatibility
-                try:
-                    df_features = build_features_from_data(multi_tf)
-                    compat = signal_generator.check_features(df_features)
-                    result['feature_check'] = compat
-                    result['data_rows_after_features'] = len(df_features)
-                    
-                    if compat['compatible']:
-                        result['status'] = 'COMPATIBLE'
-                        result['message'] = 'API data is fully compatible with the model'
-                    else:
-                        result['status'] = 'INCOMPATIBLE'
-                        result['message'] = f"Missing {len(compat['missing_features'])} features"
-                except Exception as e:
-                    result['feature_check_error'] = str(e)
-                    result['status'] = 'ERROR'
-            else:
-                result['data_available'] = False
-                result['status'] = 'NO_DATA'
-                result['message'] = 'Could not fetch API data (rate limited?)'
+
+        result['expected_features'] = signal_generator.feature_cols
+        result['feature_count'] = len(signal_generator.feature_cols)
+        result['models'] = list(signal_generator.models.keys())
+        result['has_calibrator'] = signal_generator.calibrator is not None
+
+        pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
+        multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+
+        if multi_tf is not None and "1min" in multi_tf:
+            from ml.signal_generator_gbdt import build_features_from_data
+
+            tf_info = {tf: len(df) for tf, df in multi_tf.items()}
+            result['data_available'] = True
+            result['timeframe_bars'] = tf_info
+
+            try:
+                df_features = build_features_from_data(multi_tf)
+                compat = signal_generator.check_features(df_features)
+                result['feature_check'] = compat
+                result['data_rows_after_features'] = len(df_features)
+
+                if compat['compatible']:
+                    result['status'] = 'COMPATIBLE'
+                    result['message'] = 'API data is fully compatible with the model'
+                else:
+                    result['status'] = 'INCOMPATIBLE'
+                    result['message'] = f"Missing {len(compat['missing_features'])} features"
+            except Exception as e:
+                result['feature_check_error'] = str(e)
+                result['status'] = 'ERROR'
         else:
-            result['status'] = 'FALLBACK_ACTIVE'
-            result['message'] = 'GBDT model not loaded, using fallback'
-        
+            result['data_available'] = False
+            result['status'] = 'NO_DATA'
+            result['message'] = 'Could not fetch API data (rate limited?)'
+
         return jsonify(result)
-        
+
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1274,7 +1182,7 @@ def health():
             'status': 'healthy',
             'database': 'connected',
             'users_count': user_count,
-            'signal_generator': 'V10 loaded' if (signal_generator and signal_generator.is_loaded) else 'not loaded',
+            'signal_generator': 'GBDT loaded' if (signal_generator and signal_generator.is_loaded) else 'not loaded',
             'timestamp': datetime.now(timezone.utc).isoformat()
         })
     except Exception as e:
