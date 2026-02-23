@@ -269,35 +269,14 @@ export const getLiveRates = async () => {
  * @param {string} pair - Currency pair (default: "EUR/USD")
  * @returns Signal object with entry, SL, TP, confidence
  */
-export const getBestSignal = async (minConfidence: number = 80, pair: string = "EUR/USD") => {
+export const getSignal = async (minConfidence: number = 80, pair: string = "EUR/USD") => {
   try {
     const response = await apiClient.get(
-      `/signal/best?min_confidence=${minConfidence}&pair=${pair}`
+      `/signal?min_confidence=${minConfidence}&pair=${pair}`
     );
     return { success: true, data: response.data };
   } catch (error: any) {
     console.error("Signal авах алдаа:", error.message);
-    return {
-      success: false,
-      error: error.response?.data?.error || error.message,
-    };
-  }
-};
-
-/**
- * V2 Signal Generator - BUY-only mode with 80%+ accuracy
- * @param {number} minConfidence - Minimum confidence threshold (default: 80)
- * @param {string} pair - Currency pair (default: "EUR/USD")
- * @returns Signal object with entry, SL, TP, confidence
- */
-export const getSignalV2 = async (minConfidence: number = 80, pair: string = "EUR/USD") => {
-  try {
-    const response = await apiClient.get(
-      `/signal/v2?min_confidence=${minConfidence}&pair=${pair}`
-    );
-    return { success: true, data: response.data };
-  } catch (error: any) {
-    console.error("Signal V2 авах алдаа:", error.message);
     return {
       success: false,
       error: error.response?.data?.error || error.message,
@@ -469,7 +448,7 @@ export default {
   // API
   checkApiStatus,
   getLiveRates,
-  getSignalV2,
+  getSignal,
   // Signal storage
   saveSignal,
   getSignalsHistory,

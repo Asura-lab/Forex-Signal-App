@@ -14,7 +14,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getBestSignal, saveSignal, getMarketAnalysis } from "../services/api";
+import { getSignal, saveSignal, getMarketAnalysis } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationProp, RouteProp } from "@react-navigation/native";
 import { CurrencyPair } from "../utils/helpers";
@@ -55,7 +55,7 @@ const SignalScreen: React.FC<SignalScreenProps> = ({ route, navigation }) => {
     queryKey: ['signal', pair?.name, confidenceThreshold],
     queryFn: async () => {
       const pairName = pair?.name || "EUR/USD";
-      const result = await getBestSignal(confidenceThreshold, pairName);
+      const result = await getSignal(confidenceThreshold, pairName);
       if (!result.success) throw new Error(result.error);
       
       const isJPY = pairName.includes("JPY");

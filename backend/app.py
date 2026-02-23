@@ -655,11 +655,7 @@ def get_specific_rate():
 
 # ==================== SIGNAL GENERATOR ENDPOINTS ====================
 
-@app.route('/signal/best', methods=['GET'])
-def get_signal_best():
-    return get_signal()
-
-@app.route('/signal/v2', methods=['GET'])
+@app.route('/signal', methods=['GET'])
 def get_signal():
     """
     Signal Generator Endpoint (GBDT Multi-Timeframe Ensemble)
@@ -752,7 +748,7 @@ def get_signal():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/signal/v2/demo', methods=['GET'])
+@app.route('/signal/demo', methods=['GET'])
 def get_signal_demo():
     """Demo signal with test data"""
     try:
@@ -1199,7 +1195,7 @@ def index():
             'auth': ['/auth/register', '/auth/login', '/auth/verify-email', '/auth/me'],
             'notifications': ['/notifications/register', '/notifications/unregister', '/notifications/preferences', '/notifications/test'],
             'rates': ['/rates/live', '/rates/specific'],
-            'signal': ['/signal/v2', '/signal/v2/demo', '/predict'],
+            'signal': ['/signal', '/signal/demo', '/predict'],
             'system': ['/health']
         }
     })
@@ -1219,7 +1215,7 @@ if __name__ == '__main__':
     print(f"\n[+] API Endpoints:")
     print(f"  POST /auth/register, /auth/login")
     print(f"  GET  /rates/live, /rates/specific")
-    print(f"  GET  /signal/v2, /signal/v2/demo")
+    print(f"  GET  /signal, /signal/demo")
     print(f"  POST /predict")
     print(f"  GET  /health")
     print("=" * 60)
