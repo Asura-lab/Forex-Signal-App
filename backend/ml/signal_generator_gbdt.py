@@ -16,9 +16,8 @@ from datetime import datetime
 warnings.filterwarnings('ignore', message='.*feature names.*')
 warnings.filterwarnings('ignore', category=UserWarning)
 
-# Paths
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-MODEL_PATH = os.path.join(PROJECT_ROOT, 'model & backtest result', 'models', 'EURUSD_gbdt.pkl')
+# Paths — model lives alongside this file in backend/ml/models/ (deployed to Render via rootDir: backend)
+MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt.pkl')
 
 
 # ==================== Feature Engineering (matches build_from_train.py) ====================

@@ -42,9 +42,6 @@ models/**/*.joblib
 models/**/*.pkl
 models/**/*.h5
 
-# Deploy-д шаардлагатай model-уудыг оруулах (gitignore exception)
-!model & backtest result/models/EURUSD_gbdt.pkl
-
 # Data files (датанууд - GitHub-д их том файлууд оруулахгүй)
 data/train/*.csv
 data/test/*.csv
@@ -52,6 +49,9 @@ data/test/*.csv
 *.csv.gz
 *.pkl
 *.parquet
+
+# Deploy-д шаардлагатай model-уудыг оруулах (must come AFTER *.pkl rule)
+!backend/ml/models/EURUSD_gbdt.pkl
 model & backtest result/data/**/*.csv
 model & backtest result/data/**/*.csv.gz
 model & backtest result/data/**/*.pkl
