@@ -100,8 +100,8 @@ def load_signal_generator():
         signal_generator = None
         return False
 
-# Load on startup
-load_signal_generator()
+# Load on startup in background thread (avoid blocking gunicorn bind)
+threading.Thread(target=load_signal_generator, daemon=True).start()
 
 # ==================== PRELOAD HISTORICAL DATA ====================
 
@@ -119,8 +119,8 @@ def preload_historical_data():
         print(f"[WARN] Historical data preload failed: {e}")
     return False
 
-# Preload on startup
-preload_historical_data()
+# Preload on startup in background thread (avoid blocking gunicorn bind)
+threading.Thread(target=preload_historical_data, daemon=True).start()
 
 # ==================== NEWS CACHE SYSTEM ====================
 
