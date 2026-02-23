@@ -253,6 +253,7 @@ def generate_verification_code():
     return str(random.randint(100000, 999999))
 
 def send_verification_email(email, code, name=""):
+    """Send verification email synchronously. Returns True on success, False on failure."""
     try:
         msg = Message(
             'Predictrix - Баталгаажуулах код',
@@ -332,20 +333,20 @@ def register():
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
     })
     
-    # Send email in background thread so the request doesn't block/timeout
-    if is_email_configured():
-        send_verification_email_async(email, code, name)
+    # Try sending email; fall back to demo_mode if sending fails for any reason
+    email_sent = send_verification_email(email, code, name) if is_email_configured() else False
+    if email_sent:
         return jsonify({
             'success': True,
             'message': 'Баталгаажуулах код илгээлээ',
             'email': email
         })
     else:
-        # Email not configured — return code directly so the app can show it
+        # Return code directly — either email not configured or SMTP failed
         print(f"[DEMO] Verification code for {email}: {code}")
         return jsonify({
             'success': True,
-            'message': 'Demo горим: имэйл тохиргоо хийгдээгүй',
+            'message': 'Demo горим: код апп дотор харагдана',
             'email': email,
             'demo_mode': True,
             'verification_code': code
@@ -411,14 +412,14 @@ def resend_verification():
         }}
     )
 
-    if is_email_configured():
-        send_verification_email_async(email, code, record.get('name', ''))
+    resent = send_verification_email(email, code, record.get('name', '')) if is_email_configured() else False
+    if resent:
         return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
     else:
         print(f"[DEMO] Resend verification code for {email}: {code}")
         return jsonify({
             'success': True,
-            'message': 'Demo горим: код шинэчлэгдлээ',
+            'message': 'Demo горим: код апп дотор харагдана',
             'demo_mode': True,
             'verification_code': code
         })
@@ -487,14 +488,27 @@ def forgot_password():
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
     })
     
+    reset_sent = False
     if is_email_configured():
-        send_reset_email_async(email, code)
+        try:
+            msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
+            msg.html = f"""
+            <h2>Нууц үг сэргээх</h2>
+            <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
+            <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
+            """
+            mail.send(msg)
+            reset_sent = True
+        except Exception as e:
+            print(f"Reset email алдаа: {e}")
+
+    if reset_sent:
         return jsonify({'success': True, 'message': 'Код илгээлээ'})
     else:
         print(f"[DEMO] Reset code for {email}: {code}")
         return jsonify({
             'success': True,
-            'message': 'Demo горим: имэйл тохиргоо хийгдээгүй',
+            'message': 'Demo горим: код апп дотор харагдана',
             'demo_mode': True,
             'reset_code': code
         })
