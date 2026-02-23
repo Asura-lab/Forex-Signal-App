@@ -1,0 +1,35 @@
+name: Deploy Backend to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'   # backend өөрчлөгдөхөд л deploy хийнэ
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: 'Predictrix'
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: './backend'
+          startup-command: 'gunicorn app:app --bind 0.0.0.0:8000 --workers 1 --timeout 120'
