@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Forex Signal API v10
+Forex Signal API
 - MongoDB + JWT Authentication
-- UniRate API for live rates
-- V10 Signal Generator (7-Model Ensemble, 85%+ = 97% accuracy)
+- Twelve Data API for live rates
+- GBDT Signal Generator (Multi-Timeframe Ensemble)
 """
 
 import sys
@@ -933,7 +933,7 @@ def check_signal_data():
         is_gbdt = signal_generator is not None and hasattr(signal_generator, 'CLASS_MAP')
         
         result = {
-            'model_type': 'GBDT (Multi-TF Ensemble)' if is_gbdt else 'V10 (7-Model Ensemble)',
+            'model_type': 'GBDT (Multi-TF Ensemble)' if is_gbdt else 'Rule-Based (Fallback)',
             'model_loaded': signal_generator is not None and signal_generator.is_loaded,
         }
         
@@ -979,8 +979,8 @@ def check_signal_data():
                 result['status'] = 'NO_DATA'
                 result['message'] = 'Could not fetch API data (rate limited?)'
         else:
-            result['status'] = 'V10_ACTIVE'
-            result['message'] = 'V10 model active (GBDT model not loaded)'
+            result['status'] = 'FALLBACK_ACTIVE'
+            result['message'] = 'GBDT model not loaded, using fallback'
         
         return jsonify(result)
         
@@ -1283,9 +1283,9 @@ def health():
 @app.route('/', methods=['GET'])
 def index():
     return jsonify({
-        'name': 'Forex Signal API',
-        'version': '10.0',
-        'model': 'V10 (7-Model Ensemble)',
+        'name': 'Predictrix API',
+        'version': '1.0',
+        'model': 'GBDT (Multi-TF Ensemble)',
         'status': 'running',
         'endpoints': {
             'auth': ['/auth/register', '/auth/login', '/auth/verify-email', '/auth/me'],
@@ -1302,10 +1302,10 @@ if __name__ == '__main__':
     PORT = 5000
     
     print("=" * 60)
-    print("FOREX SIGNAL API v10.0")
+    print("PREDICTRIX API v1.0")
     print("=" * 60)
     print(f"✓ MongoDB: Connected")
-    print(f"✓ Signal Generator V10: {'Loaded (7-Model Ensemble)' if (signal_generator and signal_generator.is_loaded) else 'Not loaded'}")
+    print(f"✓ GBDT Signal Generator: {'Loaded (Multi-TF Ensemble)' if (signal_generator and signal_generator.is_loaded) else 'Not loaded'}")
     print(f"✓ Twelve Data API: Enabled")
     print(f"✓ Port: {PORT}")
     print(f"\n[+] API Endpoints:")
