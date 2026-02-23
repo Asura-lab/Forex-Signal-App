@@ -6,7 +6,7 @@
 import { Platform } from "react-native";
 
 const getApiUrl = () => {
-  return 'https://forex-signal-back.onrender.com';
+  return 'https://forex-signal-backend.onrender.com';
 };
 
 export const API_URL = getApiUrl(); // Export API_URL directly as well for convenience
