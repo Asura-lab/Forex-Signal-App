@@ -277,6 +277,26 @@ def send_verification_email_async(email, code, name=""):
     t = threading.Thread(target=_send, daemon=True)
     t.start()
 
+def is_email_configured():
+    """Check whether SMTP credentials are available."""
+    return bool(MAIL_USERNAME and MAIL_PASSWORD)
+
+def send_reset_email_async(email, code):
+    """Send password reset email in a background thread."""
+    def _send():
+        with app.app_context():
+            try:
+                msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
+                msg.html = f"""
+                <h2>Нууц үг сэргээх</h2>
+                <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
+                <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
+                """
+                mail.send(msg)
+            except Exception as e:
+                print(f"Reset email алдаа: {e}")
+    threading.Thread(target=_send, daemon=True).start()
+
 # ==================== AUTH ENDPOINTS ====================
 
 @app.route('/auth/register', methods=['POST'])
@@ -313,12 +333,23 @@ def register():
     })
     
     # Send email in background thread so the request doesn't block/timeout
-    send_verification_email_async(email, code, name)
-    return jsonify({
-        'success': True,
-        'message': 'Баталгаажуулах код илгээлээ',
-        'email': email
-    })
+    if is_email_configured():
+        send_verification_email_async(email, code, name)
+        return jsonify({
+            'success': True,
+            'message': 'Баталгаажуулах код илгээлээ',
+            'email': email
+        })
+    else:
+        # Email not configured — return code directly so the app can show it
+        print(f"[DEMO] Verification code for {email}: {code}")
+        return jsonify({
+            'success': True,
+            'message': 'Demo горим: имэйл тохиргоо хийгдээгүй',
+            'email': email,
+            'demo_mode': True,
+            'verification_code': code
+        })
 
 @app.route('/auth/verify-email', methods=['POST'])
 def verify_email():
@@ -379,9 +410,18 @@ def resend_verification():
             'expires_at': datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
         }}
     )
-    
-    send_verification_email_async(email, code, record.get('name', ''))
-    return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
+
+    if is_email_configured():
+        send_verification_email_async(email, code, record.get('name', ''))
+        return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
+    else:
+        print(f"[DEMO] Resend verification code for {email}: {code}")
+        return jsonify({
+            'success': True,
+            'message': 'Demo горим: код шинэчлэгдлээ',
+            'demo_mode': True,
+            'verification_code': code
+        })
 
 @app.route('/auth/login', methods=['POST'])
 def login():
@@ -447,21 +487,17 @@ def forgot_password():
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=RESET_CODE_EXPIRY_MINUTES)
     })
     
-    def _send_reset():
-        with app.app_context():
-            try:
-                msg = Message('Predictrix - Нууц үг сэргээх', recipients=[email])
-                msg.html = f"""
-                <h2>Нууц үг сэргээх</h2>
-                <p>Код: <strong style="font-size: 24px;">{code}</strong></p>
-                <p>Код {RESET_CODE_EXPIRY_MINUTES} минутын дотор хүчинтэй.</p>
-                """
-                mail.send(msg)
-            except Exception as e:
-                print(f"Reset email алдаа: {e}")
-    threading.Thread(target=_send_reset, daemon=True).start()
-
-    return jsonify({'success': True, 'message': 'Код илгээлээ'})
+    if is_email_configured():
+        send_reset_email_async(email, code)
+        return jsonify({'success': True, 'message': 'Код илгээлээ'})
+    else:
+        print(f"[DEMO] Reset code for {email}: {code}")
+        return jsonify({
+            'success': True,
+            'message': 'Demo горим: имэйл тохиргоо хийгдээгүй',
+            'demo_mode': True,
+            'reset_code': code
+        })
 
 @app.route('/auth/reset-password', methods=['POST'])
 def reset_password():
