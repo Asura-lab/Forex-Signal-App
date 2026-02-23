@@ -657,10 +657,10 @@ def get_specific_rate():
 
 @app.route('/signal/best', methods=['GET'])
 def get_signal_best():
-    return get_signal_v2()
+    return get_signal()
 
 @app.route('/signal/v2', methods=['GET'])
-def get_signal_v2():
+def get_signal():
     """
     Signal Generator Endpoint (GBDT Multi-Timeframe Ensemble)
     Query params:
@@ -753,7 +753,7 @@ def get_signal_v2():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/signal/v2/demo', methods=['GET'])
-def get_signal_v2_demo():
+def get_signal_demo():
     """Demo signal with test data"""
     try:
         if signal_generator is None or not signal_generator.is_loaded:
