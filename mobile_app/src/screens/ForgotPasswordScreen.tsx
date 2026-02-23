@@ -27,7 +27,7 @@ import {
  * Step 3: New Password
  */
 const ForgotPasswordScreen = ({ navigation }) => {
-  const { isDark } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
 
@@ -306,9 +306,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Text style={styles.backText}>{"<"} Буцах</Text>
-            </TouchableOpacity>
+            <View style={styles.topRow}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Text style={styles.backText}>{"<"} Буцах</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+                <Text style={styles.themeToggleText}>{isDark ? '☀️' : '🌙'}</Text>
+              </TouchableOpacity>
+            </View>
             <Text style={styles.title}>НУУЦ ҮГ СЭРГЭЭХ</Text>
             <Text style={styles.subtitle}>
               {step === 1 && "Имэйл хаягаа оруулна уу"}
@@ -357,8 +362,20 @@ const createStyles = (colors) => StyleSheet.create({
   headerContainer: {
     marginBottom: 32,
   },
-  backButton: {
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
+  },
+  themeToggle: {
+    padding: 8,
+  },
+  themeToggleText: {
+    fontSize: 22,
+  },
+  backButton: {
+    padding: 4,
   },
   backText: {
     color: colors.textSecondary,

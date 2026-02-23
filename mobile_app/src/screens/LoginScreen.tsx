@@ -24,7 +24,7 @@ interface LoginScreenProps {
  * Login Screen - Professional minimal design
  */
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
-  const { isDark } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
 
   const [email, setEmail] = useState<string>("");
@@ -97,6 +97,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       <View style={styles.content}>
+        {/* Theme Toggle */}
+        <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+          <Text style={styles.themeToggleText}>{isDark ? '☀️' : '🌙'}</Text>
+        </TouchableOpacity>
+
         {/* Logo */}
         <View style={styles.headerContainer}>
           <View style={styles.logoContainer}>
@@ -104,7 +109,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             <View style={[styles.logoLine, styles.logoLine2]} />
             <View style={[styles.logoLine, styles.logoLine3]} />
           </View>
-          <Text style={styles.title}>FOREX SIGNAL</Text>
+          <Text style={styles.title}>PREDICTRIX</Text>
           <Text style={styles.subtitle}>AI Trading Assistant</Text>
         </View>
 
@@ -202,6 +207,14 @@ const createStyles = (colors) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    themeToggle: {
+      alignSelf: 'flex-end',
+      padding: 8,
+      marginBottom: 8,
+    },
+    themeToggleText: {
+      fontSize: 22,
     },
     content: {
       flex: 1,

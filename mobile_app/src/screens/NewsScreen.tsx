@@ -691,9 +691,10 @@ const createStyles = (colors) => StyleSheet.create({
     fontWeight: '700',
   },
   analysisText: {
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 14,
+    lineHeight: 22,
     marginBottom: 4,
+    color: colors.textPrimary,
   },
   // Modal Styles
   modalOverlay: {

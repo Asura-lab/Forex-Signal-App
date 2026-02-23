@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+﻿import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -9,16 +9,19 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  StatusBar,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Ionicons } from "../components/Icon";
+import { useTheme } from "../context/ThemeContext";
+import { getColors } from "../config/theme";
 import { verifyEmail, resendVerificationCode } from "../services/api";
 
 /**
- * Email Verification Screen - Имэйл баталгаажуулах дэлгэц
+ * Email Verification Screen - consistent design with Login/SignUp/ForgotPassword
  */
 const EmailVerificationScreen = ({ route, navigation }) => {
   const { email, name, verificationCode } = route.params;
+  const { isDark, toggleTheme } = useTheme();
+  const colors = getColors(isDark);
 
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -28,7 +31,6 @@ const EmailVerificationScreen = ({ route, navigation }) => {
 
   const inputRefs = useRef([]);
 
-  // Countdown timer
   useEffect(() => {
     if (countdown > 0) {
       const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
@@ -38,80 +40,60 @@ const EmailVerificationScreen = ({ route, navigation }) => {
     }
   }, [countdown]);
 
-  // Demo mode - Автоматаар код харуулах
   useEffect(() => {
     if (verificationCode) {
       Alert.alert(
         "Demo Mode",
-        `Таны баталгаажуулах код: ${verificationCode}\n\n(Имэйл тохиргоо хийгдээгүй учир demo горимд ажиллаж байна)`,
+        `Ð¢Ð°Ð½Ñ‹ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÐºÐ¾Ð´: ${verificationCode}\n\n(Ð˜Ð¼ÑÐ¹Ð» Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ Ñ…Ð¸Ð¹Ð³Ð´ÑÑÐ³Ò¯Ð¹ ÑƒÑ‡Ð¸Ñ€ demo Ð³Ð¾Ñ€Ð¸Ð¼Ð´ Ð°Ð¶Ð¸Ð»Ð»Ð°Ð¶ Ð±Ð°Ð¹Ð½Ð°)`,
         [{ text: "OK" }]
       );
     }
   }, [verificationCode]);
 
   const handleCodeChange = (text, index) => {
-    // Зөвхөн тоо оруулах
     if (text && !/^\d+$/.test(text)) return;
-
     const newCode = [...code];
     newCode[index] = text;
     setCode(newCode);
-
-    // Автоматаар дараагийн input луу шилжих
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
-
-    // Бүх код оруулсан бол автоматаар баталгаажуулах
     if (index === 5 && text) {
       const fullCode = newCode.join("");
-      if (fullCode.length === 6) {
-        handleVerify(fullCode);
-      }
+      if (fullCode.length === 6) handleVerify(fullCode);
     }
   };
 
   const handleKeyPress = (e, index) => {
-    // Backspace дарахад өмнөх input луу буцах
     if (e.nativeEvent.key === "Backspace" && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handleVerify = async (fullCode = null) => {
-    const verificationCode = fullCode || code.join("");
-
-    if (verificationCode.length !== 6) {
-      Alert.alert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
+    const verCode = fullCode || code.join("");
+    if (verCode.length !== 6) {
+      Alert.alert("ÐÐ»Ð´Ð°Ð°", "6 Ð¾Ñ€Ð¾Ð½Ñ‚Ð¾Ð¹ ÐºÐ¾Ð´Ñ‹Ð³ Ð±Ò¯Ñ€ÑÐ½ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð° ÑƒÑƒ");
       return;
     }
-
     setLoading(true);
-
     try {
-      const result = await verifyEmail(email, verificationCode);
-
+      const result = await verifyEmail(email, verCode);
       if (result.success) {
-        Alert.alert("Амжилттай!", "Таны имэйл амжилттай баталгаажлаа", [
+        Alert.alert("ÐÐ¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹!", "Ð¢Ð°Ð½Ñ‹ Ð¸Ð¼ÑÐ¹Ð» Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶Ð»Ð°Ð°", [
           {
             text: "OK",
-            onPress: () => {
-              // Main screen рүү шилжих
-              navigation.reset({
-                index: 0,
-                routes: [{ name: "Main" }],
-              });
-            },
+            onPress: () =>
+              navigation.reset({ index: 0, routes: [{ name: "Main" }] }),
           },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Баталгаажуулалт амжилтгүй");
-        // Код цэвэрлэх
+        Alert.alert("ÐÐ»Ð´Ð°Ð°", result.error || "Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ð»Ñ‚ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹");
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
     } catch (error) {
-      Alert.alert("Алдаа", "Баталгаажуулах явцад алдаа гарлаа");
+      Alert.alert("ÐÐ»Ð´Ð°Ð°", "Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÑÐ²Ñ†Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°");
     } finally {
       setLoading(false);
     }
@@ -119,63 +101,71 @@ const EmailVerificationScreen = ({ route, navigation }) => {
 
   const handleResend = async () => {
     if (!canResend || resending) return;
-
     setResending(true);
-
     try {
       const result = await resendVerificationCode(email);
-
       if (result.success) {
         Alert.alert(
-          "Илгээгдлээ",
+          "Ð˜Ð»Ð³ÑÑÐ³Ð´Ð»ÑÑ",
           result.data.demo_mode
-            ? `Шинэ код: ${result.data.verification_code}\n\n(Demo горим)`
-            : "Шинэ баталгаажуулах код таны имэйл хаяг руу илгээгдлээ"
+            ? `Ð¨Ð¸Ð½Ñ ÐºÐ¾Ð´: ${result.data.verification_code}\n\n(Demo Ð³Ð¾Ñ€Ð¸Ð¼)`
+            : "Ð¨Ð¸Ð½Ñ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÐºÐ¾Ð´ Ñ‚Ð°Ð½Ñ‹ Ð¸Ð¼ÑÐ¹Ð» Ñ…Ð°ÑÐ³ Ñ€ÑƒÑƒ Ð¸Ð»Ð³ÑÑÐ³Ð´Ð»ÑÑ"
         );
         setCountdown(60);
         setCanResend(false);
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       } else {
-        Alert.alert("Алдаа", result.error || "Код илгээх амжилтгүй");
+        Alert.alert("ÐÐ»Ð´Ð°Ð°", result.error || "ÐšÐ¾Ð´ Ð¸Ð»Ð³ÑÑÑ… Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹");
       }
     } catch (error) {
-      Alert.alert("Алдаа", "Код илгээх явцад алдаа гарлаа");
+      Alert.alert("ÐÐ»Ð´Ð°Ð°", "ÐšÐ¾Ð´ Ð¸Ð»Ð³ÑÑÑ… ÑÐ²Ñ†Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°");
     } finally {
       setResending(false);
     }
   };
+
+  const styles = createStyles(colors);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <LinearGradient
-        colors={["#1a237e", "#283593", "#3949ab"]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.gradient}
-      >
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.headerContainer}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="mail-outline" size={60} color="#FFFFFF" />
-            </View>
-            <Text style={styles.title}>Имэйл баталгаажуулах</Text>
-            <Text style={styles.subtitle}>
-              Бид {email} хаягт 6 оронтой код илгээлээ
-            </Text>
-          </View>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={colors.background}
+      />
+      <View style={styles.content}>
+        {/* Top row: Back + Theme toggle */}
+        <View style={styles.topRow}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Login")}
+            style={styles.backButton}
+          >
+            <Text style={styles.backText}>{"<"} Ð‘ÑƒÑ†Ð°Ñ…</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+            <Text style={styles.themeToggleText}>{isDark ? "â˜€ï¸" : "ðŸŒ™"}</Text>
+          </TouchableOpacity>
+        </View>
 
-          {/* Code Input */}
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>Ð˜ÐœÐ­Ð™Ð› Ð‘ÐÐ¢ÐÐ›Ð“ÐÐÐ–Ð£Ð£Ð›ÐÐ¥</Text>
+          <Text style={styles.subtitle}>
+            {email} Ñ…Ð°ÑÐ³ Ñ€ÑƒÑƒ Ð¸Ð»Ð³ÑÑÑÑÐ½ 6 Ð¾Ñ€Ð¾Ð½Ñ‚Ð¾Ð¹ ÐºÐ¾Ð´Ñ‹Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð° ÑƒÑƒ
+          </Text>
+        </View>
+
+        {/* Form Card */}
+        <View style={styles.formContainer}>
           <View style={styles.codeContainer}>
             {code.map((digit, index) => (
               <TextInput
                 key={index}
                 ref={(ref) => (inputRefs.current[index] = ref)}
-                style={[styles.codeInput, digit && styles.codeInputFilled]}
+                style={[styles.codeInput, digit ? styles.codeInputFilled : null]}
                 value={digit}
                 onChangeText={(text) => handleCodeChange(text, index)}
                 onKeyPress={(e) => handleKeyPress(e, index)}
@@ -186,169 +176,160 @@ const EmailVerificationScreen = ({ route, navigation }) => {
             ))}
           </View>
 
-          {/* Verify Button */}
           <TouchableOpacity
-            style={styles.verifyButton}
+            style={[
+              styles.primaryButton,
+              (loading || code.join("").length !== 6) && styles.disabledButton,
+            ]}
             onPress={() => handleVerify()}
             disabled={loading || code.join("").length !== 6}
           >
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <>
-                <Ionicons
-                  name="checkmark-circle-outline"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.verifyButtonText}>Баталгаажуулах</Text>
-              </>
+              <Text style={styles.primaryButtonText}>Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ…</Text>
             )}
           </TouchableOpacity>
 
-          {/* Resend Code */}
           <View style={styles.resendContainer}>
-            <Text style={styles.resendText}>Код ирсэнгүй юу?</Text>
-            <TouchableOpacity
-              onPress={handleResend}
-              disabled={!canResend || resending}
-            >
+            <Text style={styles.resendLabel}>ÐšÐ¾Ð´ Ð¸Ñ€ÑÐ½Ð³Ò¯Ð¹ ÑŽÑƒ? </Text>
+            <TouchableOpacity onPress={handleResend} disabled={!canResend || resending}>
               {resending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
+                <ActivityIndicator size="small" color={colors.success} />
               ) : (
-                <Text
-                  style={[
-                    styles.resendButton,
-                    !canResend && styles.resendButtonDisabled,
-                  ]}
-                >
-                  {canResend ? "Дахин илгээх" : `Дахин илгээх (${countdown}с)`}
+                <Text style={[styles.resendLink, !canResend && styles.resendLinkDisabled]}>
+                  {canResend ? "Ð”Ð°Ñ…Ð¸Ð½ Ð¸Ð»Ð³ÑÑÑ…" : `Ð”Ð°Ñ…Ð¸Ð½ Ð¸Ð»Ð³ÑÑÑ… (${countdown}Ñ)`}
                 </Text>
               )}
             </TouchableOpacity>
           </View>
-
-          {/* Back to Login */}
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.navigate("Login")}
-          >
-            <Ionicons name="arrow-back-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.backButtonText}>Нэвтрэх хуудас руу буцах</Text>
-          </TouchableOpacity>
         </View>
-      </LinearGradient>
+
+        <Text style={styles.footerText}>For research purposes only</Text>
+      </View>
     </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  gradient: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 30,
-  },
-  headerContainer: {
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  iconContainer: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#FFFFFF",
-    marginBottom: 10,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: "#E3F2FD",
-    textAlign: "center",
-    paddingHorizontal: 20,
-    lineHeight: 20,
-  },
-  codeContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 30,
-  },
-  codeInput: {
-    width: 50,
-    height: 60,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.3)",
-    borderRadius: 12,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  codeInputFilled: {
-    borderColor: "#4CAF50",
-    backgroundColor: "rgba(76,175,80,0.2)",
-  },
-  verifyButton: {
-    backgroundColor: "#4CAF50",
-    paddingVertical: 15,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    elevation: 8,
-  },
-  verifyButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  resendContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 30,
-  },
-  resendText: {
-    color: "#E3F2FD",
-    fontSize: 14,
-  },
-  resendButton: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "bold",
-    textDecorationLine: "underline",
-  },
-  resendButtonDisabled: {
-    color: "rgba(255,255,255,0.5)",
-    textDecorationLine: "none",
-  },
-  backButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 12,
-  },
-  backButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "500",
-  },
-});
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    content: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 24,
+    },
+    topRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: 32,
+    },
+    backButton: {
+      padding: 4,
+    },
+    backText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+    },
+    themeToggle: {
+      padding: 8,
+    },
+    themeToggleText: {
+      fontSize: 22,
+    },
+    headerContainer: {
+      alignItems: "center",
+      marginBottom: 36,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      letterSpacing: 2,
+      textAlign: "center",
+    },
+    subtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 10,
+      textAlign: "center",
+      lineHeight: 20,
+      paddingHorizontal: 8,
+    },
+    formContainer: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+    },
+    codeContainer: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      marginBottom: 28,
+      gap: 8,
+    },
+    codeInput: {
+      flex: 1,
+      height: 56,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+      color: colors.textPrimary,
+      fontSize: 22,
+      fontWeight: "bold",
+      textAlign: "center",
+    },
+    codeInputFilled: {
+      borderColor: colors.success,
+    },
+    primaryButton: {
+      backgroundColor: colors.success,
+      borderRadius: 8,
+      height: 50,
+      justifyContent: "center",
+      alignItems: "center",
+      marginBottom: 20,
+    },
+    disabledButton: {
+      opacity: 0.5,
+    },
+    primaryButtonText: {
+      color: "#FFFFFF",
+      fontSize: 15,
+      fontWeight: "600",
+      letterSpacing: 1,
+    },
+    resendContainer: {
+      flexDirection: "row",
+      justifyContent: "center",
+      alignItems: "center",
+      paddingTop: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    resendLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+    },
+    resendLink: {
+      color: colors.success,
+      fontSize: 13,
+      fontWeight: "600",
+    },
+    resendLinkDisabled: {
+      color: colors.textSecondary,
+      fontWeight: "400",
+    },
+    footerText: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      textAlign: "center",
+      marginTop: 32,
+    },
+  });
 
 export default EmailVerificationScreen;

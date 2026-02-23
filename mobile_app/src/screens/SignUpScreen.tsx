@@ -25,7 +25,7 @@ interface SignUpScreenProps {
  * SignUp Screen - Professional minimal design
  */
 const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
-  const { isDark } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
 
@@ -123,11 +123,16 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
         <View style={styles.content}>
           {/* Header */}
           <View style={styles.headerContainer}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Text style={styles.backText}>{"<"} Back</Text>
-            </TouchableOpacity>
-            <Text style={styles.title}>CREATE ACCOUNT</Text>
-            <Text style={styles.subtitle}>Join Forex Signal</Text>
+            <View style={styles.topRow}>
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                <Text style={styles.backText}>{"<"} Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+                <Text style={styles.themeToggleText}>{isDark ? '☀️' : '🌙'}</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.title}>БҮРТГҮҮЛЭХ</Text>
+            <Text style={styles.subtitle}>Predictrix-д нэгдэх</Text>
           </View>
 
           {/* Form */}
@@ -262,8 +267,20 @@ const createStyles = (colors) => StyleSheet.create({
   headerContainer: {
     marginBottom: 32,
   },
-  backButton: {
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
+  },
+  themeToggle: {
+    padding: 8,
+  },
+  themeToggleText: {
+    fontSize: 22,
+  },
+  backButton: {
+    padding: 4,
   },
   backText: {
     color: colors.textSecondary,
