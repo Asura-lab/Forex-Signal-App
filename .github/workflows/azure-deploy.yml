@@ -26,10 +26,10 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Zip backend folder
+      - name: Zip backend with virtualenv
         run: |
           cd backend
-          zip -r ../backend.zip . -x "*.pyc" -x "__pycache__/*" -x ".git/*"
+          zip -r ../backend.zip .
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
