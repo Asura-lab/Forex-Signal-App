@@ -61,6 +61,7 @@ app.config['MAIL_USE_SSL'] = MAIL_USE_SSL
 app.config['MAIL_USERNAME'] = MAIL_USERNAME
 app.config['MAIL_PASSWORD'] = MAIL_PASSWORD
 app.config['MAIL_DEFAULT_SENDER'] = MAIL_DEFAULT_SENDER
+app.config['MAIL_TIMEOUT'] = 10  # 10s SMTP connection timeout to prevent worker hangs
 
 mail = Mail(app)
 
@@ -268,6 +269,14 @@ def send_verification_email(email, code, name=""):
         print(f"Email илгээх алдаа: {e}")
         return False
 
+def send_verification_email_async(email, code, name=""):
+    """Send verification email in a background thread to avoid blocking the worker."""
+    def _send():
+        with app.app_context():
+            send_verification_email(email, code, name)
+    t = threading.Thread(target=_send, daemon=True)
+    t.start()
+
 # ==================== AUTH ENDPOINTS ====================
 
 @app.route('/auth/register', methods=['POST'])
@@ -303,15 +312,13 @@ def register():
         'expires_at': datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_CODE_EXPIRY_MINUTES)
     })
     
-    # Send email
-    if send_verification_email(email, code, name):
-        return jsonify({
-            'success': True,
-            'message': 'Баталгаажуулах код илгээлээ',
-            'email': email
-        })
-    else:
-        return jsonify({'error': 'Имэйл илгээхэд алдаа гарлаа'}), 500
+    # Send email in background thread so the request doesn't block/timeout
+    send_verification_email_async(email, code, name)
+    return jsonify({
+        'success': True,
+        'message': 'Баталгаажуулах код илгээлээ',
+        'email': email
+    })
 
 @app.route('/auth/verify-email', methods=['POST'])
 def verify_email():
@@ -373,9 +380,8 @@ def resend_verification():
         }}
     )
     
-    if send_verification_email(email, code, record.get('name', '')):
-        return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
-    return jsonify({'error': 'Имэйл илгээхэд алдаа'}), 500
+    send_verification_email_async(email, code, record.get('name', ''))
+    return jsonify({'success': True, 'message': 'Код дахин илгээлээ'})
 
 @app.route('/auth/login', methods=['POST'])
 def login():
