@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -128,9 +129,10 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 <Text style={styles.backText}>{"<"} Back</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-                <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
+                <Text style={styles.themeIconText}>{isDark ? '☀' : '☽'}</Text>
               </TouchableOpacity>
             </View>
+            <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
             <Text style={styles.title}>БҮРТГҮҮЛЭХ</Text>
             <Text style={styles.subtitle}>Predictrix-д нэгдэх</Text>
           </View>
@@ -276,11 +278,22 @@ const createStyles = (colors) => StyleSheet.create({
   themeToggle: {
     padding: 8,
   },
+  themeIconText: {
+    fontSize: 20,
+    color: colors.textSecondary,
+  },
   themeIcon: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
+  },
+  appIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    marginBottom: 16,
+    alignSelf: 'center',
   },
   backButton: {
     padding: 4,

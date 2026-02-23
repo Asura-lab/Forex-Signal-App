@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -99,16 +100,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       <View style={styles.content}>
         {/* Theme Toggle */}
         <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-          <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
+          <Text style={styles.themeIconText}>{isDark ? '☀' : '☽'}</Text>
         </TouchableOpacity>
 
         {/* Logo */}
         <View style={styles.headerContainer}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logoLine} />
-            <View style={[styles.logoLine, styles.logoLine2]} />
-            <View style={[styles.logoLine, styles.logoLine3]} />
-          </View>
+          <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
           <Text style={styles.title}>PREDICTRIX</Text>
           <Text style={styles.subtitle}>AI Trading Assistant</Text>
         </View>
@@ -213,11 +210,9 @@ const createStyles = (colors) =>
       padding: 8,
       marginBottom: 8,
     },
-    themeIcon: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      borderWidth: 1.5,
+    themeIconText: {
+      fontSize: 20,
+      color: colors.textSecondary,
     },
     content: {
       flex: 1,
@@ -228,29 +223,11 @@ const createStyles = (colors) =>
       alignItems: "center",
       marginBottom: 48,
     },
-    logoContainer: {
-      width: 60,
-      height: 60,
-      justifyContent: 'center',
-      alignItems: 'flex-start',
+    appIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 16,
       marginBottom: 16,
-    },
-    logoLine: {
-      width: 40,
-      height: 3,
-      backgroundColor: colors.success,
-      marginVertical: 3,
-      borderRadius: 2,
-    },
-    logoLine2: {
-      width: 50,
-      backgroundColor: colors.success,
-      opacity: 0.8,
-    },
-    logoLine3: {
-      width: 30,
-      backgroundColor: colors.success,
-      opacity: 0.6,
     },
     title: {
       fontSize: 28,

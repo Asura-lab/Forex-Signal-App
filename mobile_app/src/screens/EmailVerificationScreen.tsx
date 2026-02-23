@@ -2,6 +2,7 @@
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -146,12 +147,13 @@ const EmailVerificationScreen = ({ route, navigation }) => {
             <Text style={styles.backText}>{"<"} Буцах</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-            <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
+            <Text style={styles.themeIconText}>{isDark ? '☀' : '☽'}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Header */}
         <View style={styles.headerContainer}>
+          <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
           <Text style={styles.title}>ИМЭЙЛ БАТАЛГААЖУУЛАХ</Text>
           <Text style={styles.subtitle}>
             {email} хаяг руу илгээсэн 6 оронтой кодыг оруулна уу
@@ -238,11 +240,15 @@ const createStyles = (colors) =>
     themeToggle: {
       padding: 8,
     },
-    themeIcon: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      borderWidth: 1.5,
+    themeIconText: {
+      fontSize: 20,
+      color: colors.textSecondary,
+    },
+    appIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 14,
+      marginBottom: 16,
     },
     headerContainer: {
       alignItems: "center",

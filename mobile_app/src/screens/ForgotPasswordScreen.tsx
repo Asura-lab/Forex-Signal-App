@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -311,9 +312,10 @@ const ForgotPasswordScreen = ({ navigation }) => {
                 <Text style={styles.backText}>{"<"} Буцах</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-                <View style={[styles.themeIcon, { backgroundColor: isDark ? colors.textSecondary : 'transparent', borderColor: colors.textSecondary }]} />
+                <Text style={styles.themeIconText}>{isDark ? '☀' : '☽'}</Text>
               </TouchableOpacity>
             </View>
+            <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
             <Text style={styles.title}>НУУЦ ҮГ СЭРГЭЭХ</Text>
             <Text style={styles.subtitle}>
               {step === 1 && "Имэйл хаягаа оруулна уу"}
@@ -371,11 +373,16 @@ const createStyles = (colors) => StyleSheet.create({
   themeToggle: {
     padding: 8,
   },
-  themeIcon: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 1.5,
+  themeIconText: {
+    fontSize: 20,
+    color: colors.textSecondary,
+  },
+  appIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    marginBottom: 16,
+    alignSelf: 'center',
   },
   backButton: {
     padding: 4,
