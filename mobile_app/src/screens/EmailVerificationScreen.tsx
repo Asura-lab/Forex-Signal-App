@@ -11,6 +11,7 @@ import {
   Platform,
   StatusBar,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { verifyEmail, resendVerificationCode } from "../services/api";
@@ -44,7 +45,7 @@ const EmailVerificationScreen = ({ route, navigation }) => {
     if (verificationCode) {
       Alert.alert(
         "Demo Mode",
-        `Ð¢Ð°Ð½Ñ‹ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÐºÐ¾Ð´: ${verificationCode}\n\n(Ð˜Ð¼ÑÐ¹Ð» Ñ‚Ð¾Ñ…Ð¸Ñ€Ð³Ð¾Ð¾ Ñ…Ð¸Ð¹Ð³Ð´ÑÑÐ³Ò¯Ð¹ ÑƒÑ‡Ð¸Ñ€ demo Ð³Ð¾Ñ€Ð¸Ð¼Ð´ Ð°Ð¶Ð¸Ð»Ð»Ð°Ð¶ Ð±Ð°Ð¹Ð½Ð°)`,
+        `Таны баталгаажуулах код: ${verificationCode}\n\n(Имэйл тохиргоо хийгдээгүй учир demo горимд ажиллаж байна)`,
         [{ text: "OK" }]
       );
     }
@@ -73,14 +74,14 @@ const EmailVerificationScreen = ({ route, navigation }) => {
   const handleVerify = async (fullCode = null) => {
     const verCode = fullCode || code.join("");
     if (verCode.length !== 6) {
-      Alert.alert("ÐÐ»Ð´Ð°Ð°", "6 Ð¾Ñ€Ð¾Ð½Ñ‚Ð¾Ð¹ ÐºÐ¾Ð´Ñ‹Ð³ Ð±Ò¯Ñ€ÑÐ½ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð° ÑƒÑƒ");
+      Alert.alert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
       return;
     }
     setLoading(true);
     try {
       const result = await verifyEmail(email, verCode);
       if (result.success) {
-        Alert.alert("ÐÐ¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹!", "Ð¢Ð°Ð½Ñ‹ Ð¸Ð¼ÑÐ¹Ð» Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ñ‚Ð°Ð¹ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶Ð»Ð°Ð°", [
+        Alert.alert("Амжилттай!", "Таны имэйл амжилттай баталгаажлаа", [
           {
             text: "OK",
             onPress: () =>
@@ -88,12 +89,12 @@ const EmailVerificationScreen = ({ route, navigation }) => {
           },
         ]);
       } else {
-        Alert.alert("ÐÐ»Ð´Ð°Ð°", result.error || "Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ð»Ñ‚ Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹");
+        Alert.alert("Алдаа", result.error || "Баталгаажуулалт амжилтгүй");
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
     } catch (error) {
-      Alert.alert("ÐÐ»Ð´Ð°Ð°", "Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÑÐ²Ñ†Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°");
+      Alert.alert("Алдаа", "Баталгаажуулах явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }
@@ -106,20 +107,20 @@ const EmailVerificationScreen = ({ route, navigation }) => {
       const result = await resendVerificationCode(email);
       if (result.success) {
         Alert.alert(
-          "Ð˜Ð»Ð³ÑÑÐ³Ð´Ð»ÑÑ",
+          "Илгээгдлээ",
           result.data.demo_mode
-            ? `Ð¨Ð¸Ð½Ñ ÐºÐ¾Ð´: ${result.data.verification_code}\n\n(Demo Ð³Ð¾Ñ€Ð¸Ð¼)`
-            : "Ð¨Ð¸Ð½Ñ Ð±Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ… ÐºÐ¾Ð´ Ñ‚Ð°Ð½Ñ‹ Ð¸Ð¼ÑÐ¹Ð» Ñ…Ð°ÑÐ³ Ñ€ÑƒÑƒ Ð¸Ð»Ð³ÑÑÐ³Ð´Ð»ÑÑ"
+            ? `Шинэ код: ${result.data.verification_code}\n\n(Demo горим)`
+            : "Шинэ баталгаажуулах код таны имэйл хаяг руу илгээгдлээ"
         );
         setCountdown(60);
         setCanResend(false);
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       } else {
-        Alert.alert("ÐÐ»Ð´Ð°Ð°", result.error || "ÐšÐ¾Ð´ Ð¸Ð»Ð³ÑÑÑ… Ð°Ð¼Ð¶Ð¸Ð»Ñ‚Ð³Ò¯Ð¹");
+        Alert.alert("Алдаа", result.error || "Код илгээх амжилтгүй");
       }
     } catch (error) {
-      Alert.alert("ÐÐ»Ð´Ð°Ð°", "ÐšÐ¾Ð´ Ð¸Ð»Ð³ÑÑÑ… ÑÐ²Ñ†Ð°Ð´ Ð°Ð»Ð´Ð°Ð° Ð³Ð°Ñ€Ð»Ð°Ð°");
+      Alert.alert("Алдаа", "Код илгээх явцад алдаа гарлаа");
     } finally {
       setResending(false);
     }
@@ -143,18 +144,22 @@ const EmailVerificationScreen = ({ route, navigation }) => {
             onPress={() => navigation.navigate("Login")}
             style={styles.backButton}
           >
-            <Text style={styles.backText}>{"<"} Ð‘ÑƒÑ†Ð°Ñ…</Text>
+            <Text style={styles.backText}>{"<"} Буцах</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-            <Text style={styles.themeToggleText}>{isDark ? "â˜€ï¸" : "ðŸŒ™"}</Text>
+            <Ionicons
+              name={isDark ? "sunny-outline" : "moon-outline"}
+              size={22}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
         </View>
 
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Ð˜ÐœÐ­Ð™Ð› Ð‘ÐÐ¢ÐÐ›Ð“ÐÐÐ–Ð£Ð£Ð›ÐÐ¥</Text>
+          <Text style={styles.title}>ИМЭЙЛ БАТАЛГААЖУУЛАХ</Text>
           <Text style={styles.subtitle}>
-            {email} Ñ…Ð°ÑÐ³ Ñ€ÑƒÑƒ Ð¸Ð»Ð³ÑÑÑÑÐ½ 6 Ð¾Ñ€Ð¾Ð½Ñ‚Ð¾Ð¹ ÐºÐ¾Ð´Ñ‹Ð³ Ð¾Ñ€ÑƒÑƒÐ»Ð½Ð° ÑƒÑƒ
+            {email} хаяг руу илгээсэн 6 оронтой кодыг оруулна уу
           </Text>
         </View>
 
@@ -187,18 +192,18 @@ const EmailVerificationScreen = ({ route, navigation }) => {
             {loading ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={styles.primaryButtonText}>Ð‘Ð°Ñ‚Ð°Ð»Ð³Ð°Ð°Ð¶ÑƒÑƒÐ»Ð°Ñ…</Text>
+              <Text style={styles.primaryButtonText}>Баталгаажуулах</Text>
             )}
           </TouchableOpacity>
 
           <View style={styles.resendContainer}>
-            <Text style={styles.resendLabel}>ÐšÐ¾Ð´ Ð¸Ñ€ÑÐ½Ð³Ò¯Ð¹ ÑŽÑƒ? </Text>
+            <Text style={styles.resendLabel}>Код ирсэнгүй юу? </Text>
             <TouchableOpacity onPress={handleResend} disabled={!canResend || resending}>
               {resending ? (
                 <ActivityIndicator size="small" color={colors.success} />
               ) : (
                 <Text style={[styles.resendLink, !canResend && styles.resendLinkDisabled]}>
-                  {canResend ? "Ð”Ð°Ñ…Ð¸Ð½ Ð¸Ð»Ð³ÑÑÑ…" : `Ð”Ð°Ñ…Ð¸Ð½ Ð¸Ð»Ð³ÑÑÑ… (${countdown}Ñ)`}
+                  {canResend ? "Дахин илгээх" : `Дахин илгээх (${countdown}с)`}
                 </Text>
               )}
             </TouchableOpacity>
@@ -237,9 +242,6 @@ const createStyles = (colors) =>
     },
     themeToggle: {
       padding: 8,
-    },
-    themeToggleText: {
-      fontSize: 22,
     },
     headerContainer: {
       alignItems: "center",
