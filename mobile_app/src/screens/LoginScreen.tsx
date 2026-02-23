@@ -103,10 +103,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           {isDark ? (
             <View style={styles.sunIcon}>
               <View style={styles.sunCore} />
-              <View style={[styles.sunRay, { top: 0, left: '50%', marginLeft: -1 }]} />
-              <View style={[styles.sunRay, { bottom: 0, left: '50%', marginLeft: -1 }]} />
-              <View style={[styles.sunRay, { left: 0, top: '50%', marginTop: -1, width: 5, height: 2 }]} />
-              <View style={[styles.sunRay, { right: 0, top: '50%', marginTop: -1, width: 5, height: 2 }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '0deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '45deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '90deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '135deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '180deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '225deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '270deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '315deg' }, { translateY: -10 }] }]} />
             </View>
           ) : (
             <View style={styles.moonIcon}>
@@ -227,21 +231,23 @@ const createStyles = (colors: any) =>
       marginBottom: 8,
     },
     sunIcon: {
-      width: 22,
-      height: 22,
+      width: 30,
+      height: 30,
       justifyContent: 'center',
       alignItems: 'center',
     },
     sunCore: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
       backgroundColor: colors.textSecondary,
     },
     sunRay: {
       position: 'absolute',
       width: 2,
-      height: 5,
+      height: 6,
+      top: 12,
+      left: 14,
       backgroundColor: colors.textSecondary,
       borderRadius: 1,
     },
@@ -276,9 +282,9 @@ const createStyles = (colors: any) =>
       marginBottom: 48,
     },
     appIcon: {
-      width: 84,
-      height: 84,
-      borderRadius: 20,
+      width: 168,
+      height: 168,
+      borderRadius: 40,
       marginBottom: 18,
       elevation: 4,
       shadowColor: '#000',
