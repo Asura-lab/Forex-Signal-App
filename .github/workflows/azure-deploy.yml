@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'backend/**'   # backend өөрчлөгдөхөд л deploy хийнэ
 
 jobs:
   build-and-deploy:
