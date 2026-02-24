@@ -1,6 +1,6 @@
 {
   "name": "predictrix",
-  "version": "0.3.01",
+  "version": "0.4.0",
   "description": "AI-Powered Forex Trading Predictions - Predictrix",
   "main": "index.js",
   "scripts": {
