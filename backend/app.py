@@ -319,6 +319,138 @@ def news_notification_scheduler():
 # Start news notification scheduler
 threading.Thread(target=news_notification_scheduler, daemon=True).start()
 
+# ==================== CONTINUOUS SIGNAL GENERATOR ====================
+# Минут тутамд таамаглал гаргаж, итгэлцэл >= 0.9 бол DB-д хадгалж,
+# хэрэглэгчийн босгоос дээш бол push notification илгээнэ.
+
+# Supported currency pairs for continuous generation
+SIGNAL_PAIRS = ["EUR/USD"]
+
+# Minimum confidence to save signal to DB (0.9 = 90%)
+SAVE_CONFIDENCE_THRESHOLD = 0.9
+
+# Cache to avoid duplicate signals within the same direction
+_last_signal_cache = {}  # { pair: { signal, timestamp } }
+
+def continuous_signal_generator():
+    """
+    Background thread: минут тутамд модел ажиллуулж таамаглал гаргана.
+    - Итгэлцэл >= 90% бол MongoDB-д хадгална
+    - Хэрэглэгч бүрийн signal_threshold-оос дээш бол push мэдэгдэл илгээнэ
+    """
+    print("[INFO] Starting continuous signal generator (every 60s)...")
+    # Wait for signal generator to load
+    for _ in range(60):
+        if signal_generator is not None and signal_generator.is_loaded:
+            break
+        time.sleep(2)
+    
+    if signal_generator is None or not signal_generator.is_loaded:
+        print("[ERROR] Continuous signal generator: model not loaded, stopping.")
+        return
+    
+    print("[OK] Continuous signal generator active.")
+    
+    while True:
+        for pair in SIGNAL_PAIRS:
+            try:
+                # Check if market is closed
+                now = datetime.now()
+                if now.weekday() >= 5 or (now.weekday() == 0 and now.hour < 8):
+                    continue  # Skip during weekends
+
+                # Fetch multi-timeframe data
+                multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
+                if multi_tf is None or "1min" not in multi_tf:
+                    print(f"[WARN] Continuous signal: no data for {pair}")
+                    continue
+
+                df = multi_tf["1min"]
+                if len(df) < 100:
+                    print(f"[WARN] Continuous signal: insufficient data for {pair} ({len(df)} bars)")
+                    continue
+
+                # Generate signal with NO minimum confidence filter (we filter after)
+                result = signal_generator.generate_signal(
+                    df_1min=df,
+                    multi_tf_data=multi_tf,
+                    min_confidence=0.0,  # No filter - we decide based on output
+                    symbol=pair.replace('/', '')
+                )
+
+                sig_type = result.get('signal', 'HOLD').upper()
+                sig_conf = result.get('confidence', 0)  # This is 0-100 percentage
+                conf_decimal = sig_conf / 100.0 if sig_conf > 1 else sig_conf
+
+                print(f"[SIGNAL] {pair}: {sig_type} @ {sig_conf:.1f}% (threshold: {SAVE_CONFIDENCE_THRESHOLD*100}%)")
+
+                # Only process BUY/SELL signals with confidence >= 0.9 (90%)
+                if sig_type in ('BUY', 'SELL') and conf_decimal >= SAVE_CONFIDENCE_THRESHOLD:
+                    # Check duplicate: skip if same signal type within last 5 minutes
+                    cache_key = pair
+                    last = _last_signal_cache.get(cache_key)
+                    if last and last['signal'] == sig_type:
+                        elapsed = (datetime.now(timezone.utc) - last['timestamp']).total_seconds()
+                        if elapsed < 300:  # 5 minutes dedup
+                            print(f"[SKIP] Duplicate {sig_type} for {pair} (last: {elapsed:.0f}s ago)")
+                            continue
+
+                    # Save to MongoDB
+                    signal_doc = {
+                        'pair': pair.replace('/', '_'),
+                        'signal': sig_type,
+                        'confidence': float(sig_conf),
+                        'entry_price': result.get('entry_price'),
+                        'stop_loss': result.get('stop_loss'),
+                        'take_profit': result.get('take_profit'),
+                        'sl_pips': result.get('sl_pips'),
+                        'tp_pips': result.get('tp_pips'),
+                        'risk_reward': result.get('risk_reward'),
+                        'model_probabilities': result.get('model_probabilities'),
+                        'models_agree': result.get('models_agree'),
+                        'atr_pips': result.get('atr_pips'),
+                        'reason': result.get('reason'),
+                        'source': 'auto',  # Mark as auto-generated
+                        'created_at': datetime.now(timezone.utc),
+                        'status': 'active'
+                    }
+                    db_result = signals_collection.insert_one(signal_doc)
+                    print(f"[DB] Signal saved: {sig_type} {pair} @ {sig_conf:.1f}% (ID: {db_result.inserted_id})")
+
+                    # Update dedup cache
+                    _last_signal_cache[cache_key] = {
+                        'signal': sig_type,
+                        'timestamp': datetime.now(timezone.utc)
+                    }
+
+                    # Send push notification per user threshold
+                    try:
+                        threading.Thread(
+                            target=push_service.send_signal_notification,
+                            args=({
+                                'signal_type': sig_type,
+                                'pair': pair,
+                                'confidence': sig_conf,
+                                'entry_price': result.get('entry_price'),
+                                'sl': result.get('stop_loss'),
+                                'tp': result.get('take_profit'),
+                            },),
+                            daemon=True
+                        ).start()
+                    except Exception as notif_err:
+                        print(f"[WARN] Signal push notification error: {notif_err}")
+
+            except Exception as e:
+                print(f"[ERROR] Continuous signal error for {pair}: {e}")
+                import traceback
+                traceback.print_exc()
+
+        # Wait 60 seconds before next cycle
+        time.sleep(60)
+
+# Start continuous signal generator
+threading.Thread(target=continuous_signal_generator, daemon=True).start()
+
 # ==================== AUTH HELPERS ====================
 
 def generate_token(user_id, email):
@@ -889,22 +1021,7 @@ def get_signal():
             symbol=pair.replace('/', '')
         )
 
-        # Push notification for high-confidence signals
-        try:
-            sig_type = signal.get('signal', 'HOLD').upper()
-            sig_conf = signal.get('confidence', 0)
-            if sig_type in ('BUY', 'SELL') and sig_conf >= 70:
-                threading.Thread(
-                    target=push_service.send_signal_notification,
-                    args=({'signal_type': sig_type, 'pair': pair,
-                           'confidence': sig_conf,
-                           'entry_price': signal.get('entry_price'),
-                           'sl': signal.get('stop_loss'),
-                           'tp': signal.get('take_profit')},),
-                    daemon=True
-                ).start()
-        except Exception as notif_err:
-            print(f"[WARN] Signal notification error: {notif_err}")
+        # Push notification хэрэггүй — continuous_signal_generator background-д хариуцна
 
         tf_info = {tf: len(tf_df) for tf, tf_df in multi_tf.items()}
 
@@ -1242,6 +1359,50 @@ def get_signals_stats():
         
     except Exception as e:
         print(f"Signal stats алдаа: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/signals/latest', methods=['GET'])
+def get_latest_signal():
+    """
+    Сүүлийн auto-generated сигнал авах endpoint
+    Query params:
+        - pair: Валютын хослол (default: EUR_USD)
+    """
+    try:
+        pair = request.args.get('pair', 'EUR_USD')
+        
+        # Get the most recent auto-generated signal
+        latest = signals_collection.find_one(
+            {'pair': pair, 'signal': {'$in': ['BUY', 'SELL']}, 'source': 'auto'},
+            sort=[('created_at', -1)]
+        )
+        
+        if not latest:
+            # Fallback: get any recent signal
+            latest = signals_collection.find_one(
+                {'pair': pair, 'signal': {'$in': ['BUY', 'SELL']}},
+                sort=[('created_at', -1)]
+            )
+        
+        if latest:
+            latest['_id'] = str(latest['_id'])
+            if latest.get('created_at'):
+                latest['created_at'] = latest['created_at'].isoformat()
+            
+            return jsonify({
+                'success': True,
+                'signal': latest
+            })
+        
+        return jsonify({
+            'success': True,
+            'signal': None,
+            'message': 'Одоогоор сигнал байхгүй байна'
+        })
+    
+    except Exception as e:
+        print(f"Latest signal алдаа: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

@@ -66,6 +66,7 @@ class PushNotificationService:
                         "news_notifications": True,
                         "news_impact_filter": "high",     # "high" | "medium" | "all"
                         "security_notifications": True,
+                        "signal_threshold": 0.9,          # 0.9-1.0 (user's personal confidence threshold)
                         "updated_at": datetime.now(timezone.utc)
                     },
                     "$setOnInsert": {
@@ -103,8 +104,12 @@ class PushNotificationService:
             allowed_keys = [
                 "notifications_enabled", "signal_notifications",
                 "news_notifications", "news_impact_filter",
-                "security_notifications"
+                "security_notifications", "signal_threshold"
             ]
+            # Validate signal_threshold range
+            if "signal_threshold" in preferences:
+                val = float(preferences["signal_threshold"])
+                preferences["signal_threshold"] = max(0.9, min(1.0, val))
             for key in allowed_keys:
                 if key in preferences:
                     update_fields[key] = preferences[key]
@@ -129,20 +134,23 @@ class PushNotificationService:
                     "signal_notifications": 1,
                     "news_notifications": 1,
                     "news_impact_filter": 1,
-                    "security_notifications": 1
+                    "security_notifications": 1,
+                    "signal_threshold": 1
                 }
             )
             if doc:
                 # Ensure defaults for new fields
                 doc.setdefault("news_impact_filter", "high")
                 doc.setdefault("security_notifications", True)
+                doc.setdefault("signal_threshold", 0.9)
                 return doc
             return {
                 "notifications_enabled": True,
                 "signal_notifications": True,
                 "news_notifications": True,
                 "news_impact_filter": "high",
-                "security_notifications": True
+                "security_notifications": True,
+                "signal_threshold": 0.9
             }
         except Exception as e:
             print(f"[ERROR] Get preferences failed: {e}")
@@ -267,14 +275,47 @@ class PushNotificationService:
         except Exception as e:
             print(f"[WARN] Mark event notified failed: {e}")
 
+    def _get_signal_tokens_by_threshold(self, confidence: float) -> list:
+        """
+        Хэрэглэгчийн signal_threshold-д тохирох token-уудыг авах.
+        confidence: Сигналын итгэлцүүр (0-1 хооронд, жишээ нь 0.95)
+        Зөвхөн итгэлцүүр >= хэрэглэгчийн босго үед илгээнэ.
+        """
+        try:
+            # Convert confidence to 0-1 range if needed
+            if confidence > 1:
+                confidence = confidence / 100.0
+
+            query = {
+                "notifications_enabled": True,
+                "signal_notifications": True
+            }
+            docs = self.push_tokens.find(query, {
+                "push_token": 1, "signal_threshold": 1, "_id": 0
+            })
+
+            tokens = []
+            for doc in docs:
+                if not doc.get("push_token"):
+                    continue
+                user_threshold = doc.get("signal_threshold", 0.9)
+                if confidence >= user_threshold:
+                    tokens.append(doc["push_token"])
+            return tokens
+        except Exception as e:
+            print(f"[ERROR] Get signal tokens by threshold failed: {e}")
+            return []
+
     def send_signal_notification(self, signal_data: dict) -> dict:
         """
-        Арилжааны сигнал мэдэгдэл илгээх
+        Арилжааны сигнал мэдэгдэл илгээх (хэрэглэгч бүрийн босгоор шүүнэ)
         signal_data: { signal_type, pair, confidence, entry_price, sl, tp }
+        confidence >= хэрэглэгчийн signal_threshold үед л мэдэгдэл илгээнэ.
         """
-        tokens = self._get_active_tokens("signal")
+        confidence_raw = signal_data.get("confidence", 0)
+        tokens = self._get_signal_tokens_by_threshold(confidence_raw)
         if not tokens:
-            print("[INFO] No active tokens for signal notifications")
+            print(f"[INFO] No active tokens for signal notifications (conf={confidence_raw})")
             return {"success": True, "sent": 0}
 
         signal_type = signal_data.get("signal_type", "HOLD").upper()

@@ -367,6 +367,25 @@ export const getSignalsStats = async (pair = "EUR_USD") => {
 };
 
 /**
+ * Сүүлийн auto-generated сигнал авах
+ * @param {string} pair - Currency pair (default: EUR_USD)
+ * @returns {Object} { success, signal }
+ */
+export const getLatestSignal = async (pair: string = "EUR/USD") => {
+  try {
+    const pairParam = pair.replace("/", "_");
+    const response = await apiClient.get(`/signals/latest?pair=${pairParam}`);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("Latest signal авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
+/**
  * Market Analysis авах
  * @param {string} pair - Currency pair (e.g. "EUR/USD")
  * @returns {Object} { success, data }

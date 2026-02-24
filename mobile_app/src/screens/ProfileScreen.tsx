@@ -55,6 +55,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [newsImpactFilter, setNewsImpactFilter] = useState<NewsImpactFilter>("high");
   const [securityNotifications, setSecurityNotifications] = useState<boolean>(true);
   const [showImpactFilterModal, setShowImpactFilterModal] = useState<boolean>(false);
+  const [signalThreshold, setSignalThreshold] = useState<number>(0.9);
+  const [showSignalThresholdModal, setShowSignalThresholdModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [oldPassword, setOldPassword] = useState<string>("");
@@ -106,6 +108,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       setNewsNotifications(prefs.news_notifications ?? true);
       setNewsImpactFilter(prefs.news_impact_filter ?? "high");
       setSecurityNotifications(prefs.security_notifications ?? true);
+      setSignalThreshold(prefs.signal_threshold ?? 0.9);
       if (prefs.notifications_enabled !== undefined) {
         setNotifications(prefs.notifications_enabled);
       }
@@ -264,6 +267,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       await updateNotificationPreferences({ security_notifications: value });
     } catch (error: any) {
       console.error("Save security notification settings error:", error);
+    }
+  };
+
+  const handleSignalThresholdChange = async (threshold: number) => {
+    setSignalThreshold(threshold);
+    setShowSignalThresholdModal(false);
+    try {
+      await updateNotificationPreferences({ signal_threshold: threshold });
+    } catch (error: any) {
+      console.error("Save signal threshold error:", error);
     }
   };
 
@@ -640,6 +653,24 @@ GitHub: github.com/Asura-lab/Predictrix
                   />
                 </View>
 
+                {signalNotifications && (
+                  <>
+                    <View style={styles.divider} />
+                    <TouchableOpacity
+                      style={styles.infoRow}
+                      onPress={() => setShowSignalThresholdModal(true)}
+                    >
+                      <View style={styles.infoContent}>
+                        <Text style={styles.infoLabel}>SIGNAL THRESHOLD</Text>
+                        <Text style={styles.infoDescription}>
+                          Min confidence: {(signalThreshold * 100).toFixed(0)}%
+                        </Text>
+                      </View>
+                      <Text style={styles.chevron}>{">"}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
                 <View style={styles.divider} />
 
                 <View style={styles.infoRow}>
@@ -1014,6 +1045,39 @@ GitHub: github.com/Asura-lab/Predictrix
               <Text style={styles.themeOptionText}>🔴🟡🟢 All Levels</Text>
               {newsImpactFilter === 'all' && <Text style={styles.checkmark}>✓</Text>}
             </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* Signal Threshold Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showSignalThresholdModal}
+        onRequestClose={() => setShowSignalThresholdModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.themeModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSignalThresholdModal(false)}
+        >
+          <View style={styles.themeModalContent}>
+            <Text style={styles.themeModalTitle}>Signal Confidence Threshold</Text>
+            
+            {[0.90, 0.92, 0.94, 0.96, 0.98, 1.0].map((val) => (
+              <TouchableOpacity
+                key={val}
+                style={[
+                  styles.themeOption,
+                  signalThreshold === val && styles.themeOptionActive,
+                  val === 1.0 && styles.themeOptionLast,
+                ]}
+                onPress={() => handleSignalThresholdChange(val)}
+              >
+                <Text style={styles.themeOptionText}>{(val * 100).toFixed(0)}%{val === 0.90 ? ' (Default)' : val === 1.0 ? ' (Maximum)' : ''}</Text>
+                {signalThreshold === val && <Text style={styles.checkmark}>✓</Text>}
+              </TouchableOpacity>
+            ))}
           </View>
         </TouchableOpacity>
       </Modal>

@@ -243,6 +243,7 @@ export interface NotificationPreferences {
   news_notifications: boolean;
   news_impact_filter: NewsImpactFilter;
   security_notifications: boolean;
+  signal_threshold: number; // 0.9 - 1.0 (user's personal confidence threshold)
 }
 
 /**
@@ -255,6 +256,7 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     news_notifications: true,
     news_impact_filter: "high",
     security_notifications: true,
+    signal_threshold: 0.9,
   };
 
   try {

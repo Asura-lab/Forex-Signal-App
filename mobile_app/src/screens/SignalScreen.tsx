@@ -14,10 +14,11 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getSignal, saveSignal, getMarketAnalysis } from "../services/api";
+import { getSignal, saveSignal, getMarketAnalysis, getLatestSignal } from "../services/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationProp, RouteProp } from "@react-navigation/native";
 import { CurrencyPair } from "../utils/helpers";
+import { updateNotificationPreferences } from "../services/notificationService";
 
 const { width } = Dimensions.get("window");
 
@@ -41,7 +42,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
   const colors = getColors(isDark);
   const styles = createStyles(colors);
   
-  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(80);
+  const [confidenceThreshold, setConfidenceThreshold] = useState<number>(90);
   const [showThresholdModal, setShowThresholdModal] = useState<boolean>(false);
   const [lastUpdate, setLastUpdate] = useState<string>(new Date().toLocaleTimeString());
 
@@ -93,25 +94,9 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
     }
   });
 
-  // Effect to save signal when new data comes in
+  // Signal auto-save хэрэггүй — backend continuous_signal_generator хариуцна
+  // Effect to track last update time
   useEffect(() => {
-    if (signalData?.signal && signalData?.signal !== "HOLD") {
-      const pairName = pair?.name || "EUR/USD";
-      saveSignalMutation.mutate({
-        pair: pairName.replace('/', '_'),
-        signal: signalData.signal,
-        confidence: signalData.confidence,
-        entry_price: signalData.entry_price,
-        stop_loss: signalData.stop_loss,
-        take_profit: signalData.take_profit,
-        sl_pips: signalData.sl_pips,
-        tp_pips: signalData.tp_pips,
-        risk_reward: signalData.risk_reward,
-        model_probabilities: signalData.model_probabilities,
-        models_agree: signalData.models_agree,
-        atr_pips: signalData.atr_pips,
-      });
-    }
     setLastUpdate(new Date().toLocaleTimeString("en-US", { hour12: false }));
   }, [signalData]);
 
@@ -183,6 +168,8 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
       await AsyncStorage.setItem("@confidence_threshold", value.toString());
       setConfidenceThreshold(value);
       setShowThresholdModal(false);
+      // Sync with server notification preferences (convert to 0-1 range)
+      await updateNotificationPreferences({ signal_threshold: value / 100 });
       refetchSignal();
     } catch (e) {}
   };
@@ -198,7 +185,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
     return colors.warning;
   };
 
-  const thresholdOptions = [60, 70, 80, 85, 90];
+  const thresholdOptions = [90, 92, 94, 96, 98, 100];
   const priceDigits = signal?.digits || 5;
 
   return (
