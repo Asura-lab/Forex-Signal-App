@@ -16,9 +16,9 @@
       "enabled": false
     },
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#1a237e"
+      "backgroundColor": "#0F172A"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -31,7 +31,7 @@
       "package": "com.asuralab.predictrix",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1a237e"
+        "backgroundColor": "#0F172A"
       },
       "useNextNotificationsApi": true
     },
