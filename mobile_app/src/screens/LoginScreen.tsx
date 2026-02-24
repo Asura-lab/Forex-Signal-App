@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   TextInput,
   TouchableOpacity,
@@ -10,9 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
-  ScrollView,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { useTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
@@ -91,362 +88,303 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
     }
   };
 
-  const styles = createStyles(colors, isDark);
-
-  const bgGradient: [string, string, string] = isDark
-    ? ["#0A1929", "#0F2235", colors.background]
-    : ["#D1FAE5", "#ECFDF5", colors.background];
+  const styles = createStyles(colors);
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={{ flex: 1, backgroundColor: colors.background }}
+      style={styles.container}
     >
-      <StatusBar
-        barStyle={isDark ? "light-content" : "dark-content"}
-        backgroundColor="transparent"
-        translucent
-      />
-      <LinearGradient colors={bgGradient} locations={[0, 0.3, 0.65]} style={styles.gradient}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Top Bar ── */}
-          <View style={styles.topBar}>
-            <View style={styles.liveBadge}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveBadgeText}>LIVE</Text>
+      <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
+      
+      <View style={styles.content}>
+        {/* Theme Toggle */}
+        <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+          {isDark ? (
+            <View style={styles.sunIcon}>
+              <View style={styles.sunCore} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '0deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '45deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '90deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '135deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '180deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '225deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '270deg' }, { translateY: -10 }] }]} />
+              <View style={[styles.sunRay, { transform: [{ rotate: '315deg' }, { translateY: -10 }] }]} />
             </View>
-            <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
-              <Text style={styles.themeEmoji}>{isDark ? "☀️" : "🌙"}</Text>
-            </TouchableOpacity>
-          </View>
+          ) : (
+            <View style={styles.moonIcon}>
+              <View style={styles.moonOuter} />
+              <View style={[styles.moonInner, { backgroundColor: colors.background }]} />
+            </View>
+          )}
+        </TouchableOpacity>
 
-          {/* ── Hero ── */}
-          <View style={styles.heroSection}>
-            <View style={styles.logoRing}>
-              <Image
-                source={require("../../assets/icon.png")}
-                style={styles.appIcon}
+        {/* Header */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.title}>PREDICTRIX</Text>
+          <Text style={styles.subtitle}>AI Trading Assistant</Text>
+        </View>
+
+        {/* Form */}
+        <View style={styles.formContainer}>
+          {/* Email */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>EMAIL</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter your email"
+                placeholderTextColor={colors.placeholderText}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
               />
             </View>
-            <Text style={styles.title}>PREDICTRIX</Text>
-            <View style={styles.titleAccent} />
-            <Text style={styles.subtitle}>AI-Powered Forex Trading Signals</Text>
           </View>
 
-          {/* ── Form Card ── */}
-          <View style={styles.formCard}>
-            <LinearGradient
-              colors={["#059669", "#10B981", "#34D399"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.cardAccentBar}
-            />
-            <View style={styles.formInner}>
-              {/* Email */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>EMAIL ADDRESS</Text>
-                <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>✉</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="your@email.com"
-                    placeholderTextColor={colors.placeholderText}
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
-              </View>
-
-              {/* Password */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>PASSWORD</Text>
-                <View style={styles.inputRow}>
-                  <Text style={styles.inputIcon}>●</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Enter password"
-                    placeholderTextColor={colors.placeholderText}
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={styles.eyeButton}
-                  >
-                    <Text style={styles.eyeText}>{showPassword ? "Hide" : "Show"}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Forgot */}
+          {/* Password */}
+          <View style={styles.inputWrapper}>
+            <Text style={styles.inputLabel}>PASSWORD</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter password"
+                placeholderTextColor={colors.placeholderText}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
               <TouchableOpacity
-                onPress={() => navigation.navigate("ForgotPassword")}
-                style={styles.forgotRow}
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.toggleButton}
               >
-                <Text style={styles.forgotText}>Forgot password?</Text>
-              </TouchableOpacity>
-
-              {/* Sign In — gradient button */}
-              <TouchableOpacity
-                style={[styles.signInWrapper, loading && { opacity: 0.6 }]}
-                onPress={handleLogin}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                <LinearGradient
-                  colors={["#059669", "#10B981", "#34D399"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.signInBtn}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.signInText}>Sign In  →</Text>
-                  )}
-                </LinearGradient>
-              </TouchableOpacity>
-
-              {/* Divider */}
-              <View style={styles.dividerRow}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>OR</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Create Account */}
-              <TouchableOpacity
-                style={styles.createAccountBtn}
-                onPress={() => navigation.navigate("SignUp")}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.createAccountText}>Create New Account</Text>
+                <Text style={styles.toggleText}>
+                  {showPassword ? "HIDE" : "SHOW"}
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={styles.footerText}>⚡ For research & educational purposes only</Text>
-        </ScrollView>
-      </LinearGradient>
+          {/* Forgot Password */}
+          <TouchableOpacity
+            onPress={() => navigation.navigate("ForgotPassword")}
+            style={styles.forgotButton}
+          >
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </TouchableOpacity>
+
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[styles.loginButton, loading && styles.disabledButton]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.loginButtonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Sign Up */}
+          <TouchableOpacity
+            style={styles.signupButton}
+            onPress={() => navigation.navigate("SignUp")}
+          >
+            <Text style={styles.signupButtonText}>Create Account</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Footer */}
+        <Text style={styles.footerText}>
+          For research purposes only
+        </Text>
+      </View>
     </KeyboardAvoidingView>
   );
 };
 
-const createStyles = (colors: any, isDark: boolean) =>
+const createStyles = (colors: any) =>
   StyleSheet.create({
-    gradient: { flex: 1 },
-    scrollContent: {
-      flexGrow: 1,
-      paddingHorizontal: 24,
-      paddingBottom: 40,
-      paddingTop: Platform.OS === "android" ? 52 : 64,
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
     },
-    topBar: {
-      flexDirection: "row",
-      justifyContent: "space-between",
+    themeToggle: {
+      alignSelf: 'flex-end',
+      padding: 8,
+      marginBottom: 8,
+    },
+    sunIcon: {
+      width: 30,
+      height: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    sunCore: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.textSecondary,
+    },
+    sunRay: {
+      position: 'absolute',
+      width: 2,
+      height: 6,
+      top: 12,
+      left: 14,
+      backgroundColor: colors.textSecondary,
+      borderRadius: 1,
+    },
+    moonIcon: {
+      width: 22,
+      height: 22,
+    },
+    moonOuter: {
+      position: 'absolute',
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: colors.textSecondary,
+      top: 2,
+      left: 0,
+    },
+    moonInner: {
+      position: 'absolute',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      top: 0,
+      left: 6,
+    },
+    content: {
+      flex: 1,
+      justifyContent: "center",
+      padding: 24,
+    },
+    headerContainer: {
       alignItems: "center",
       marginBottom: 36,
     },
-    liveBadge: {
-      flexDirection: "row",
-      alignItems: "center",
-      backgroundColor: isDark ? "rgba(16,185,129,0.12)" : "rgba(16,185,129,0.08)",
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(16,185,129,0.3)" : "rgba(16,185,129,0.2)",
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 5,
-    },
-    liveDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: "#10B981",
-      marginRight: 6,
-    },
-    liveBadgeText: {
-      fontSize: 10,
-      fontWeight: "700",
-      color: "#10B981",
-      letterSpacing: 1.5,
-    },
-    themeToggle: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    themeEmoji: { fontSize: 18 },
-    heroSection: {
-      alignItems: "center",
-      marginBottom: 32,
-    },
-    logoRing: {
-      width: 96,
-      height: 96,
-      borderRadius: 48,
-      borderWidth: 2,
-      borderColor: isDark ? "rgba(16,185,129,0.4)" : "rgba(16,185,129,0.3)",
-      padding: 6,
-      justifyContent: "center",
-      alignItems: "center",
-      marginBottom: 20,
-      shadowColor: "#10B981",
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: isDark ? 0.35 : 0.12,
-      shadowRadius: 16,
-      elevation: 6,
-    },
-    appIcon: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-    },
     title: {
-      fontSize: 30,
-      fontWeight: "800",
+      fontSize: 28,
+      fontWeight: "700",
       color: colors.textPrimary,
-      letterSpacing: 5,
-    },
-    titleAccent: {
-      width: 48,
-      height: 3,
-      backgroundColor: "#10B981",
-      borderRadius: 2,
-      marginTop: 10,
-      marginBottom: 10,
+      letterSpacing: 3,
     },
     subtitle: {
-      fontSize: 12,
+      fontSize: 13,
       color: colors.textSecondary,
-      letterSpacing: 0.3,
-      textAlign: "center",
+      marginTop: 8,
+      letterSpacing: 1,
     },
-    formCard: {
+    formContainer: {
       backgroundColor: colors.card,
-      borderRadius: 20,
-      overflow: "hidden",
-      borderWidth: 1,
-      borderColor: isDark ? "rgba(16,185,129,0.1)" : "rgba(0,0,0,0.05)",
-      shadowColor: isDark ? "#10B981" : "#000",
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: isDark ? 0.12 : 0.08,
-      shadowRadius: 20,
-      elevation: 8,
-      marginBottom: 28,
+      borderRadius: 16,
+      padding: 24,
     },
-    cardAccentBar: { height: 3 },
-    formInner: { padding: 24 },
-    inputGroup: { marginBottom: 16 },
+    inputWrapper: {
+      marginBottom: 20,
+    },
     inputLabel: {
-      fontSize: 10,
-      fontWeight: "700",
+      fontSize: 11,
+      fontWeight: '600',
       color: colors.textSecondary,
-      letterSpacing: 1.5,
       marginBottom: 8,
+      letterSpacing: 1,
     },
-    inputRow: {
+    inputContainer: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: isDark ? "rgba(255,255,255,0.04)" : colors.background,
-      borderRadius: 12,
-      height: 52,
-      paddingHorizontal: 14,
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      height: 50,
+      paddingHorizontal: 16,
       borderWidth: 1,
       borderColor: colors.border,
     },
-    inputIcon: {
-      fontSize: 15,
-      color: "#10B981",
-      marginRight: 10,
-      width: 20,
-      textAlign: "center",
-      opacity: 0.9,
-    },
-    textInput: {
+    input: {
       flex: 1,
       fontSize: 15,
       color: colors.textPrimary,
-      height: 52,
     },
-    eyeButton: { paddingLeft: 8, paddingVertical: 4 },
-    eyeText: {
-      fontSize: 12,
-      fontWeight: "600",
-      color: "#10B981",
-      letterSpacing: 0.3,
+    toggleButton: {
+      paddingHorizontal: 8,
     },
-    forgotRow: {
-      alignSelf: "flex-end",
-      marginBottom: 20,
-      marginTop: 2,
+    toggleText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: colors.success,
+      letterSpacing: 1,
     },
-    forgotText: { fontSize: 13, color: colors.textSecondary },
-    signInWrapper: {
-      borderRadius: 14,
-      overflow: "hidden",
-      shadowColor: "#10B981",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.4,
-      shadowRadius: 10,
-      elevation: 6,
+    forgotButton: {
+      alignSelf: 'flex-end',
+      marginBottom: 24,
     },
-    signInBtn: {
-      height: 54,
+    forgotText: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    loginButton: {
+      backgroundColor: colors.success,
+      borderRadius: 8,
+      height: 50,
       justifyContent: "center",
       alignItems: "center",
     },
-    signInText: {
-      color: "#FFFFFF",
-      fontSize: 16,
-      fontWeight: "700",
-      letterSpacing: 0.5,
+    disabledButton: {
+      opacity: 0.6,
     },
-    dividerRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginVertical: 20,
-    },
-    dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-    dividerText: {
-      fontSize: 11,
-      color: colors.textSecondary,
-      marginHorizontal: 14,
+    loginButtonText: {
+      color: '#FFFFFF',
+      fontSize: 15,
       fontWeight: "600",
       letterSpacing: 1,
     },
-    createAccountBtn: {
-      height: 52,
-      borderRadius: 14,
-      borderWidth: 1.5,
-      borderColor: isDark ? "rgba(16,185,129,0.45)" : "#10B981",
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginVertical: 24,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    dividerText: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginHorizontal: 16,
+    },
+    signupButton: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      height: 50,
       justifyContent: "center",
       alignItems: "center",
-      backgroundColor: isDark ? "rgba(16,185,129,0.06)" : "transparent",
     },
-    createAccountText: {
-      color: "#10B981",
+    signupButtonText: {
+      color: colors.textPrimary,
       fontSize: 15,
-      fontWeight: "600",
+      fontWeight: "500",
     },
     footerText: {
       color: colors.textSecondary,
-      fontSize: 11,
+      fontSize: 12,
       textAlign: "center",
-      opacity: 0.6,
+      marginTop: 32,
     },
   });
 

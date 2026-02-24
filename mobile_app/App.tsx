@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   StatusBar,
-  ActivityIndicator,
   View,
 } from "react-native";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
@@ -23,11 +22,13 @@ import {
 } from "./src/services/notificationService";
 import { AlertProvider } from "./src/context/AlertContext";
 import AppAlert from "./src/components/AppAlert";
+import SplashScreen from "./src/screens/SplashScreen";
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
 
 function AppContent() {
+  const [showSplash, setShowSplash] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [userLoggedIn, setUserLoggedIn] = useState(false);
   const { isDark } = useTheme();
@@ -95,18 +96,19 @@ function AppContent() {
     }
   };
 
-  if (isLoading) {
+  if (showSplash || isLoading) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+          }}
+        />
+        {showSplash && (
+          <SplashScreen onFinish={() => setShowSplash(false)} />
+        )}
+      </>
     );
   }
 
