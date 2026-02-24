@@ -7,12 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { verifyEmail, resendVerificationCode } from "../services/api";
 
@@ -23,6 +23,7 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
   const { email, name, verificationCode } = route.params;
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
+  const { showAlert } = useAlert();
 
   const [code, setCode] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -43,7 +44,7 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
 
   useEffect(() => {
     if (verificationCode) {
-      Alert.alert(
+      showAlert(
         "Demo Mode",
         `Таны баталгаажуулах код: ${verificationCode}\n\n(Имэйл тохиргоо хийгдээгүй учир demo горимд ажиллаж байна)`,
         [{ text: "OK" }]
@@ -74,14 +75,14 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
   const handleVerify = async (fullCode: string | null = null) => {
     const verCode = fullCode || code.join("");
     if (verCode.length !== 6) {
-      Alert.alert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
+      showAlert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
       return;
     }
     setLoading(true);
     try {
       const result = await verifyEmail(email, verCode);
       if (result.success) {
-        Alert.alert("Амжилттай!", "Таны имэйл амжилттай баталгаажлаа", [
+        showAlert("Амжилттай!", "Таны имэйл амжилттай баталгаажлаа", [
           {
             text: "OK",
             onPress: () =>
@@ -89,12 +90,12 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
           },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Баталгаажуулалт амжилтгүй");
+        showAlert("Алдаа", result.error || "Баталгаажуулалт амжилтгүй");
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
     } catch (error) {
-      Alert.alert("Алдаа", "Баталгаажуулах явцад алдаа гарлаа");
+      showAlert("Алдаа", "Баталгаажуулах явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }
@@ -106,7 +107,7 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
     try {
       const result = await resendVerificationCode(email);
       if (result.success) {
-        Alert.alert(
+        showAlert(
           "Илгээгдлээ",
           result.data.demo_mode
             ? `Шинэ код: ${result.data.verification_code}\n\n(Demo горим)`
@@ -117,10 +118,10 @@ const EmailVerificationScreen = ({ route, navigation }: { route: any; navigation
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       } else {
-        Alert.alert("Алдаа", result.error || "Код илгээх амжилтгүй");
+        showAlert("Алдаа", result.error || "Код илгээх амжилтгүй");
       }
     } catch (error) {
-      Alert.alert("Алдаа", "Код илгээх явцад алдаа гарлаа");
+      showAlert("Алдаа", "Код илгээх явцад алдаа гарлаа");
     } finally {
       setResending(false);
     }

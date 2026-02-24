@@ -7,13 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { registerUser } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
@@ -29,6 +29,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const { showAlert } = useAlert();
 
   const [name, setName] = useState<string>("");
   const [email, setEmail] = useState<string>("");
@@ -41,27 +42,27 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
   const handleSignUp = async () => {
     if (!name.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
-      Alert.alert("Error", "Please fill all fields");
+      showAlert("Error", "Please fill all fields");
       return;
     }
 
     if (!acceptedTerms) {
-      Alert.alert("Notice", "Please accept Terms of Service and Privacy Policy");
+      showAlert("Notice", "Please accept Terms of Service and Privacy Policy");
       return;
     }
 
     if (!email.includes("@")) {
-      Alert.alert("Error", "Please enter a valid email");
+      showAlert("Error", "Please enter a valid email");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      showAlert("Error", "Password must be at least 6 characters");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      showAlert("Error", "Passwords do not match");
       return;
     }
 
@@ -77,17 +78,17 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
           verificationCode: result.data.demo_mode ? result.data.verification_code : null,
         });
       } else {
-        Alert.alert("Error", result.error || "Registration failed");
+      showAlert("Error", result.error || "Registration failed");
       }
     } catch (error: any) {
-      Alert.alert("Error", "Registration failed. Please try again.");
+      showAlert("Error", "Registration failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const openTermsOfService = () => {
-    Alert.alert(
+    showAlert(
       "Terms of Service",
       "TERMS OF SERVICE\n\n" +
       "1. About Service\n" +
@@ -100,7 +101,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
   };
 
   const openPrivacyPolicy = () => {
-    Alert.alert(
+    showAlert(
       "Privacy Policy",
       "PRIVACY POLICY\n\n" +
       "1. Data Collection\n" +

@@ -7,12 +7,12 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StatusBar,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { loginUser } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
@@ -27,6 +27,7 @@ interface LoginScreenProps {
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
+  const { showAlert } = useAlert();
 
   const [email, setEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -35,12 +36,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Алдаа", "Имэйл болон нууц үг оруулна уу");
+      showAlert("Алдаа", "Имэйл болон нууц үг оруулна уу");
       return;
     }
 
     if (!email.includes("@")) {
-      Alert.alert("Алдаа", "Зөв имэйл хаяг оруулна уу");
+      showAlert("Алдаа", "Зөв имэйл хаяг оруулна уу");
       return;
     }
 
@@ -56,7 +57,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         });
       } else {
         if (result.requiresVerification) {
-          Alert.alert(
+          showAlert(
             "Имэйл баталгаажуулах",
             "Та имэйл хаягаа баталгаажуулах шаардлагатай",
             [
@@ -69,7 +70,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             ]
           );
         } else {
-          Alert.alert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
+          showAlert("Алдаа", result.error || "Нэвтрэх амжилтгүй боллоо");
         }
       }
     } catch (error: any) {
@@ -82,7 +83,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         errorMessage = "Хүлээх хугацаа дууслаа.";
       }
 
-      Alert.alert("Алдаа", errorMessage);
+      showAlert("Алдаа", errorMessage);
     } finally {
       setLoading(false);
     }
@@ -139,7 +140,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter your email"
-                placeholderTextColor="#4A5568"
+                placeholderTextColor={colors.placeholderText}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -156,7 +157,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 placeholder="Enter password"
-                placeholderTextColor="#4A5568"
+                placeholderTextColor={colors.placeholderText}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}

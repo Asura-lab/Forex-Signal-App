@@ -7,13 +7,13 @@ import {
   TextInput,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   StatusBar,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import {
   forgotPassword,
@@ -31,6 +31,7 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
   const { isDark, toggleTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const { showAlert } = useAlert();
 
   const [step, setStep] = useState(1); // 1: Email, 2: Code, 3: New Password
   const [email, setEmail] = useState("");
@@ -47,7 +48,7 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
   // Step 1: Имэйл илгээх
   const handleSendEmail = async () => {
     if (!email.trim() || !email.includes("@")) {
-      Alert.alert("Алдаа", "Зөв имэйл хаяг оруулна уу");
+      showAlert("Алдаа", "Зөв имэйл хаяг оруулна уу");
       return;
     }
 
@@ -59,23 +60,23 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
       if (result.success) {
         if (result.data.demo_mode) {
           setDemoCode(result.data.reset_code);
-          Alert.alert(
+          showAlert(
             "Demo Mode",
             `Таны сэргээх код: ${result.data.reset_code}\n\n(Имэйл тохиргоо хийгдээгүй учир demo горимд ажиллаж байна)`,
             [{ text: "OK", onPress: () => setStep(2) }]
           );
         } else {
-          Alert.alert(
+          showAlert(
             "Амжилттай",
             "Сэргээх код таны имэйл хаяг руу илгээгдлээ",
             [{ text: "OK", onPress: () => setStep(2) }]
           );
         }
       } else {
-        Alert.alert("Алдаа", result.error || "Код илгээх амжилтгүй");
+        showAlert("Алдаа", result.error || "Код илгээх амжилтгүй");
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Код илгээх явцад алдаа гарлаа");
+      showAlert("Алдаа", "Код илгээх явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }
@@ -86,7 +87,7 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
     const verificationCode = code.join("");
 
     if (verificationCode.length !== 6) {
-      Alert.alert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
+      showAlert("Алдаа", "6 оронтой кодыг бүрэн оруулна уу");
       return;
     }
 
@@ -96,16 +97,16 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
       const result = await verifyResetCode(email, verificationCode);
 
       if (result.success) {
-        Alert.alert("Амжилттай", "Код баталгаажлаа", [
+        showAlert("Амжилттай", "Код баталгаажлаа", [
           { text: "OK", onPress: () => setStep(3) },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Буруу код");
+        showAlert("Алдаа", result.error || "Буруу код");
         setCode(["", "", "", "", "", ""]);
         inputRefs.current[0]?.focus();
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Код шалгах явцад алдаа гарлаа");
+      showAlert("Алдаа", "Код шалгах явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }
@@ -114,17 +115,17 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
   // Step 3: Нууц үг солих
   const handleResetPassword = async () => {
     if (!newPassword.trim() || !confirmPassword.trim()) {
-      Alert.alert("Алдаа", "Нууц үгээ оруулна уу");
+      showAlert("Алдаа", "Нууц үгээ оруулна уу");
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert("Алдаа", "Нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+      showAlert("Алдаа", "Нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert("Алдаа", "Нууц үг таарахгүй байна");
+      showAlert("Алдаа", "Нууц үг таарахгүй байна");
       return;
     }
 
@@ -134,17 +135,17 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
       const result = await resetPassword(email, code.join(""), newPassword);
 
       if (result.success) {
-        Alert.alert("Амжилттай!", "Таны нууц үг амжилттай солигдлоо", [
+        showAlert("Амжилттай!", "Таны нууц үг амжилттай солигдлоо", [
           {
             text: "OK",
             onPress: () => navigation.navigate("Login"),
           },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Нууц үг солих амжилтгүй");
+        showAlert("Алдаа", result.error || "Нууц үг солих амжилтгүй");
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Нууц үг солих явцад алдаа гарлаа");
+      showAlert("Алдаа", "Нууц үг солих явцад алдаа гарлаа");
     } finally {
       setLoading(false);
     }

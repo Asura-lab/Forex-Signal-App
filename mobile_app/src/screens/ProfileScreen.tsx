@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Switch,
   Modal,
@@ -16,6 +15,7 @@ import {
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../context/ThemeContext";
+import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { logoutUser, updateUserProfile, changeUserPassword } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
@@ -44,6 +44,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { isDark, themeMode, setTheme } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const { showAlert } = useAlert();
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
@@ -137,7 +138,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert("Алдаа", "Нэр хоосон байж болохгүй");
+      showAlert("Алдаа", "Нэр хоосон байж болохгүй");
       return;
     }
 
@@ -151,14 +152,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         await AsyncStorage.setItem("@user_data", JSON.stringify(updatedUser));
         setUserData(updatedUser as UserData);
 
-        Alert.alert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
+        showAlert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
           { text: "OK", onPress: () => setEditMode(false) },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
+        showAlert("Алдаа", result.error || "Мэдээлэл шинэчлэхэд алдаа гарлаа");
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
+      showAlert("Алдаа", "Серверт холбогдох боломжгүй байна");
       console.error("Update error:", error);
     } finally {
       setLoading(false);
@@ -171,17 +172,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
   const handlePasswordChange = async () => {
     if (!oldPassword || !newPassword || !confirmPassword) {
-      Alert.alert("Алдаа", "Бүх талбарыг бөглөнө үү");
+      showAlert("Алдаа", "Бүх талбарыг бөглөнө үү");
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert("Алдаа", "Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+      showAlert("Алдаа", "Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert("Алдаа", "Шинэ нууц үг таарахгүй байна");
+      showAlert("Алдаа", "Шинэ нууц үг таарахгүй байна");
       return;
     }
 
@@ -190,7 +191,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       const result = await changeUserPassword(oldPassword, newPassword);
 
       if (result.success) {
-        Alert.alert("Амжилттай", "Нууц үг амжилттай солигдлоо", [
+        showAlert("Амжилттай", "Нууц үг амжилттай солигдлоо", [
           {
             text: "OK",
             onPress: () => {
@@ -202,10 +203,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           },
         ]);
       } else {
-        Alert.alert("Алдаа", result.error || "Нууц үг солихоо алдаа гарлаа");
+        showAlert("Алдаа", result.error || "Нууц үг солихоо алдаа гарлаа");
       }
     } catch (error: any) {
-      Alert.alert("Алдаа", "Серверт холбогдох боломжгүй байна");
+      showAlert("Алдаа", "Серверт холбогдох боломжгүй байна");
       console.error("Password change error:", error);
     } finally {
       setLoading(false);
@@ -288,7 +289,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    Alert.alert("Гарах", "Та системээс гарахдаа итгэлтэй байна уу?", [
+    showAlert("Гарах", "Та системээс гарахдаа итгэлтэй байна уу?", [
       {
         text: "Үгүй",
         style: "cancel",
@@ -479,7 +480,7 @@ GitHub: github.com/Asura-lab/Predictrix
 
   // Open external link
   const openExternalLink = (url: string) => {
-    Alert.alert(
+    showAlert(
       "Холбоос нээх",
       "Та вэб хөтөч дээр нээхдээ итгэлтэй байна уу?",
       [
@@ -555,7 +556,7 @@ GitHub: github.com/Asura-lab/Predictrix
                     value={name}
                     onChangeText={setName}
                     placeholder="Enter name"
-                    placeholderTextColor="#4A5568"
+                    placeholderTextColor={colors.placeholderText}
                   />
                 ) : (
                   <Text style={styles.infoValue}>{name}</Text>
@@ -574,7 +575,7 @@ GitHub: github.com/Asura-lab/Predictrix
                     value={email}
                     onChangeText={setEmail}
                     placeholder="Enter email"
-                    placeholderTextColor="#4A5568"
+                    placeholderTextColor={colors.placeholderText}
                     keyboardType="email-address"
                   />
                 ) : (
@@ -847,7 +848,7 @@ GitHub: github.com/Asura-lab/Predictrix
                   onChangeText={setOldPassword}
                   secureTextEntry
                   placeholder="Enter current password"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
               </View>
@@ -860,7 +861,7 @@ GitHub: github.com/Asura-lab/Predictrix
                   onChangeText={setNewPassword}
                   secureTextEntry
                   placeholder="Min 6 characters"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
               </View>
@@ -873,7 +874,7 @@ GitHub: github.com/Asura-lab/Predictrix
                   onChangeText={setConfirmPassword}
                   secureTextEntry
                   placeholder="Confirm new password"
-                  placeholderTextColor="#4A5568"
+                  placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
               </View>

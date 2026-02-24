@@ -21,6 +21,8 @@ import {
   setupNotificationListeners,
   requestNotificationPermission,
 } from "./src/services/notificationService";
+import { AlertProvider } from "./src/context/AlertContext";
+import AppAlert from "./src/components/AppAlert";
 
 const Stack = createStackNavigator();
 const queryClient = new QueryClient();
@@ -114,6 +116,7 @@ function AppContent() {
         barStyle={isDark ? "light-content" : "dark-content"}
         backgroundColor={colors.primary}
       />
+      <AppAlert />
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={userLoggedIn ? "Main" : "Login"}
@@ -173,7 +176,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AppContent />
+        <AlertProvider>
+          <AppContent />
+        </AlertProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
