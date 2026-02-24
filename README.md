@@ -1,98 +1,187 @@
-# Forex Signal App
+# Predictrix — AI Forex Signal App
 
-**EUR/USD BUY Signal Generator** | **Ensemble ML** | **React Native** | **MongoDB + JWT**
-
-> XGBoost + LightGBM + Random Forest ensemble ашиглан EUR/USD валютын хосын BUY дохио таамаглах систем
+**Диплом судалгааны ажил** | React Native | Flask (Azure) | GBDT Ensemble ML | MongoDB
 
 ---
 
-## Тойм
+## Зорилго ба зориулалт
 
-Энэ систем нь **Ensemble Machine Learning** ашиглан Forex зах зээл дээр BUY дохио таамаглах production-level аппликейшн юм.
+Predictrix нь **EUR/USD** валютын хосын Forex арилжааны дохиог машин сургалтаар таамаглах систем юм. Энэ төсөл нь дипломын ажлын судалгааны хэрэглэгдэхүүн бөгөөд дараах асуудлыг шийдвэрлэхийг зорьсон:
 
-### Гол үзүүлэлтүүд:
+> *"Техникийн дүн шинжилгээний олон timeframe-ийн мэдээллийг нэгтгэсэн GBDT ensemble загвар нь Forex зах зээлд ашигтай арилжааны дохиог найдвартай таамаглах боломжтой юу?"*
 
-| Confidence | Signals | Win Rate | Total Pips | Profit Factor |
-|------------|---------|----------|------------|---------------|
-| ≥75% | 279 | 48.4% | +937 | 1.76 |
-| ≥80% | 105 | **61.9%** | +671 | **3.10** |
-| ≥85% | 48 | 68.8% | +387 | 4.82 |
-| ≥90% | 9 | 100.0% | +120 | ∞ |
-
-### Онцлог:
-
-- [BUY] **BUY-Only Strategy**: SELL сигнал хассан (28% accuracy), зөвхөн BUY (80% accuracy)
-- [AI] **Ensemble Model**: XGBoost (40%) + LightGBM (35%) + Random Forest (25%)
-- [Technical] **70 Technical Indicators**: RSI, MACD, Bollinger, ATR, SMA, EMA гэх мэт
-- [Security] **JWT Authentication**: MongoDB + secure token-based auth
-- [Mobile] **Mobile App**: React Native + Expo (iOS & Android)
-- [Data] **Real-time Data**: Twelve Data API integration
+Судалгааны гол зорилтууд:
+- 6 өөр timeframe-ийн (M1–H4) техникийн үзүүлэлтүүдийг (48 feature) нэгтгэн загвар бүтээх
+- Overfitting-ийг бодитоор шийдэх — validation дээр calibrated probability үүсгэх
+- Backtest-ийн үр дүнг эрсдэлийн удирдлагатай хамт (Sharpe, Drawdown, PF) үнэлэх
+- Загварыг production мобайл аппликейшнтэй нэгтгэж, бодит цагийн дохио гаргах
 
 ---
 
-## Архитектур
+## ML Загварын архитектур
+
+### Ensemble GBDT (Phase 7B)
+
+Загвар нь 3 gradient boosting алгоритмыг тэнцүү жинтэйгээр нийлүүлсэн ensemble юм:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                 [MOBILE] REACT NATIVE MOBILE APP             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Login/     │  │    Signal    │  │   Profile    │      │
-│  │   Register   │  │    Screen    │  │   Settings   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└─────────────────────────────────────────────────────────────┘
-                            ↕ REST API (JWT)
-┌─────────────────────────────────────────────────────────────┐
-│              [BACKEND] FLASK + WAITRESS BACKEND              │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │  Authentication      Signal V2         Market Data   │   │
-│  │  - /auth/register    - /signal/v2      - /rates/live │   │
-│  │  - /auth/login       - /signal/save    - /health     │   │
-│  │  - /auth/me          - /signals/stats                │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────┐
-│                  [ML] ENSEMBLE ML ENGINE                     │
-│  ┌─────────────┬─────────────────┬──────────────────┐      │
-│  │   XGBoost   │    LightGBM     │  Random Forest   │      │
-│  │    (40%)    │      (35%)      │      (25%)       │      │
-│  └─────────────┴─────────────────┴──────────────────┘      │
-│              70 Technical Indicators                        │
-└─────────────────────────────────────────────────────────────┘
-                            ↕
-┌─────────────────────────────────────────────────────────────┐
-│                      [DATA] DATA LAYER                       │
-│  ┌──────────────────┐  ┌──────────────────┐                │
-│  │  MongoDB Atlas   │  │  Twelve Data API │                │
-│  │  - users         │  │  - Live rates    │                │
-│  │  - signals       │  │  - OHLCV data    │                │
-│  │  - verification  │  │  - Real-time     │                │
-│  └──────────────────┘  └──────────────────┘                │
-└─────────────────────────────────────────────────────────────┘
+Input: 48 Multi-Timeframe Features (M1, M5, M15, M30, H1, H4)
+         │
+    ┌────┴────────────────────────────────────┐
+    │                                         │
+LightGBM          XGBoost              CatBoost
+(496 trees,       (~400 trees,         (499 trees,
+ GPU, L1+L2)       CPU-hist, L1+L2)    GPU, L2=3.0)
+    │                  │                    │
+    └──────────────────┴────────────────────┘
+                       │
+              Equal-Weight Averaging
+                       │
+              Probability Calibration
+              (Logistic Regression)
+                       │
+         3-Class Output: BUY / HOLD / SELL
+                + Confidence Score (0–1)
+```
+
+**Anti-overfitting дизайн (Phase 7B шийдэл):**
+
+Phase 6B-д training accuracy 100% (overfitting!), backtest win rate зөвхөн 37.2% байсан.
+Phase 7B-д дараах аргуудаар шийдэв:
+
+| Техник | Тохиргоо | Нөлөө |
+|--------|----------|-------|
+| Багтаамж бууруулах | max_depth: 8→5, num_leaves: 128→31 | Noise-г цаашид цагхааж чадахгүй |
+| L1/L2 regularization | reg_alpha=0.1, reg_lambda=1.0–3.0 | Жин хасах, sparse features |
+| Early stopping | 50 round, 2023 validation дээр | Overfitting-ийн өмнө зогсоох |
+| Удаан сургалт | learning rate: 0.05→0.03 | Алхам алхмаар ерөнхийлөх |
+| Probability calibration | Logistic Regression | Raw score → бодит магадлал |
+
+---
+
+## Өгөгдөл ба сургалт
+
+**EUR/USD 1-minute OHLCV өгөгдөл (2015–2025):**
+
+```
+Нийт өгөгдөл:   3,715,131 мөр (3.7M)
+├── Train:       2,972,624 мөр  (2015–2022)
+├── Validation:    371,125 мөр  (2023)    ← Early stopping, calibration
+├── Test:          371,382 мөр  (2024)    ← Загваруудад харуулаагүй
+└── Backtest:      359,639 мөр  (2025)    ← Signal үүсгэх
+```
+
+**48 Feature инженерчлэл (6 timeframe × 8 feature):**
+
+| Feature | Тайлбар |
+|---------|---------|
+| RSI(14), RSI(7) | Momentum oscillator |
+| ATR(14) | Volatility хэмжилт |
+| SMA(20), SMA(50) | Trend чиглэл |
+| MACD, Signal, Hist | Trend хүч |
+| Bollinger Bands | Volatility хүрээ |
+
+**Label үүсгэлт:** 4 цагийн дотор 30+ pips хөдлөх — BUY / SELL, бусад — HOLD
+
+```
+BUY:   451,686  (12.2%)
+SELL:  453,559  (12.2%)
+HOLD:  2,809,886 (75.6%)   ← Зах зээлийн 75% нь range
 ```
 
 ---
 
-## Технологи
+## Загварын гүйцэтгэл
 
-### Backend:
-- **Python 3.11+**
-- **Flask 3.0+** - REST API
-- **Waitress** - Production WSGI server
-- **XGBoost, LightGBM, scikit-learn** - ML models
-- **pandas, numpy** - Data processing
-- **PyJWT, bcrypt** - Authentication
-- **pymongo** - MongoDB driver
+### Accuracy (Classification)
 
-### Mobile App:
-- **React Native + Expo**
-- **React Navigation**
-- **Axios** - HTTP client
-- **AsyncStorage** - Local storage
+| Dataset | Samples | Accuracy | High-conf (≥0.92) accuracy |
+|---------|---------|----------|---------------------------|
+| Train (2015–2022) | 2,378,099 | 77.4% | 97.8% |
+| Validation (2023) | 371,125 | 80.2% | 96.2% |
+| Test (2024) | 371,382 | 87.4% | — |
 
-### Database & APIs:
-- **MongoDB Atlas** - User data, signals
-- **Twelve Data API** - Real-time forex data
+Train–Validation gap: −2.8% → Overfitting хамгийн бага
+
+**Confidence calibration:**
+```
+Confidence 0.85–0.90  →  ~72% accuracy
+Confidence 0.90–0.92  →  ~84% accuracy
+Confidence 0.92–0.95  →  ~91% accuracy  ✅ Production threshold
+Confidence 0.95+      →  ~97% accuracy
+```
+
+### Backtest үр дүн (2025 он, EUR/USD)
+
+**Систем:**  1% risk per trade, ATR×5 SL, ATR×15 TP (1:3 R/R)
+
+| Хэмжүүр | Утга | Тайлбар |
+|---------|------|---------|
+| **Annual Return** | **+41.61%** | S&P 500 (~10%) -аас хамаагүй өндөр |
+| **Sharpe Ratio** | **9.64** | Институцийн түвшин (>3.0 = сайн) |
+| **Profit Factor** | **2.46** | Ашигтай (>2.0 = маш сайн) |
+| **Max Drawdown** | **3.93%** | Маш бага эрсдэл |
+| **Win Rate** | **44.44%** (20/45) | 1:3 R/R-тэй хамт ашигтай |
+| **Total Trades** | 45 (12 сар) | Overtrading байхгүй |
+| **Recovery Factor** | 6.69 | Drawdown-аас хурдан сэргэдэг |
+| **Avg Confidence** | 0.923 | Зөвхөн өндөр итгэлтэй дохио |
+| **Total Signals gen.** | 1,065 | Маш сонгомол (0.3% нь арилжаа болдог) |
+
+> **Тэмдэглэл:** Win rate 44% харагдах боловч 1:3 risk/reward харьцаатай учир ашигтай.
+> 20 ялалт × ~28 pips = +560 pips, 25 ялагдал × ~9.4 pips = −235 pips → Net: +325 pips
+
+---
+
+## Системийн архитектур
+
+```
+┌────────────────────────────────────────────────┐
+│          PREDICTRIX MOBILE APP                 │
+│          React Native + Expo SDK 51            │
+│                                                │
+│  Signal  │  Live Rates  │  News  │  Auth/Profile│
+└────────────────────────────────────────────────┘
+                    ↕ HTTPS + JWT
+┌────────────────────────────────────────────────┐
+│    BACKEND — Azure App Service (Korea Central) │
+│    Flask REST API + Gunicorn                   │
+│                                                │
+│  GBDT Signal Engine  │  Gemini AI Analyst      │
+│  JWT + bcrypt Auth   │  Twelve Data Rates      │
+│  MongoDB Atlas       │  Expo Push Notifications│
+└────────────────────────────────────────────────┘
+        ↕                  ↕               ↕
+  MongoDB Atlas      Twelve Data API   ForexFactory
+  (users, signals)  (20+ pairs, OHLCV) (news, events)
+```
+
+---
+
+## Технологийн стек
+
+### Backend (Azure App Service, Korea Central)
+
+| Технологи | Зориулалт |
+|-----------|-----------|
+| Python 3.11 + Flask | REST API (30+ endpoint) |
+| Gunicorn | Production WSGI |
+| LightGBM, XGBoost, CatBoost | GBDT ensemble загвар |
+| scikit-learn | Calibration, pipeline |
+| pandas, numpy | Өгөгдлийн боловсруулалт |
+| PyMongo | MongoDB Atlas |
+| PyJWT + bcrypt | Аутентификаци |
+| Flask-Mail | Email OTP |
+| Google Gemini AI | Зах зээлийн AI дүн шинжилгээ |
+
+### Mobile App (React Native + Expo)
+
+| Технологи | Зориулалт |
+|-----------|-----------|
+| React Native 0.74 + Expo SDK 51 | Android/iOS |
+| React Navigation 6 | Дэлгэц навигаци |
+| Axios + TanStack Query | API & cache |
+| AsyncStorage | Token хадгалалт |
+| expo-notifications | Push notification |
 
 ---
 
@@ -100,204 +189,114 @@
 
 ```
 Forex-Signal-App/
-│
-├── 📂 backend/                    # Flask Backend API
-│   ├── app.py                     # Main application (17 endpoints)
-│   ├── config/
-│   │   ├── .env                   # Environment variables
-│   │   └── settings.py            # Configuration
+├── backend/
+│   ├── app.py                       # Flask API (30+ endpoint)
+│   ├── Procfile / runtime.txt       # Azure deploy тохиргоо
+│   ├── config/settings.py           # Env config
 │   ├── ml/
-│   │   └── signal_generator_v2.py # V2 Signal Generator class
+│   │   ├── signal_generator_gbdt.py # GBDT inference engine
+│   │   └── models/                  # Trained .joblib files
 │   └── utils/
-│       └── twelvedata_handler.py  # Twelve Data API integration
+│       ├── twelvedata_handler.py    # Live rates
+│       ├── market_analyst.py        # Gemini AI
+│       └── push_notifications.py
 │
-├── 📂 mobile_app/                 # React Native Mobile App
-│   ├── App.js                     # Main entry
-│   ├── src/
-│   │   ├── screens/               # LoginScreen, SignalScreen, etc.
-│   │   ├── components/            # Reusable UI components
-│   │   ├── services/api.js        # API integration
-│   │   └── context/AuthContext.js # Auth state management
-│   └── android/                   # Android build files
+├── mobile_app/
+│   ├── app.json / eas.json          # Expo + EAS config
+│   └── src/
+│       ├── screens/                 # Signal, Rates, News, Auth
+│       ├── services/api.ts          # Backend calls
+│       ├── config/api.ts            # Azure URL
+│       └── context/ navigation/
 │
-├── 📂 models/                     # Trained ML Models
-│   └── signal_generator_v2/
-│       ├── xgboost_v2.joblib      # XGBoost model
-│       ├── lightgbm_v2.joblib     # LightGBM model
-│       ├── rf_v2.joblib           # Random Forest model
-│       ├── scaler_v2.joblib       # StandardScaler
-│       └── feature_cols_v2.joblib # Feature columns
+├── model & backtest result/
+│   ├── code/                        # train_models.py, generate_signals_2025.py
+│   ├── data/                        # EUR/USD M1–H4 CSV (2015–2025)
+│   ├── models/                      # GBDT .joblib artifacts
+│   ├── figures/                     # equity_curve, drawdown, feature_importance...
+│   ├── results/                     # backtest_summary.txt, signals_2025.csv
+│   └── documentation/               # Phase 7B technical report
 │
-├── 📂 data/                       # Training Data
-│   ├── EUR_USD_1min.csv           # Train: 1,859,492 rows (2019-2024)
-│   └── EUR_USD_test.csv           # Test: 296,778 rows (2024-2025)
-│
-├── 📂 docs/                       # Documentation
-│   └── *.md                       # Various docs
-│
-├── 📂 diplom/                     # Diploma thesis (LaTeX)
-│
-├── forex_signal_v2.ipynb          # Model training notebook
-├── requirements.txt               # Python dependencies
-└── README.md                      # This file
+├── diplom/                          # Дипломын ажил (LaTeX, XeLaTeX)
+├── mt5/                             # MetaTrader 5 EA scripts
+├── docs/                            # Privacy policy, terms of service
+└── tests/
 ```
 
 ---
 
-## Суулгах
+## Backtest харьцуулалт (Хөгжлийн үе шатууд)
 
-### Backend:
+| Хувилбар | Win Rate | Profit Factor | Sharpe | Max DD | Тайлбар |
+|---------|----------|---------------|--------|--------|---------|
+| Phase 5 | 46.6% | 1.53 | — | 22.5% | Эхний baseline |
+| Phase 6B | 37.2% | — | — | — | Overfitting (train 100%!) |
+| **Phase 7B** | **44.4%** | **2.46** | **9.64** | **3.93%** | Anti-overfitting, calibrated |
+
+Phase 6B-аас Phase 7B руу шилжихдээ overfitting-ийг арилгаж, Sharpe ratio 9.64-д хүрсэн нь системийн хамгийн том ахиц юм.
+
+---
+
+## Android APK
+
+**[⬇ Хамгийн сүүлийн APK татах](https://github.com/Asura-lab/Forex-Signal-App/releases/latest)**
+
+```
+Minimum: Android 6.0 (API 23)
+Суулгахдаа "Unknown sources" зөвшөөрнө үү
+```
+
+---
+
+## Backend API (Azure)
+
+`https://predictrix-cvhvhtheawabdahg.koreacentral-01.azurewebsites.net`
+
+| Group | Endpoint | Method |
+|-------|----------|--------|
+| Auth | `/auth/register`, `/auth/login`, `/auth/verify-email` | POST |
+| Auth | `/auth/me`, `/auth/update` | GET/PUT |
+| Signal | `/signal`, `/predict` | GET/POST |
+| Rates | `/rates/live`, `/rates/specific` | GET |
+| Analysis | `/api/market-analysis`, `/api/news` | GET |
+| System | `/health` | GET |
+
+---
+
+## Хөгжүүлэлтийн орчин
 
 ```bash
-# 1. Clone
+# Backend
 git clone https://github.com/Asura-lab/Forex-Signal-App.git
 cd Forex-Signal-App
-
-# 2. Virtual environment
-python -m venv .venv
-.venv\Scripts\activate  # Windows
-
-# 3. Dependencies
-pip install -r requirements.txt
-
-# 4. Environment variables
-# backend/config/.env файлд:
-# MONGO_URI=mongodb+srv://...
-# SECRET_KEY=your-secret-key
-# TWELVEDATA_API_KEY=your-api-key
-
-# 5. Run
+python -m venv .venv && .venv\Scripts\activate
+pip install -r backend/requirements.txt
+# backend/config/.env: MONGO_URI, SECRET_KEY, TWELVEDATA_API_KEY, GEMINI_API_KEY_1
 python backend/app.py
-```
 
-Backend: `http://localhost:5000`
-
-### Mobile App:
-
-```bash
-cd mobile_app
-npm install
+# Mobile
+cd mobile_app && npm install
 npx expo start
+# EAS build
+npx eas build --platform android --profile preview
 ```
 
 ---
 
-## API Endpoints
+## Хувилбарын түүх
 
-### Authentication:
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/auth/register` | Бүртгүүлэх |
-| POST | `/auth/verify-email` | Имэйл баталгаажуулах |
-| POST | `/auth/login` | Нэвтрэх |
-| GET | `/auth/me` | Хэрэглэгчийн мэдээлэл |
-| POST | `/auth/forgot-password` | Нууц үг мартсан |
-| POST | `/auth/reset-password` | Нууц үг сэргээх |
-
-### Signal:
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/signal/v2` | BUY сигнал авах |
-| GET | `/signal/v2/demo` | Demo сигнал |
-| POST | `/signal/save` | Сигнал хадгалах |
-| GET | `/signals/history` | Сигналын түүх |
-| GET | `/signals/stats` | Статистик |
-
-### Market Data:
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/rates/live` | Бодит цагийн ханш |
-| GET | `/health` | Health check |
-
-### Example Request:
-
-```bash
-curl "http://localhost:5000/signal/v2?min_confidence=80"
-```
-
-### Example Response:
-
-```json
-{
-  "success": true,
-  "signal": "BUY",
-  "confidence": 85.2,
-  "entry_price": 1.08234,
-  "stop_loss": 1.08134,
-  "take_profit": 1.08434,
-  "sl_pips": 10.0,
-  "tp_pips": 20.0,
-  "risk_reward": "1:2.0",
-  "atr_pips": 8.5,
-  "models_agree": true,
-  "model_probs": {
-    "xgboost": 87.3,
-    "lightgbm": 84.1,
-    "random_forest": 82.5
-  }
-}
-```
+| Хувилбар | Огноо | Өөрчлөлт |
+|---------|-------|----------|
+| **v0.4.0** | 2026-02-24 | Backend Azure App Service-д байршсан |
+| v0.3.3 | 2026-02-23 | Bug fix, UI сайжруулалт |
+| v0.3.2 | 2026-02-23 | Push notification |
+| v0.3.1 | 2026-02-22 | Market analysis, news feed |
+| v0.3.0 | 2026-02-22 | GBDT multi-timeframe ensemble нэвтрүүлсэн |
 
 ---
 
-## Model Training
+## Зохиогч
 
-### Notebook: `forex_signal_v2.ipynb`
+Судалгааны ажил, дипломын зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү.
 
-```python
-# 1. Data: 2+ million rows EUR/USD 1-min
-# 2. Features: 70 technical indicators
-# 3. Labels: BUY vs NOT_BUY (binary)
-# 4. Models: XGBoost, LightGBM, Random Forest
-# 5. Ensemble: Weighted average (40%, 35%, 25%)
-# 6. Backtest: 61.9% WR at 80% confidence
-```
-
-### Dynamic SL/TP (ATR-based):
-- **Stop Loss**: 1.5 × ATR (10-20 pips)
-- **Take Profit**: 2.5 × ATR (20-40 pips)
-- **Risk:Reward**: 1:1.5 - 1:2
-
----
-
-## Performance
-
-| Metric | Value |
-|--------|-------|
-| Training Data | 1,859,492 rows |
-| Test Data | 296,778 rows |
-| Features | 70 |
-| Win Rate (80%+ conf) | 61.9% |
-| Profit Factor | 3.10 |
-| Signals/day | ~1.9 |
-
----
-
-## Security
-
-- [OK] Bcrypt password hashing
-- [OK] JWT token authentication
-- [OK] Email verification (6-digit code)
-- [OK] CORS protection
-- [OK] Environment variables for secrets
-
----
-
-## License
-
-Educational and research purposes only.
-
----
-
-## Author
-
-**Asura-lab**
-- GitHub: [@Asura-lab](https://github.com/Asura-lab)
-
----
-
-**[!] Disclaimer**: Энэ систем нь зөвхөн боловсрол, судалгааны зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү!
-
----
-
-**Made in Mongolia**
+**Asura-lab** · [github.com/Asura-lab](https://github.com/Asura-lab)
