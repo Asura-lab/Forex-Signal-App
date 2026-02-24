@@ -362,14 +362,18 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                   AI ЗАГВАРУУДЫН ШИНЖИЛГЭЭ
                 </Text>
                 <View style={styles.modelGrid}>
-                  {Object.entries(signal.model_probabilities).map(([model, prob]) => (
-                    <View key={model} style={styles.modelItem}>
-                      <Text style={styles.modelName}>{model.toUpperCase()}</Text>
-                      <Text style={[styles.modelProb, { color: (prob as number) > 50 ? colors.success : colors.error }]}>
-                        {(prob as number).toFixed(0)}%
-                      </Text>
-                    </View>
-                  ))}
+                  {Object.entries(signal.model_probabilities).map(([model, prob]) => {
+                    const probNum = typeof prob === 'number' ? prob : parseFloat(String(prob) ?? '0');
+                    const isValid = !isNaN(probNum);
+                    return (
+                      <View key={model} style={styles.modelItem}>
+                        <Text style={styles.modelName}>{model.toUpperCase()}</Text>
+                        <Text style={[styles.modelProb, { color: isValid && probNum > 50 ? colors.success : colors.error }]}>
+                          {isValid ? probNum.toFixed(0) : '—'}%
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
                 
                 {signal.models_agree && (
