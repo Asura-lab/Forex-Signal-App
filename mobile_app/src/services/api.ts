@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
+import { getDeviceId } from "./notificationService";
 
 export interface UserData {
   id: string;
@@ -144,9 +146,12 @@ export const resendVerificationCode = async (email: string): Promise<ApiResponse
  */
 export const loginUser = async (email: string, password: string): Promise<ApiResponse> => {
   try {
+    const deviceId = await getDeviceId();
     const response = await apiClient.post("/auth/login", {
       email,
       password,
+      device_id: deviceId,
+      platform: Platform.OS,
     });
 
     // Token хадгалах

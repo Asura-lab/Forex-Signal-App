@@ -19,6 +19,7 @@ import SignalScreen from "./src/screens/SignalScreen";
 import {
   initializePushNotifications,
   setupNotificationListeners,
+  requestNotificationPermission,
 } from "./src/services/notificationService";
 
 const Stack = createStackNavigator();
@@ -33,6 +34,13 @@ function AppContent() {
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  // Request notification permission on first app load (before login)
+  useEffect(() => {
+    requestNotificationPermission().then((granted) => {
+      console.log("[NOTIFICATION] Permission:", granted ? "granted" : "denied");
+    });
   }, []);
 
   // Initialize push notifications after auth check
@@ -60,6 +68,8 @@ function AppContent() {
                 navigationRef.current.navigate("Signal");
               } else if (data.screen === "News") {
                 navigationRef.current.navigate("Main", { screen: "News" });
+              } else if (data.screen === "Profile") {
+                navigationRef.current.navigate("Main", { screen: "Profile" });
               }
             } catch (e) {
               console.log("[WARN] Navigation from notification failed:", e);

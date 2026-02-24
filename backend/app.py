@@ -163,7 +163,7 @@ class NewsCache:
             print(f"[ERROR] News cache update failed: {e}")
 
     def _check_and_notify_news(self, upcoming):
-        """Томоохон мэдээ илэрвэл push notification илгээх"""
+        """Томоохон мэдээ илэрвэл push notification илгээх (impact шүүлтүүртэй)"""
         if not upcoming:
             return
         
@@ -180,14 +180,30 @@ class NewsCache:
         for event in events:
             if not isinstance(event, dict):
                 continue
-            impact = str(event.get('impact', '')).lower()
-            # Only notify for high impact events
-            if impact in ('high', 'red', '3', 'critical'):
+            raw_impact = str(event.get('impact', '')).lower()
+            # Map to standardized impact
+            if raw_impact in ('high', 'red', '3', 'critical'):
+                impact = 'high'
+            elif raw_impact in ('medium', 'orange', '2', 'yellow'):
+                impact = 'medium'
+            else:
+                impact = 'low'
+
+            # Only push for high and medium (low is not useful)
+            if impact in ('high', 'medium'):
+                event_title = event.get('title', event.get('event', 'Economic News'))
+                event_key = f"{event.get('date', '')}_{event_title}_{event.get('currency', '')}"
+                
+                # Skip if already notified
+                if push_service.is_event_notified(event_key):
+                    continue
+                    
+                push_service.mark_event_notified(event_key)
                 threading.Thread(
                     target=push_service.send_news_notification,
                     args=({
-                        'title': event.get('title', event.get('event', 'High Impact News')),
-                        'impact': 'high',
+                        'title': event_title,
+                        'impact': impact,
                         'currency': event.get('currency', event.get('country', 'USD')),
                         'description': event.get('forecast', event.get('description', '')),
                     },),
@@ -218,6 +234,90 @@ def news_updater_task():
 
 # Start background updater
 threading.Thread(target=news_updater_task, daemon=True).start()
+
+# ==================== NEWS NOTIFICATION SCHEDULER ====================
+# Checks upcoming events every 2 minutes, sends notifications 10 min before event
+
+def news_notification_scheduler():
+    """10 минутын өмнө мэдээний мэдэгдэл илгээх scheduler"""
+    print("[INFO] Starting news notification scheduler (10-min advance alerts)...")
+    time.sleep(30)  # Wait for initial news cache to load
+    
+    while True:
+        try:
+            upcoming = news_cache.get('upcoming')
+            if upcoming:
+                events = []
+                if isinstance(upcoming, dict):
+                    events = upcoming.get('events', upcoming.get('data', []))
+                elif isinstance(upcoming, list):
+                    events = upcoming
+                
+                now = datetime.now(timezone.utc)
+                
+                for event in events:
+                    if not isinstance(event, dict):
+                        continue
+                    
+                    # Parse event time
+                    date_str = event.get('date', '')
+                    if not date_str:
+                        continue
+                    
+                    try:
+                        # Handle raw TradingView date (before _format_event) or formatted date
+                        raw = event.get('raw', {})
+                        raw_date = raw.get('date', date_str) if raw else date_str
+                        
+                        if 'T' in str(raw_date):
+                            event_time = datetime.fromisoformat(str(raw_date).replace('Z', '+00:00'))
+                        else:
+                            # Try parsing formatted "YYYY-MM-DD HH:MM"
+                            event_time = datetime.strptime(str(raw_date), "%Y-%m-%d %H:%M")
+                            event_time = event_time.replace(tzinfo=timezone.utc)
+                    except (ValueError, TypeError):
+                        continue
+                    
+                    # Check if event is 5-12 minutes from now (window to catch ~10 min before)
+                    diff_minutes = (event_time - now).total_seconds() / 60
+                    if 5 <= diff_minutes <= 12:
+                        raw_impact = str(event.get('impact', event.get('sentiment', ''))).lower()
+                        if raw_impact in ('high', 'red', '3', 'critical'):
+                            impact = 'high'
+                        elif raw_impact in ('medium', 'orange', '2', 'yellow'):
+                            impact = 'medium'
+                        else:
+                            impact = 'low'
+                        
+                        event_title = event.get('title', event.get('event_name', 'Economic News'))
+                        event_key = f"sched_{date_str}_{event_title}"
+                        
+                        if push_service.is_event_notified(event_key):
+                            continue
+                        
+                        push_service.mark_event_notified(event_key)
+                        time_str = event_time.strftime("%H:%M UTC")
+                        
+                        threading.Thread(
+                            target=push_service.send_news_notification,
+                            args=({
+                                'title': event_title,
+                                'impact': impact,
+                                'currency': event.get('currency', 'USD'),
+                                'description': event.get('forecast', event.get('description', '')),
+                                'event_time': time_str,
+                            },),
+                            daemon=True
+                        ).start()
+                        print(f"[INFO] Scheduled news notification: {event_title} at {time_str} ({impact})")
+        
+        except Exception as e:
+            print(f"[WARN] News notification scheduler error: {e}")
+        
+        time.sleep(120)  # Check every 2 minutes
+
+# Start news notification scheduler
+threading.Thread(target=news_notification_scheduler, daemon=True).start()
 
 # ==================== AUTH HELPERS ====================
 
@@ -429,6 +529,8 @@ def login():
     data = request.json
     email = data.get('email', '').strip().lower()
     password = data.get('password', '')
+    device_id = data.get('device_id', '')
+    platform_name = data.get('platform', 'Unknown')
     
     user = users_collection.find_one({'email': email})
     if not user:
@@ -443,6 +545,28 @@ def login():
         return jsonify({'error': 'Имэйл эсвэл нууц үг буруу'}), 401
     
     token = generate_token(user['_id'], email)
+    
+    # Security alert: detect login from new device
+    try:
+        user_id_str = str(user['_id'])
+        existing_device = push_service.get_user_device(user_id_str)
+        if (existing_device and existing_device.get('device_id') 
+                and device_id and existing_device['device_id'] != device_id):
+            # Different device detected — send security alert
+            client_ip = request.headers.get('X-Forwarded-For', request.remote_addr)
+            login_time = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+            threading.Thread(
+                target=push_service.send_security_alert,
+                args=(user_id_str, {
+                    'ip': str(client_ip).split(',')[0].strip() if client_ip else 'Unknown',
+                    'platform': platform_name,
+                    'device_name': data.get('device_name', platform_name),
+                    'login_time': login_time,
+                }),
+                daemon=True
+            ).start()
+    except Exception as sec_err:
+        print(f"[WARN] Security alert check failed: {sec_err}")
     
     return jsonify({
         'success': True,
@@ -554,11 +678,14 @@ def register_push_token():
     data = request.json or {}
     push_token = data.get('push_token', '').strip()
     platform = data.get('platform', 'unknown')
+    device_id = data.get('device_id', '')
     
     if not push_token:
         return jsonify({'error': 'Push token шаардлагатай'}), 400
     
-    success = push_service.register_token(payload['user_id'], push_token, platform)
+    success = push_service.register_token(
+        payload['user_id'], push_token, platform, device_id
+    )
     
     if success:
         return jsonify({'success': True, 'message': 'Push token бүртгэгдлээ'})

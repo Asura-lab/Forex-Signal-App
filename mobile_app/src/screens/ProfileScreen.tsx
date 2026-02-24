@@ -24,6 +24,7 @@ import {
   updateNotificationPreferences,
   initializePushNotifications,
   unregisterPushTokenFromServer,
+  NewsImpactFilter,
 } from "../services/notificationService";
 
 interface UserData {
@@ -51,6 +52,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [notifications, setNotifications] = useState<boolean>(true);
   const [signalNotifications, setSignalNotifications] = useState<boolean>(true);
   const [newsNotifications, setNewsNotifications] = useState<boolean>(true);
+  const [newsImpactFilter, setNewsImpactFilter] = useState<NewsImpactFilter>("high");
+  const [securityNotifications, setSecurityNotifications] = useState<boolean>(true);
+  const [showImpactFilterModal, setShowImpactFilterModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [showPasswordModal, setShowPasswordModal] = useState<boolean>(false);
   const [oldPassword, setOldPassword] = useState<string>("");
@@ -100,6 +104,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       const prefs = await getNotificationPreferences();
       setSignalNotifications(prefs.signal_notifications ?? true);
       setNewsNotifications(prefs.news_notifications ?? true);
+      setNewsImpactFilter(prefs.news_impact_filter ?? "high");
+      setSecurityNotifications(prefs.security_notifications ?? true);
       if (prefs.notifications_enabled !== undefined) {
         setNotifications(prefs.notifications_enabled);
       }
@@ -239,6 +245,25 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       await updateNotificationPreferences({ news_notifications: value });
     } catch (error: any) {
       console.error("Save news notification settings error:", error);
+    }
+  };
+
+  const handleNewsImpactFilterChange = async (filter: NewsImpactFilter) => {
+    setNewsImpactFilter(filter);
+    setShowImpactFilterModal(false);
+    try {
+      await updateNotificationPreferences({ news_impact_filter: filter });
+    } catch (error: any) {
+      console.error("Save news impact filter error:", error);
+    }
+  };
+
+  const handleSecurityNotificationToggle = async (value: boolean) => {
+    setSecurityNotifications(value);
+    try {
+      await updateNotificationPreferences({ security_notifications: value });
+    } catch (error: any) {
+      console.error("Save security notification settings error:", error);
     }
   };
 
@@ -621,7 +646,7 @@ GitHub: github.com/Asura-lab/Predictrix
                   <View style={styles.infoContent}>
                     <Text style={styles.infoLabel}>NEWS ALERTS</Text>
                     <Text style={styles.infoDescription}>
-                      Major economic news events
+                      Economic news events (10 min before)
                     </Text>
                   </View>
                   <Switch
@@ -629,6 +654,45 @@ GitHub: github.com/Asura-lab/Predictrix
                     onValueChange={handleNewsNotificationToggle}
                     trackColor={{ false: "#1E293B", true: "#FF5252" }}
                     thumbColor={newsNotifications ? "#FFFFFF" : "#6B7280"}
+                  />
+                </View>
+
+                {newsNotifications && (
+                  <>
+                    <View style={styles.divider} />
+                    <TouchableOpacity
+                      style={styles.infoRow}
+                      onPress={() => setShowImpactFilterModal(true)}
+                    >
+                      <View style={styles.infoContent}>
+                        <Text style={styles.infoLabel}>NEWS IMPACT FILTER</Text>
+                        <Text style={styles.infoDescription}>
+                          {newsImpactFilter === "high"
+                            ? "🔴 High impact only"
+                            : newsImpactFilter === "medium"
+                            ? "🔴🟡 High + Medium"
+                            : "🔴🟡🟢 All impact levels"}
+                        </Text>
+                      </View>
+                      <Text style={styles.chevron}>{">"}</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+
+                <View style={styles.divider} />
+
+                <View style={styles.infoRow}>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoLabel}>SECURITY ALERTS</Text>
+                    <Text style={styles.infoDescription}>
+                      Login from new device
+                    </Text>
+                  </View>
+                  <Switch
+                    value={securityNotifications}
+                    onValueChange={handleSecurityNotificationToggle}
+                    trackColor={{ false: "#1E293B", true: "#2196F3" }}
+                    thumbColor={securityNotifications ? "#FFFFFF" : "#6B7280"}
                   />
                 </View>
               </>
@@ -897,6 +961,58 @@ GitHub: github.com/Asura-lab/Predictrix
             >
               <Text style={styles.themeOptionText}>Dark</Text>
               {themeMode === 'dark' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* News Impact Filter Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showImpactFilterModal}
+        onRequestClose={() => setShowImpactFilterModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.themeModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowImpactFilterModal(false)}
+        >
+          <View style={styles.themeModalContent}>
+            <Text style={styles.themeModalTitle}>News Impact Filter</Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                newsImpactFilter === 'high' && styles.themeOptionActive
+              ]}
+              onPress={() => handleNewsImpactFilterChange('high')}
+            >
+              <Text style={styles.themeOptionText}>🔴 High Impact Only</Text>
+              {newsImpactFilter === 'high' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                newsImpactFilter === 'medium' && styles.themeOptionActive
+              ]}
+              onPress={() => handleNewsImpactFilterChange('medium')}
+            >
+              <Text style={styles.themeOptionText}>🔴🟡 High + Medium</Text>
+              {newsImpactFilter === 'medium' && <Text style={styles.checkmark}>✓</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                styles.themeOptionLast,
+                newsImpactFilter === 'all' && styles.themeOptionActive
+              ]}
+              onPress={() => handleNewsImpactFilterChange('all')}
+            >
+              <Text style={styles.themeOptionText}>🔴🟡🟢 All Levels</Text>
+              {newsImpactFilter === 'all' && <Text style={styles.checkmark}>✓</Text>}
             </TouchableOpacity>
           </View>
         </TouchableOpacity>

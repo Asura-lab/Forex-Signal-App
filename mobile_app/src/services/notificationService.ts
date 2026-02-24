@@ -1,6 +1,11 @@
 /**
  * Push Notification Service
  * Expo Push Notifications ашиглан мэдэгдэл хүлээн авах, бүртгэх
+ *
+ * 3 төрлийн мэдэгдэл:
+ *   1. Trading Signal — шинэ сигнал үүсэхэд
+ *   2. News Alert — эдийн засгийн мэдээний өмнө (impact шүүлтүүртэй)
+ *   3. Security Alert — өөр төхөөрөмжөөс нэвтрэхэд
  */
 
 import * as Notifications from "expo-notifications";
@@ -21,6 +26,50 @@ Notifications.setNotificationHandler({
     shouldSetBadge: true,
   }),
 });
+
+// ==================== DEVICE ID ====================
+
+/**
+ * Unique device identifier авах (security alert-д хэрэглэнэ)
+ */
+export async function getDeviceId(): Promise<string> {
+  try {
+    // Try stored device ID first
+    const stored = await AsyncStorage.getItem("@device_id");
+    if (stored) return stored;
+
+    // Generate a stable ID from device info
+    const deviceId = `${Platform.OS}_${Device.modelName ?? "unknown"}_${Date.now()}`;
+    await AsyncStorage.setItem("@device_id", deviceId);
+    return deviceId;
+  } catch {
+    return `${Platform.OS}_unknown_${Date.now()}`;
+  }
+}
+
+// ==================== PERMISSION REQUEST ====================
+
+/**
+ * Notification зөвшөөрөл асуух (App эхлэхэд дуудна — login шаардахгүй)
+ */
+export async function requestNotificationPermission(): Promise<boolean> {
+  try {
+    if (!Device.isDevice) {
+      console.log("[WARN] Push notifications require a physical device");
+      return false;
+    }
+
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+    if (existingStatus === "granted") return true;
+
+    const { status } = await Notifications.requestPermissionsAsync();
+    return status === "granted";
+  } catch (error) {
+    console.error("[ERROR] Request notification permission failed:", error);
+    return false;
+  }
+}
 
 // ==================== PUSH TOKEN REGISTRATION ====================
 
@@ -61,7 +110,7 @@ export async function getExpoPushToken(): Promise<string | null> {
     const token = tokenData.data;
     console.log("[OK] Expo Push Token:", token);
 
-    // Android notification channel
+    // Android notification channels
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "Default",
@@ -82,10 +131,19 @@ export async function getExpoPushToken(): Promise<string | null> {
 
       await Notifications.setNotificationChannelAsync("news", {
         name: "Market News",
-        description: "Major economic news alerts",
+        description: "Economic news alerts before events",
         importance: Notifications.AndroidImportance.HIGH,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: "#FF5252",
+        sound: "default",
+      });
+
+      await Notifications.setNotificationChannelAsync("security", {
+        name: "Security Alerts",
+        description: "Login and account security notifications",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 500, 200, 500],
+        lightColor: "#FF0000",
         sound: "default",
       });
     }
@@ -110,11 +168,14 @@ export async function registerPushTokenWithServer(
       return false;
     }
 
+    const deviceId = await getDeviceId();
+
     const response = await axios.post(
       `${API_BASE_URL}/notifications/register`,
       {
         push_token: pushToken,
         platform: Platform.OS,
+        device_id: deviceId,
       },
       {
         headers: {
@@ -174,10 +235,14 @@ export async function unregisterPushTokenFromServer(): Promise<boolean> {
 
 // ==================== NOTIFICATION PREFERENCES ====================
 
+export type NewsImpactFilter = "high" | "medium" | "all";
+
 export interface NotificationPreferences {
   notifications_enabled: boolean;
   signal_notifications: boolean;
   news_notifications: boolean;
+  news_impact_filter: NewsImpactFilter;
+  security_notifications: boolean;
 }
 
 /**
@@ -188,6 +253,8 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     notifications_enabled: true,
     signal_notifications: true,
     news_notifications: true,
+    news_impact_filter: "high",
+    security_notifications: true,
   };
 
   try {
@@ -205,11 +272,10 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     );
 
     if (response.data?.success) {
-      return response.data.preferences;
+      return { ...defaults, ...response.data.preferences };
     }
   } catch (error: any) {
     if (error?.response?.status === 401) {
-      // Token expired or invalid — clear it so the user can re-authenticate
       await AsyncStorage.removeItem("userToken");
       console.warn("[WARN] Notification preferences: token expired, cleared stored token.");
     } else {
@@ -245,7 +311,6 @@ export async function updateNotificationPreferences(
     return response.data?.success ?? false;
   } catch (error: any) {
     if (error?.response?.status === 401) {
-      // Token expired or invalid — clear it so the user can re-authenticate
       await AsyncStorage.removeItem("userToken");
       console.warn("[WARN] Update notification preferences: token expired, cleared stored token.");
     } else {
