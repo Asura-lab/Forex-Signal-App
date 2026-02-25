@@ -363,7 +363,21 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                 </Text>
                 <View style={styles.modelGrid}>
                   {Object.entries(signal.model_probabilities).map(([model, prob]) => {
-                    const probNum = typeof prob === 'number' ? prob : parseFloat(String(prob) ?? '0');
+                    // prob is an object like {SELL: 3.2, HOLD: 93.5, BUY: 3.3}
+                    let probNum: number;
+                    if (typeof prob === 'object' && prob !== null) {
+                      const probObj = prob as Record<string, number>;
+                      // Show the probability for the current signal direction
+                      if (signal.signal === 'BUY') {
+                        probNum = probObj.BUY ?? 0;
+                      } else if (signal.signal === 'SELL') {
+                        probNum = probObj.SELL ?? 0;
+                      } else {
+                        probNum = probObj.HOLD ?? 0;
+                      }
+                    } else {
+                      probNum = typeof prob === 'number' ? prob : parseFloat(String(prob) ?? '0');
+                    }
                     const isValid = !isNaN(probNum);
                     return (
                       <View key={model} style={styles.modelItem}>
