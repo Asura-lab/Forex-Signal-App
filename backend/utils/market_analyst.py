@@ -37,13 +37,13 @@ class MarketAnalyst:
         self.api_keys = GEMINI_API_KEYS
         self.current_key_index = 0
         
-        # Models from screenshot (Prioritized by user request & quota)
+        # Models (2.5 series priority)
         self.available_models = [
-            'gemini-3-flash',        # PRIMARY: The requested model
-            'gemini-2.5-flash-lite', # SECONDARY: High RPM (10 RPM)
-            'gemini-2.5-flash',      # TERTIARY: Lower limits (5 RPM)
+            'gemini-2.5-pro',        # PRIMARY: Most capable
+            'gemini-2.5-flash',      # SECONDARY: Fast + capable
+            'gemini-2.5-flash-lite', # TERTIARY: High RPM
+            'gemini-2.0-flash',      # BACKUP: Reliable
             'gemini-2.0-flash-lite', # BACKUP: High RPM
-            'gemini-2.0-flash'       # BACKUP: Reliable
         ]
         self.current_model_index = 0
         self.gemini = None

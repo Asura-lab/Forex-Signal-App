@@ -5,8 +5,22 @@
 
 import { Platform } from "react-native";
 
+// ─── Environment switch ───────────────────────────────────────────────────────
+// __DEV__ = true  → local backend (npm start / expo go)
+// __DEV__ = false → Azure production backend (release build)
+
+const AZURE_URL = 'https://predictrix-cvhvhtheawabdahg.koreacentral-01.azurewebsites.net';
+
+// Android emulator uses 10.0.2.2 to reach host machine; iOS uses localhost
+const LOCAL_URL = Platform.OS === 'android'
+  ? 'http://10.0.2.2:5000'
+  : 'http://localhost:5000';
+
 const getApiUrl = () => {
-  return 'https://predictrix-cvhvhtheawabdahg.koreacentral-01.azurewebsites.net';
+  if (__DEV__) {
+    return LOCAL_URL;
+  }
+  return AZURE_URL;
 };
 
 export const API_URL = getApiUrl(); // Export API_URL directly as well for convenience
