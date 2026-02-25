@@ -6,7 +6,8 @@ import time
 import requests
 import urllib.parse
 import re
-import google.generativeai as genai
+from google import genai
+from google.genai import types as genai_types
 from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from config.settings import MONGO_URI, GEMINI_API_KEYS
@@ -33,7 +34,8 @@ class MarketAnalyst:
             'gemini-2.0-flash'       # BACKUP: Reliable
         ]
         self.current_model_index = 0
-        self.model = None
+        self.client = None
+        self.current_model_name = self.available_models[0]
         
         if self.api_keys:
             self._configure_gemini()
@@ -56,15 +58,12 @@ class MarketAnalyst:
         self.cache_duration = 900  # 15 minutes
 
     def _configure_gemini(self):
-        """Initialize Gemini model with current key and model"""
+        """Initialize Gemini client with current key and model"""
         try:
             current_key = self.api_keys[self.current_key_index]
-            model_name = self.available_models[self.current_model_index]
-            
-            genai.configure(api_key=current_key)
-            self.model = genai.GenerativeModel(model_name)
-            
-            print(f"[INFO] Connected to Google {model_name} (Key #{self.current_key_index + 1})")
+            self.current_model_name = self.available_models[self.current_model_index]
+            self.client = genai.Client(api_key=current_key)
+            print(f"[INFO] Connected to Google {self.current_model_name} (Key #{self.current_key_index + 1})")
         except Exception as e:
             print(f"[ERROR] Gemini Configuration Error: {e}")
 
@@ -90,42 +89,36 @@ class MarketAnalyst:
         """Unified AI caller (Gemini > Pollinations)"""
         
         # 1. Try Gemini
-        if self.model:
+        if self.client:
             try:
                 final_prompt = prompt
                 # Add disclaimer to bypass financial advice filters
                 final_prompt = "IMPORTANT: This analysis is for EDUCATIONAL PURPOSES ONLY. Do not provide financial advice.\n\n" + final_prompt
                 
-                generation_config = {}
-                
                 if force_json:
                     final_prompt += "\n\nReturn JSON only."
-                    # Enforce JSON output for Gemini
-                    generation_config = {"response_mime_type": "application/json"}
                 
                 # Safety settings to prevent blocking
                 safety_settings = [
-                    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-                    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                    genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+                    genai_types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
+                    genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+                    genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
                 ]
 
-                response = self.model.generate_content(
-                    final_prompt, 
-                    generation_config=generation_config,
-                    safety_settings=safety_settings
+                config_kwargs = {"safety_settings": safety_settings}
+                if force_json:
+                    config_kwargs["response_mime_type"] = "application/json"
+
+                response = self.client.models.generate_content(
+                    model=self.current_model_name,
+                    contents=final_prompt,
+                    config=genai_types.GenerateContentConfig(**config_kwargs)
                 )
-                
-                # Check for safety blocking
-                if response.prompt_feedback:
-                    if response.prompt_feedback.block_reason:
-                        print(f"[WARN] Gemini Prompt Blocked: {response.prompt_feedback.block_reason}")
-                        return None
                 
                 try:
                     text = response.text.strip()
-                except ValueError:
+                except (ValueError, AttributeError):
                     # Occurs when response was blocked by safety checks but no text generated
                     raise Exception("Gemini Safety Block - Empty Response")
 

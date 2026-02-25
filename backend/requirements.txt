@@ -30,7 +30,7 @@ flask-mail>=0.9.1
 gunicorn>=21.2.0
 
 # === AI & LLM ===
-google-generativeai>=0.3.0
+google-genai>=1.0.0
 
 # === TIMEZONE ===
 pytz>=2024.1
