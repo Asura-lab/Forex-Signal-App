@@ -42,10 +42,22 @@ from utils.twelvedata_handler import (
 )
 
 # Import Market Analyst (News & AI)
-from utils.market_analyst import market_analyst
+try:
+    from utils.market_analyst import market_analyst
+    print("[OK] market_analyst loaded", flush=True)
+except Exception as _e:
+    print(f"[CRITICAL] market_analyst import failed: {_e}", flush=True)
+    import traceback; traceback.print_exc()
+    raise
 
 # Import GBDT Signal Generator (trained multi-timeframe model)
-from ml.signal_generator_gbdt import get_signal_generator_gbdt
+try:
+    from ml.signal_generator_gbdt import get_signal_generator_gbdt
+    print("[OK] signal_generator_gbdt loaded", flush=True)
+except Exception as _e:
+    print(f"[CRITICAL] signal_generator_gbdt import failed: {_e}", flush=True)
+    import traceback; traceback.print_exc()
+    raise
 
 # Import Push Notification Service
 from utils.push_notifications import push_service

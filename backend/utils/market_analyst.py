@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import sys
 import random
 import json
 import ast
@@ -6,8 +7,19 @@ import time
 import requests
 import urllib.parse
 import re
-from google import genai
-from google.genai import types as genai_types
+
+# google-genai import (failsafe)
+try:
+    from google import genai
+    from google.genai import types as genai_types
+    GENAI_AVAILABLE = True
+    print("[OK] google-genai imported successfully", flush=True)
+except Exception as e:
+    print(f"[ERROR] google-genai import failed: {e}", flush=True)
+    GENAI_AVAILABLE = False
+    genai = None
+    genai_types = None
+
 from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
 from config.settings import MONGO_URI, GEMINI_API_KEYS
@@ -37,10 +49,13 @@ class MarketAnalyst:
         self.gemini = None
         self.current_model_name = self.available_models[0]
         
-        if self.api_keys:
+        if self.api_keys and GENAI_AVAILABLE:
             self._configure_gemini()
         else:
-            print("[WARN] No GEMINI_API_KEYS found. Using Pollinations.ai fallback.")
+            if not GENAI_AVAILABLE:
+                print("[WARN] google-genai not available. Using Pollinations.ai fallback.", flush=True)
+            else:
+                print("[WARN] No GEMINI_API_KEYS found. Using Pollinations.ai fallback.", flush=True)
 
         # MongoDB Connection
         try:
@@ -63,9 +78,9 @@ class MarketAnalyst:
             current_key = self.api_keys[self.current_key_index]
             self.current_model_name = self.available_models[self.current_model_index]
             self.gemini = genai.Client(api_key=current_key)
-            print(f"[INFO] Connected to Google {self.current_model_name} (Key #{self.current_key_index + 1})")
+            print(f"[INFO] Connected to Google {self.current_model_name} (Key #{self.current_key_index + 1})", flush=True)
         except Exception as e:
-            print(f"[ERROR] Gemini Configuration Error: {e}")
+            print(f"[ERROR] Gemini Configuration Error: {e}", flush=True)
 
     def _rotate_key(self):
         """Switch to next available API key"""
