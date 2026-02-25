@@ -87,14 +87,22 @@ try:
     reset_codes = db['reset_codes']
     signals_collection = db['signals']  # Таамгууд хадгалах collection
     in_app_notifications = db['in_app_notifications']  # In-app мэдэгдлүүд
+    # Migration: drop conflicting old index if it exists
+    try:
+        existing = {i['name'] for i in in_app_notifications.list_indexes()}
+        if 'idx_created_desc' in existing:
+            in_app_notifications.drop_index('idx_created_desc')
+            print("[INFO] Dropped old idx_created_desc index", flush=True)
+    except Exception as drop_err:
+        print(f"[WARN] drop idx_created_desc: {drop_err}", flush=True)
     # TTL index: auto-delete old notifications after 7 days
     try:
         in_app_notifications.create_index("created_at", expireAfterSeconds=7*86400)
     except Exception as idx_err:
-        print(f"[WARN] in_app_notifications TTL index: {idx_err}")
-    print("✓ MongoDB холбогдлоо")
+        print(f"[WARN] in_app_notifications TTL index: {idx_err}", flush=True)
+    print("✓ MongoDB холбогдлоо", flush=True)
 except Exception as e:
-    print(f"✗ MongoDB холбогдох алдаа: {e}")
+    print(f"✗ MongoDB холбогдох алдаа: {e}", flush=True)
     exit(1)
 
 # ==================== SIGNAL GENERATORS ====================
