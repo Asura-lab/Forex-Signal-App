@@ -37,14 +37,14 @@ class MarketAnalyst:
         self.api_keys = GEMINI_API_KEYS
         self.current_key_index = 0
         
-        # Models (2.5 series priority)
+        # Models (free tier available)
         self.available_models = [
-            'gemini-2.5-pro',        # PRIMARY: Most capable
-            'gemini-2.5-flash',      # SECONDARY: Fast + capable
-            'gemini-2.5-flash-lite', # TERTIARY: High RPM
-            'gemini-2.0-flash',      # BACKUP: Reliable
-            'gemini-2.0-flash-lite', # BACKUP: High RPM
+            'gemini-2.5-flash',      # PRIMARY: Fast + capable (free tier)
+            'gemini-2.5-flash-lite', # SECONDARY: High RPM (free tier)
+            'gemini-2.0-flash',      # BACKUP: Reliable (free tier)
+            'gemini-2.0-flash-lite', # BACKUP: High RPM (free tier)
         ]
+        self._exhausted_models = set()  # Track quota-exhausted models
         self.current_model_index = 0
         self.gemini = None
         self.current_model_name = self.available_models[0]
@@ -149,36 +149,41 @@ class MarketAnalyst:
                 
                 error_str = str(e).lower()
                 is_auth_error = any(x in error_str for x in ["403", "leaked", "permission", "key", "invalid", "unauthenticated"])
-                is_rate_limit = any(x in error_str for x in ["429", "quota", "exhausted", "limit", "resource"])
+                is_rate_limit = any(x in error_str for x in ["429", "quota", "exhausted", "resource_exhausted"])
                 is_not_found = "404" in error_str and "not found" in error_str
                 is_empty = "empty" in error_str or "safety" in error_str
 
-                # ACTION 1: If 404 (Model missing) or Empty (Flaky model) -> SWITCH MODEL
-                if is_not_found or is_empty:
-                    print(f"[WARN] Issue with Model {self.available_models[self.current_model_index]}: {e}")
-                    if self._rotate_model():
-                         try:
-                            return self._call_ai(prompt, force_json, retries=0) # Recursive retry with new model
-                         except: pass
+                # 429 Quota: mark current model exhausted, switch model immediately
+                if is_rate_limit:
+                    current_model = self.available_models[self.current_model_index]
+                    self._exhausted_models.add(current_model)
+                    print(f"[WARN] {current_model} quota exhausted, switching model...", flush=True)
+                    # Find next non-exhausted model
+                    switched = False
+                    for _ in range(len(self.available_models)):
+                        self.current_model_index = (self.current_model_index + 1) % len(self.available_models)
+                        next_model = self.available_models[self.current_model_index]
+                        if next_model not in self._exhausted_models:
+                            self.current_model_name = next_model
+                            print(f"[INFO] Switched to model: {next_model}", flush=True)
+                            switched = True
+                            break
+                    if switched and retries > 0:
+                        return self._call_ai(prompt, force_json, retries=retries - 1)
+                    # All models exhausted → fall through to Pollinations
+                    print("[WARN] All Gemini models quota exhausted, using fallback.", flush=True)
+                    break
 
-                # ACTION 2: If Auth/Rate Limit -> ROTATE KEY
-                if is_auth_error or is_rate_limit:
-                    print(f"[WARN] Issue with Key #{self.current_key_index + 1}: {e}")
-                    if self._rotate_key():
-                        try:
-                            return self._call_ai(prompt, force_json, retries=0) # Recursive retry with new key
-                        except: pass
-                        
-                # ACTION 3: If everything failed, try rotating key AND model as last resort
-                # Ensure we don't recurse infinitely
-                if retries > 0:
-                     # Check if we have unused keys for this specific error? 
-                     # Just force rotation to next available resource
-                     if self._rotate_key():
-                          try:
-                            time.sleep(1)
-                            return self._call_ai(prompt, force_json, retries=retries-1)
-                          except: pass
+                # 404 / Empty: switch model
+                if is_not_found or is_empty:
+                    if self._rotate_model() and retries > 0:
+                        return self._call_ai(prompt, force_json, retries=retries - 1)
+
+                # Auth error: rotate key
+                if is_auth_error:
+                    if self._rotate_key() and retries > 0:
+                        return self._call_ai(prompt, force_json, retries=retries - 1)
+                    break
 
         # 2. Fallback to Pollinations (Legacy)
         url = "https://text.pollinations.ai/"
