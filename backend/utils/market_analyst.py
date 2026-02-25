@@ -34,7 +34,7 @@ class MarketAnalyst:
             'gemini-2.0-flash'       # BACKUP: Reliable
         ]
         self.current_model_index = 0
-        self.client = None
+        self.gemini = None
         self.current_model_name = self.available_models[0]
         
         if self.api_keys:
@@ -62,7 +62,7 @@ class MarketAnalyst:
         try:
             current_key = self.api_keys[self.current_key_index]
             self.current_model_name = self.available_models[self.current_model_index]
-            self.client = genai.Client(api_key=current_key)
+            self.gemini = genai.Client(api_key=current_key)
             print(f"[INFO] Connected to Google {self.current_model_name} (Key #{self.current_key_index + 1})")
         except Exception as e:
             print(f"[ERROR] Gemini Configuration Error: {e}")
@@ -89,7 +89,7 @@ class MarketAnalyst:
         """Unified AI caller (Gemini > Pollinations)"""
         
         # 1. Try Gemini
-        if self.client:
+        if self.gemini:
             try:
                 final_prompt = prompt
                 # Add disclaimer to bypass financial advice filters
@@ -110,7 +110,7 @@ class MarketAnalyst:
                 if force_json:
                     config_kwargs["response_mime_type"] = "application/json"
 
-                response = self.client.models.generate_content(
+                response = self.gemini.models.generate_content(
                     model=self.current_model_name,
                     contents=final_prompt,
                     config=genai_types.GenerateContentConfig(**config_kwargs)
