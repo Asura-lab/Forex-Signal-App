@@ -51,9 +51,8 @@ class MarketAnalyst:
             print(f"[ERROR] MongoDB Connection Error: {e}")
             self.db = None
 
-        # Cache settings
-        self.last_insight = None
-        self.last_insight_time = 0
+        # Cache settings (per-pair)
+        self._insight_cache = {}  # { pair: { "data": ..., "time": ... } }
         self.cache_duration = 900  # 15 minutes
 
     def _configure_gemini(self):
@@ -408,8 +407,14 @@ class MarketAnalyst:
             return []
 
     def generate_ai_insight(self, technical_signal, pair="EUR/USD"):
-        """Generate AI insight using Pollinations"""
+        """Generate AI insight with per-pair caching (15 min)"""
         current_time = time.time()
+        
+        # Check per-pair cache first
+        cached = self._insight_cache.get(pair)
+        if cached and (current_time - cached["time"]) < self.cache_duration:
+            print(f"[CACHE HIT] Returning cached insight for {pair} (age: {int(current_time - cached['time'])}s)")
+            return cached["data"]
         
         try:
             news_list = self.get_latest_news(limit=5)
@@ -531,8 +536,8 @@ class MarketAnalyst:
             insight['created_at'] = datetime.now(timezone.utc).isoformat()
             self._save_to_db(insight, pair)
             
-            self.last_insight = insight
-            self.last_insight_time = current_time
+            # Save to per-pair cache
+            self._insight_cache[pair] = {"data": insight, "time": current_time}
             
             return insight
 

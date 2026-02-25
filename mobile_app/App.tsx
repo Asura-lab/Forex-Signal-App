@@ -15,6 +15,7 @@ import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import MainTabs from "./src/navigation/MainTabs";
 import SignalScreen from "./src/screens/SignalScreen";
+import NotificationsScreen from "./src/screens/NotificationsScreen";
 import {
   initializePushNotifications,
   setupNotificationListeners,
@@ -164,6 +165,13 @@ function AppContent() {
           <Stack.Screen
             name="Signal"
             component={SignalScreen as any}
+            options={{
+              headerShown: false,
+            }}
+          />
+          <Stack.Screen
+            name="Notifications"
+            component={NotificationsScreen}
             options={{
               headerShown: false,
             }}

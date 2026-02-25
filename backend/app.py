@@ -74,6 +74,10 @@ try:
     verification_codes = db['verification_codes']
     reset_codes = db['reset_codes']
     signals_collection = db['signals']  # Таамгууд хадгалах collection
+    in_app_notifications = db['in_app_notifications']  # In-app мэдэгдлүүд
+    # TTL index: auto-delete old notifications after 7 days
+    in_app_notifications.create_index("created_at", expireAfterSeconds=7*86400)
+    in_app_notifications.create_index("created_at", name="idx_created_desc")
     print("✓ MongoDB холбогдлоо")
 except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
@@ -199,12 +203,23 @@ class NewsCache:
                     continue
                     
                 push_service.mark_event_notified(event_key)
+
+                # Save in-app notification (always, regardless of push permission)
+                currency = event.get('currency', event.get('country', 'USD'))
+                impact_emoji = "\U0001f534" if impact == "high" else "\U0001f7e1"
+                save_in_app_notification(
+                    ntype='news',
+                    title=f"{impact_emoji} {currency} - News Alert",
+                    body=event_title,
+                    data={'impact': impact, 'currency': currency}
+                )
+
                 threading.Thread(
                     target=push_service.send_news_notification,
                     args=({
                         'title': event_title,
                         'impact': impact,
-                        'currency': event.get('currency', event.get('country', 'USD')),
+                        'currency': currency,
                         'description': event.get('forecast', event.get('description', '')),
                     },),
                     daemon=True
@@ -297,13 +312,23 @@ def news_notification_scheduler():
                         
                         push_service.mark_event_notified(event_key)
                         time_str = event_time.strftime("%H:%M UTC")
+                        currency = event.get('currency', 'USD')
+                        
+                        # Save in-app notification (always)
+                        impact_emoji = "\U0001f534" if impact == "high" else "\U0001f7e1" if impact == "medium" else "\U0001f7e2"
+                        save_in_app_notification(
+                            ntype='news',
+                            title=f"{impact_emoji} {currency} - News Alert",
+                            body=f"\u23f0 {time_str}\n{event_title}",
+                            data={'impact': impact, 'currency': currency, 'event_time': time_str}
+                        )
                         
                         threading.Thread(
                             target=push_service.send_news_notification,
                             args=({
                                 'title': event_title,
                                 'impact': impact,
-                                'currency': event.get('currency', 'USD'),
+                                'currency': currency,
                                 'description': event.get('forecast', event.get('description', '')),
                                 'event_time': time_str,
                             },),
@@ -331,6 +356,10 @@ SAVE_CONFIDENCE_THRESHOLD = 0.9
 
 # Cache to avoid duplicate signals within the same direction
 _last_signal_cache = {}  # { pair: { signal, timestamp } }
+
+# Signal endpoint response cache (per pair, 60s TTL)
+_signal_response_cache = {}  # { pair: { "data": ..., "time": ... } }
+SIGNAL_CACHE_TTL = 60  # seconds
 
 def continuous_signal_generator():
     """
@@ -423,6 +452,24 @@ def continuous_signal_generator():
                         'timestamp': datetime.now(timezone.utc)
                     }
 
+                    # Save in-app notification (always, regardless of push permission)
+                    emoji = "\U0001f4c8" if sig_type == "BUY" else "\U0001f4c9"
+                    conf_pct = f"{sig_conf:.1f}%"
+                    entry_price = result.get('entry_price', 'N/A')
+                    save_in_app_notification(
+                        ntype='signal',
+                        title=f"{emoji} {sig_type} Signal - {pair}",
+                        body=f"Confidence: {conf_pct} | Entry: {entry_price}",
+                        data={
+                            'signal_type': sig_type,
+                            'pair': pair,
+                            'confidence': sig_conf,
+                            'entry_price': entry_price,
+                            'stop_loss': result.get('stop_loss'),
+                            'take_profit': result.get('take_profit'),
+                        }
+                    )
+
                     # Send push notification per user threshold
                     try:
                         threading.Thread(
@@ -450,6 +497,25 @@ def continuous_signal_generator():
 
 # Start continuous signal generator
 threading.Thread(target=continuous_signal_generator, daemon=True).start()
+
+# ==================== IN-APP NOTIFICATION HELPERS ====================
+
+def save_in_app_notification(ntype: str, title: str, body: str, data: dict = None):
+    """
+    In-app мэдэгдэл хадгалах (push зөвшөөрөлгүй ч харагдана).
+    ntype: 'signal' | 'news' | 'security' | 'system'
+    """
+    try:
+        doc = {
+            'type': ntype,
+            'title': title,
+            'body': body,
+            'data': data or {},
+            'created_at': datetime.now(timezone.utc),
+        }
+        in_app_notifications.insert_one(doc)
+    except Exception as e:
+        print(f"[WARN] Save in-app notification failed: {e}")
 
 # ==================== AUTH HELPERS ====================
 
@@ -906,6 +972,42 @@ def test_push_notification():
         'expo_response': result.json() if result.status_code == 200 else result.text
     })
 
+@app.route('/notifications/in-app', methods=['GET'])
+def get_in_app_notifications():
+    """
+    In-app мэдэгдлүүдийг авах (push зөвшөөрөлгүй ч ажиллана).
+    Auth шаардлагатай.
+    Query params: limit (default 20), type (optional: signal/news/system)
+    """
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+
+    limit = min(int(request.args.get('limit', 20)), 50)
+    ntype = request.args.get('type', None)
+
+    query = {}
+    if ntype:
+        query['type'] = ntype
+
+    try:
+        docs = list(
+            in_app_notifications.find(query, {'_id': 0})
+            .sort('created_at', -1)
+            .limit(limit)
+        )
+        # Convert datetime to ISO string for JSON serialization
+        for doc in docs:
+            if 'created_at' in doc:
+                doc['created_at'] = doc['created_at'].isoformat()
+        return jsonify({'success': True, 'notifications': docs, 'count': len(docs)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 # ==================== LIVE RATES (Twelve Data) ====================
 
 @app.route('/rates/live', methods=['GET'])
@@ -985,6 +1087,13 @@ def get_signal():
         min_confidence = float(request.args.get('min_confidence', 60))
         pair = request.args.get('pair', 'EUR/USD').replace('_', '/')
 
+        # Check signal response cache (60s TTL)
+        cached = _signal_response_cache.get(pair)
+        if cached and (time.time() - cached['time']) < SIGNAL_CACHE_TTL:
+            cached_data = cached['data'].copy()
+            cached_data['cached'] = True
+            return jsonify(cached_data)
+
         multi_tf = get_twelvedata_multitf(symbol=pair, base_bars=5000)
 
         if multi_tf is None or "1min" not in multi_tf:
@@ -1025,7 +1134,7 @@ def get_signal():
 
         tf_info = {tf: len(tf_df) for tf, tf_df in multi_tf.items()}
 
-        return jsonify({
+        response_data = {
             'success': True,
             'pair': pair.replace('/', '_'),
             'data_info': {
@@ -1037,7 +1146,12 @@ def get_signal():
                 'note': 'Market хаалттай үед сүүлийн арилжааны дата' if market_closed else None
             },
             **signal
-        })
+        }
+
+        # Cache the response
+        _signal_response_cache[pair] = {'data': response_data, 'time': time.time()}
+
+        return jsonify(response_data)
 
     except Exception as e:
         print(f"Signal error: {e}")
@@ -1469,10 +1583,20 @@ import traceback
 
 @app.route('/api/market-analysis', methods=['GET'])
 def get_market_analysis():
-    """AI зах зээлийн дүгнэлт авах"""
+    """AI зах зээлийн дүгнэлт авах (with in-memory cache)"""
     try:
         pair = request.args.get('pair', 'EUR/USD')
         print(f"Analyzing pair: {pair}")
+        
+        # Check if market_analyst already has a valid cache for this pair
+        # If so, skip the TwelveData fetch entirely
+        cached = market_analyst._insight_cache.get(pair)
+        if cached and (time.time() - cached["time"]) < market_analyst.cache_duration:
+            print(f"[CACHE HIT] /api/market-analysis for {pair}")
+            return jsonify({
+                "status": "success",
+                "data": cached["data"]
+            }), 200
         
         mock_signal = {
             "signal": "NEUTRAL",

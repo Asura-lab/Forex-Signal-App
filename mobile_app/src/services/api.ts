@@ -473,6 +473,36 @@ export const analyzeNewsEvent = async (eventData: any) => {
   }
 };
 
+// ==================== IN-APP NOTIFICATIONS ====================
+
+export interface InAppNotification {
+  type: string;
+  title: string;
+  body: string;
+  data: any;
+  created_at: string;
+}
+
+/**
+ * In-app мэдэгдлүүдийг серверээс авах
+ * @param limit - Хамгийн ихдээ хэдийг авах (default: 20)
+ * @param type - Шүүлтүүр: 'signal' | 'news' | 'system' (optional)
+ */
+export const getInAppNotifications = async (limit: number = 20, type?: string): Promise<ApiResponse<{ notifications: InAppNotification[], count: number }>> => {
+  try {
+    let url = `/notifications/in-app?limit=${limit}`;
+    if (type) url += `&type=${type}`;
+    const response = await apiClient.get(url);
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    console.error("In-app мэдэгдэл авах алдаа:", error.message);
+    return {
+      success: false,
+      error: error.response?.data?.error || error.message,
+    };
+  }
+};
+
 export default {
   // Auth
   registerUser,
@@ -496,4 +526,5 @@ export default {
   changeUserPassword,
   getNews,
   analyzeNewsEvent,
+  getInAppNotifications,
 };

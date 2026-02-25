@@ -67,6 +67,8 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
         dataInfo: result.data.data_info 
       };
     },
+    staleTime: 60000, // Data is fresh for 60s — won't refetch on re-mount
+    gcTime: 5 * 60 * 1000, // Keep in cache for 5 min
     refetchInterval: 60000, // Auto refetch every 1 min
     retry: 2
   });
@@ -83,6 +85,8 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
       if (result.success) return result.data;
       return null;
     },
+    staleTime: 15 * 60 * 1000, // AI analysis is fresh for 15 min
+    gcTime: 30 * 60 * 1000, // Keep in cache for 30 min
     enabled: !!pair?.name, // Only run if pair name exists
   });
 

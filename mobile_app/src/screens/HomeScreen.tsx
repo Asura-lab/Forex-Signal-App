@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import {
   View,
   Text,
@@ -7,11 +7,12 @@ import {
   RefreshControl,
   ActivityIndicator,
   StatusBar,
+  TouchableOpacity,
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import CurrencyList from "../components/CurrencyList";
-import { checkApiStatus, getLiveRates } from "../services/api";
+import { checkApiStatus, getLiveRates, getInAppNotifications } from "../services/api";
 import { CurrencyPair } from "../utils/helpers";
 import { NavigationProp } from "@react-navigation/native";
 import { useQuery } from "@tanstack/react-query";
@@ -64,6 +65,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     refetchInterval: 60000,
   });
 
+  // In-App Notifications Count Query
+  const { data: notifCount } = useQuery({
+    queryKey: ["inAppNotifications"],
+    queryFn: async () => {
+      const result = await getInAppNotifications(50);
+      if (result.success && result.data) {
+        return (result.data.notifications || []).length;
+      }
+      return 0;
+    },
+    staleTime: 60000,
+    refetchInterval: 120000,
+  });
+
   const lastUpdateTime = new Date().toLocaleTimeString("en-US", { hour12: false });
 
   const onRefresh = async () => {
@@ -73,6 +88,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const handlePairPress = (pair: CurrencyPair) => {
     navigation.navigate("Signal", { pair });
   };
+
+  const badgeCount = notifCount ?? 0;
 
 
   if (isLoading && !liveRates) {
@@ -93,9 +110,31 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>FOREX MARKET</Text>
-          <View style={styles.statusContainer}>
-            <View style={[styles.statusDot, { backgroundColor: apiConnected ? colors.success : colors.error }]} />
-            <Text style={[styles.statusText, { color: apiConnected ? colors.success : colors.error }]}>{apiConnected ? "LIVE" : "OFFLINE"}</Text>
+          <View style={styles.headerRight}>
+            {/* Bell Icon */}
+            <TouchableOpacity
+              style={styles.bellButton}
+              onPress={() => navigation.navigate("Notifications" as never)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.bellIcon}>
+                <View style={[styles.bellDome, { borderColor: colors.textSecondary }]} />
+                <View style={[styles.bellRim, { backgroundColor: colors.textSecondary }]} />
+                <View style={[styles.bellClapper, { backgroundColor: colors.textSecondary }]} />
+              </View>
+              {badgeCount > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            {/* Status */}
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: apiConnected ? colors.success : colors.error }]} />
+              <Text style={[styles.statusText, { color: apiConnected ? colors.success : colors.error }]}>{apiConnected ? "LIVE" : "OFFLINE"}</Text>
+            </View>
           </View>
         </View>
         {lastUpdateTime && (
@@ -151,8 +190,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 16,
+    paddingTop: 38,
+    paddingBottom: 14,
     paddingHorizontal: 16,
     backgroundColor: colors.card,
     borderBottomWidth: 1,
@@ -168,6 +207,56 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: "700",
     color: colors.textPrimary,
     letterSpacing: 2,
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  bellButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bellIcon: {
+    alignItems: 'center',
+  },
+  bellDome: {
+    width: 16,
+    height: 12,
+    borderWidth: 2,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
+  bellRim: {
+    width: 20,
+    height: 2.5,
+    borderRadius: 1,
+  },
+  bellClapper: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    marginTop: 1,
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 0,
+    right: -4,
+    backgroundColor: colors.error,
+    borderRadius: 9,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   statusContainer: {
     flexDirection: "row",
@@ -227,6 +316,7 @@ const createStyles = (colors: any) => StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+
 });
 
 export default HomeScreen;
