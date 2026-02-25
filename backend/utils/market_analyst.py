@@ -64,7 +64,8 @@ class MarketAnalyst:
 
         # Cache settings (per-pair)
         self._insight_cache = {}  # { pair: { "data": ..., "time": ... } }
-        self.cache_duration = 900  # 15 minutes
+        self.cache_duration_market = 3600  # 1 цаг — зах зээлийн ерөнхий төлөв
+        self.cache_duration_pair   = 1800  # 30 минут — хосолсон шинжилгээ
 
     def _configure_gemini(self):
         """Initialize Gemini client with current API key"""
@@ -84,11 +85,12 @@ class MarketAnalyst:
         self._configure_gemini()
         return True
 
-    def _call_ai(self, prompt, force_json=False, model=None, retries=3):
-        """Unified AI caller (Gemini → key rotation on 429 → Pollinations)
+    def _call_ai(self, prompt, force_json=False, model=None, fallback_model=None, retries=3):
+        """Unified AI caller (Gemini → key rotation on 429 → optional fallback_model → Pollinations)
         
-        model: 'gemini-2.5-flash'      — хосолсон болон зах зээлийн тойм
-               'gemini-2.5-flash-lite' — бусад мэдээний шинжилгээ (default)
+        model:          'gemini-2.5-flash'      — хосолсон болон зах зээлийн тойм
+                        'gemini-2.5-flash-lite' — бусад мэдээний шинжилгээ (default)
+        fallback_model: зөвхөн FLASH→LITE нэг чиглэлтэй. LITE дуусвал FLASH руу буцаж болохгүй.
         """
         use_model = model or self.LITE_MODEL
 
@@ -156,6 +158,9 @@ class MarketAnalyst:
                     break
 
             if keys_tried >= total_keys:
+                if fallback_model:
+                    print(f"[WARN] {use_model}: бүх {total_keys} key хязгаар тулсан → {fallback_model} ашиглана.", flush=True)
+                    return self._call_ai(prompt, force_json=force_json, model=fallback_model, fallback_model=None, retries=retries)
                 print(f"[WARN] Бүх {total_keys} Gemini key хязгаар тулсан. Pollinations fallback.", flush=True)
 
         # 2. Fallback to Pollinations
@@ -387,13 +392,15 @@ class MarketAnalyst:
             return []
 
     def generate_ai_insight(self, technical_signal, pair="EUR/USD"):
-        """Generate AI insight with per-pair caching (15 min)"""
+        """Generate AI insight with per-pair caching (30 min pair / 1h market)"""
         current_time = time.time()
+        cache_ttl = self.cache_duration_market if pair == "MARKET" else self.cache_duration_pair
         
         # Check per-pair cache first
         cached = self._insight_cache.get(pair)
-        if cached and (current_time - cached["time"]) < self.cache_duration:
-            print(f"[CACHE HIT] Returning cached insight for {pair} (age: {int(current_time - cached['time'])}s)")
+        if cached and (current_time - cached["time"]) < cache_ttl:
+            age = int(current_time - cached['time'])
+            print(f"[CACHE HIT] {pair} (age: {age}s / TTL: {cache_ttl}s)")
             return cached["data"]
         
         try:
@@ -449,7 +456,7 @@ class MarketAnalyst:
             insight = None
             
             for attempt in range(max_retries):
-                response_text = self._call_ai(prompt, force_json=True, model=self.FLASH_MODEL)
+                response_text = self._call_ai(prompt, force_json=True, model=self.FLASH_MODEL, fallback_model=self.LITE_MODEL)
                 
                 if not response_text:
                     print(f"[WARN] Attempt {attempt+1}: Empty response from AI")
