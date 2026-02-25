@@ -88,8 +88,10 @@ try:
     signals_collection = db['signals']  # Таамгууд хадгалах collection
     in_app_notifications = db['in_app_notifications']  # In-app мэдэгдлүүд
     # TTL index: auto-delete old notifications after 7 days
-    in_app_notifications.create_index("created_at", expireAfterSeconds=7*86400)
-    in_app_notifications.create_index("created_at", name="idx_created_desc")
+    try:
+        in_app_notifications.create_index("created_at", expireAfterSeconds=7*86400)
+    except Exception as idx_err:
+        print(f"[WARN] in_app_notifications TTL index: {idx_err}")
     print("✓ MongoDB холбогдлоо")
 except Exception as e:
     print(f"✗ MongoDB холбогдох алдаа: {e}")
