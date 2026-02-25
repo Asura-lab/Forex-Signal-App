@@ -67,6 +67,13 @@ class MarketAnalyst:
         self.cache_duration_market = 3600  # 1 цаг — зах зээлийн ерөнхий төлөв
         self.cache_duration_pair   = 1800  # 30 минут — хосолсон шинжилгээ
 
+        # Flash model exhaustion tracking
+        # Бүх 21 key 429 тулсвал Flash хязгаар тулсан гэж төлж хадгалагддах
+        # 6 цаг дараа key-үүд дахин шалгаад ашиглах боломжтой болох долх тоон
+        self._flash_exhausted     = False
+        self._flash_exhausted_at  = None
+        self.FLASH_RECOVERY_SECS  = 6 * 3600  # 6 цаг
+
     def _configure_gemini(self):
         """Initialize Gemini client with current API key"""
         try:
@@ -86,13 +93,29 @@ class MarketAnalyst:
         return True
 
     def _call_ai(self, prompt, force_json=False, model=None, fallback_model=None, retries=3):
-        """Unified AI caller (Gemini → key rotation on 429 → optional fallback_model → Pollinations)
+        """Unified AI caller (Gemini → key rotation on 429 → Pollinations)
         
-        model:          'gemini-2.5-flash'      — хосолсон болон зах зээлийн тойм
-                        'gemini-2.5-flash-lite' — бусад мэдээний шинжилгээ (default)
-        fallback_model: зөвхөн FLASH→LITE нэг чиглэлтэй. LITE дуусвал FLASH руу буцаж болохгүй.
+        model: FLASH_MODEL — хосолсон / зах зээлийн тойм
+               LITE_MODEL  — бусад мэдээний шинжилгээ (default)
+        Flash хязгаар тулсвал Lite-рүү шилжэнэ (Lite руу буцах хориотой).
+        6 цаг дараа флаш key-үүд эхнээс дахин шалгана.
         """
         use_model = model or self.LITE_MODEL
+
+        # ─── Flash 6-цагийн сэргэлт шалгалт ───
+        if use_model == self.FLASH_MODEL and self._flash_exhausted:
+            elapsed = time.time() - self._flash_exhausted_at
+            if elapsed >= self.FLASH_RECOVERY_SECS:
+                print(f"[INFO] Flash сэргэлт: {elapsed/3600:.1f}ц өнгөрсөн → key#1-ээс дахин туршина.", flush=True)
+                self._flash_exhausted    = False
+                self._flash_exhausted_at = None
+                self.current_key_index   = 0
+                self._configure_gemini()
+                # хязгаарлалт цэвэрлсэн тул урагш энэ функц ургалжлая флаш-ийг туршина
+            else:
+                remaining_min = int((self.FLASH_RECOVERY_SECS - elapsed) / 60)
+                print(f"[INFO] Flash exhausted (үлдсэн: {remaining_min}мин) → Lite ашиглана.", flush=True)
+                return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, fallback_model=None, retries=retries)
 
         # 1. Try Gemini — бүх 21 key-г дараалан туршина
         if self.gemini:
@@ -158,10 +181,16 @@ class MarketAnalyst:
                     break
 
             if keys_tried >= total_keys:
-                if fallback_model:
-                    print(f"[WARN] {use_model}: бүх {total_keys} key хязгаар тулсан → {fallback_model} ашиглана.", flush=True)
-                    return self._call_ai(prompt, force_json=force_json, model=fallback_model, fallback_model=None, retries=retries)
-                print(f"[WARN] Бүх {total_keys} Gemini key хязгаар тулсан. Pollinations fallback.", flush=True)
+                if use_model == self.FLASH_MODEL:
+                    # Flash бүх key дуусан → exhausted тэмдэлээд
+                    self._flash_exhausted    = True
+                    self._flash_exhausted_at = time.time()
+                    self.current_key_index   = 0      # Lite-д key#1-ээс эхлэнэ
+                    self._configure_gemini()
+                    print(f"[WARN] Flash: бүх {total_keys} key хязгаар тулсан → 6ц-д сэргэнэ. Lite ашиглана.", flush=True)
+                    return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, fallback_model=None, retries=retries)
+                # Lite бүх key дуусан → Pollinations
+                print(f"[WARN] Lite: бүх {total_keys} key хязгаар тулсан. Pollinations fallback.", flush=True)
 
         # 2. Fallback to Pollinations
         url = "https://text.pollinations.ai/"
