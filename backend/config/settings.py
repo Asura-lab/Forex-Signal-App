@@ -39,13 +39,29 @@ MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', MAIL_USERNAME)
 VERIFICATION_CODE_EXPIRY_MINUTES = 10
 RESET_CODE_EXPIRY_MINUTES = 10
 
-# AI Configuration
+# AI Configuration - All 21 Gemini API keys
 GEMINI_API_KEYS = [
     os.getenv('GEMINI_API_KEY_1'),
     os.getenv('GEMINI_API_KEY_2'),
     os.getenv('GEMINI_API_KEY_3'),
     os.getenv('GEMINI_API_KEY_4'),
-    os.getenv('GEMINI_API_KEY_5')
+    os.getenv('GEMINI_API_KEY_5'),
+    os.getenv('GEMINI_API_KEY_6'),
+    os.getenv('GEMINI_API_KEY_7'),
+    os.getenv('GEMINI_API_KEY_8'),
+    os.getenv('GEMINI_API_KEY_9'),
+    os.getenv('GEMINI_API_KEY_10'),
+    os.getenv('GEMINI_API_KEY_11'),
+    os.getenv('GEMINI_API_KEY_12'),
+    os.getenv('GEMINI_API_KEY_13'),
+    os.getenv('GEMINI_API_KEY_14'),
+    os.getenv('GEMINI_API_KEY_15'),
+    os.getenv('GEMINI_API_KEY_16'),
+    os.getenv('GEMINI_API_KEY_17'),
+    os.getenv('GEMINI_API_KEY_18'),
+    os.getenv('GEMINI_API_KEY_19'),
+    os.getenv('GEMINI_API_KEY_20'),
+    os.getenv('GEMINI_API_KEY_21'),
 ]
 # Filter out None values
 GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]

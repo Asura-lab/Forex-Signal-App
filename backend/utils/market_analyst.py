@@ -32,30 +32,24 @@ class MarketAnalyst:
     Integrates with AlphaVantage (Sentiment) & TradingView (Calendar).
     """
     
+    # Model constants
+    FLASH_MODEL = 'gemini-2.5-flash'       # Хосолсон болон зах зээлийн тойм
+    LITE_MODEL  = 'gemini-2.5-flash-lite'  # Бусад (мэдээний шинжилгээ гэх мэт)
+
     def __init__(self):
-        # Configure Gemini with Key Rotation & Model Fallback
+        # Configure Gemini with Key Rotation (21 keys)
         self.api_keys = GEMINI_API_KEYS
         self.current_key_index = 0
-        
-        # Models (free tier available)
-        self.available_models = [
-            'gemini-2.5-flash',      # PRIMARY: Fast + capable (free tier)
-            'gemini-2.5-flash-lite', # SECONDARY: High RPM (free tier)
-            'gemini-2.0-flash',      # BACKUP: Reliable (free tier)
-            'gemini-2.0-flash-lite', # BACKUP: High RPM (free tier)
-        ]
-        self._exhausted_models = set()  # Track quota-exhausted models
-        self.current_model_index = 0
         self.gemini = None
-        self.current_model_name = self.available_models[0]
-        
+
         if self.api_keys and GENAI_AVAILABLE:
             self._configure_gemini()
+            print(f"[INFO] {len(self.api_keys)} Gemini API key бэлэн байна.", flush=True)
         else:
             if not GENAI_AVAILABLE:
-                print("[WARN] google-genai not available. Using Pollinations.ai fallback.", flush=True)
+                print("[WARN] google-genai суулгаагүй. Pollinations fallback ашиглана.", flush=True)
             else:
-                print("[WARN] No GEMINI_API_KEYS found. Using Pollinations.ai fallback.", flush=True)
+                print("[WARN] GEMINI_API_KEYS олдсонгүй. Pollinations fallback ашиглана.", flush=True)
 
         # MongoDB Connection
         try:
@@ -73,136 +67,111 @@ class MarketAnalyst:
         self.cache_duration = 900  # 15 minutes
 
     def _configure_gemini(self):
-        """Initialize Gemini client with current key and model"""
+        """Initialize Gemini client with current API key"""
         try:
             current_key = self.api_keys[self.current_key_index]
-            self.current_model_name = self.available_models[self.current_model_index]
             self.gemini = genai.Client(api_key=current_key)
-            print(f"[INFO] Connected to Google {self.current_model_name} (Key #{self.current_key_index + 1})", flush=True)
+            print(f"[INFO] Gemini client: Key #{self.current_key_index + 1}/{len(self.api_keys)}", flush=True)
         except Exception as e:
             print(f"[ERROR] Gemini Configuration Error: {e}", flush=True)
 
     def _rotate_key(self):
-        """Switch to next available API key"""
-        if len(self.api_keys) > 1:
-            self.current_key_index = (self.current_key_index + 1) % len(self.api_keys)
-            print(f"[INFO] Rotating API Key to #{self.current_key_index + 1}...")
-            self._configure_gemini()
-            return True
-        return False
+        """Switch to next available API key (wrap around)"""
+        next_index = (self.current_key_index + 1) % len(self.api_keys)
+        if next_index == self.current_key_index:
+            return False  # зөвхөн 1 key байвал rotate хийх боломжгүй
+        self.current_key_index = next_index
+        self._configure_gemini()
+        return True
 
-    def _rotate_model(self):
-        """Switch to next available model"""
-        if len(self.available_models) > 1:
-            self.current_model_index = (self.current_model_index + 1) % len(self.available_models)
-            print(f"[INFO] Switching Model to {self.available_models[self.current_model_index]}...")
-            self._configure_gemini()
-            return True
-        return False
-
-    def _call_ai(self, prompt, force_json=False, retries=3):
-        """Unified AI caller (Gemini > Pollinations)"""
+    def _call_ai(self, prompt, force_json=False, model=None, retries=3):
+        """Unified AI caller (Gemini → key rotation on 429 → Pollinations)
         
-        # 1. Try Gemini
+        model: 'gemini-2.5-flash'      — хосолсон болон зах зээлийн тойм
+               'gemini-2.5-flash-lite' — бусад мэдээний шинжилгээ (default)
+        """
+        use_model = model or self.LITE_MODEL
+
+        # 1. Try Gemini — бүх 21 key-г дараалан туршина
         if self.gemini:
-            try:
-                final_prompt = prompt
-                # Add disclaimer to bypass financial advice filters
-                final_prompt = "IMPORTANT: This analysis is for EDUCATIONAL PURPOSES ONLY. Do not provide financial advice.\n\n" + final_prompt
-                
-                if force_json:
-                    final_prompt += "\n\nReturn JSON only."
-                
-                # Safety settings to prevent blocking
-                safety_settings = [
-                    genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
-                    genai_types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_NONE"),
-                    genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                    genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
-                ]
+            start_key_index = self.current_key_index
+            keys_tried = 0
+            total_keys = len(self.api_keys)
 
-                config_kwargs = {"safety_settings": safety_settings}
-                if force_json:
-                    config_kwargs["response_mime_type"] = "application/json"
-
-                response = self.gemini.models.generate_content(
-                    model=self.current_model_name,
-                    contents=final_prompt,
-                    config=genai_types.GenerateContentConfig(**config_kwargs)
-                )
-                
+            while keys_tried < total_keys:
                 try:
-                    text = response.text.strip()
-                except (ValueError, AttributeError):
-                    # Occurs when response was blocked by safety checks but no text generated
-                    raise Exception("Gemini Safety Block - Empty Response")
+                    final_prompt = (
+                        "IMPORTANT: This analysis is for EDUCATIONAL PURPOSES ONLY. "
+                        "Do not provide financial advice.\n\n" + prompt
+                    )
+                    if force_json:
+                        final_prompt += "\n\nReturn JSON only."
 
-                # Debug print - detailed
-                if not text:
-                    raise Exception("Gemini returned empty text string")
-                
-                print(f"[DEBUG] Gemini Response Start: {text[:100]}...")
-                return text
+                    safety_settings = [
+                        genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT",        threshold="BLOCK_NONE"),
+                        genai_types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH",       threshold="BLOCK_NONE"),
+                        genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
+                        genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
+                    ]
 
-            except Exception as e:
-                print(f"[WARN] Gemini API Error (Key #{self.current_key_index + 1}, {self.available_models[self.current_model_index]}): {e}")
-                
-                error_str = str(e).lower()
-                is_auth_error = any(x in error_str for x in ["403", "leaked", "permission", "key", "invalid", "unauthenticated"])
-                is_rate_limit = any(x in error_str for x in ["429", "quota", "exhausted", "resource_exhausted"])
-                is_not_found = "404" in error_str and "not found" in error_str
-                is_empty = "empty" in error_str or "safety" in error_str
+                    config_kwargs = {"safety_settings": safety_settings}
+                    if force_json:
+                        config_kwargs["response_mime_type"] = "application/json"
 
-                # 429 Quota: mark current model exhausted, switch model immediately
-                if is_rate_limit:
-                    current_model = self.available_models[self.current_model_index]
-                    self._exhausted_models.add(current_model)
-                    print(f"[WARN] {current_model} quota exhausted, switching model...", flush=True)
-                    # Find next non-exhausted model
-                    switched = False
-                    for _ in range(len(self.available_models)):
-                        self.current_model_index = (self.current_model_index + 1) % len(self.available_models)
-                        next_model = self.available_models[self.current_model_index]
-                        if next_model not in self._exhausted_models:
-                            self.current_model_name = next_model
-                            print(f"[INFO] Switched to model: {next_model}", flush=True)
-                            switched = True
-                            break
-                    if switched and retries > 0:
-                        return self._call_ai(prompt, force_json, retries=retries - 1)
-                    # All models exhausted → fall through to Pollinations
-                    print("[WARN] All Gemini models quota exhausted, using Pollinations fallback.", flush=True)
+                    response = self.gemini.models.generate_content(
+                        model=use_model,
+                        contents=final_prompt,
+                        config=genai_types.GenerateContentConfig(**config_kwargs)
+                    )
 
-                # 404 / Empty: switch model
-                if is_not_found or is_empty:
-                    if self._rotate_model() and retries > 0:
-                        return self._call_ai(prompt, force_json, retries=retries - 1)
+                    try:
+                        text = response.text.strip()
+                    except (ValueError, AttributeError):
+                        raise Exception("Gemini Safety Block - Empty Response")
 
-                # Auth error: rotate key
-                if is_auth_error:
-                    if self._rotate_key() and retries > 0:
-                        return self._call_ai(prompt, force_json, retries=retries - 1)
+                    if not text:
+                        raise Exception("Gemini returned empty text string")
 
-        # 2. Fallback to Pollinations (Legacy)
+                    print(f"[DEBUG] Gemini [{use_model}] Key#{self.current_key_index+1} Response: {text[:80]}...", flush=True)
+                    return text
+
+                except Exception as e:
+                    error_str = str(e).lower()
+                    is_rate_limit  = any(x in error_str for x in ["429", "quota", "resource_exhausted", "exhausted"])
+                    is_auth_error  = any(x in error_str for x in ["403", "leaked", "permission", "invalid", "unauthenticated"])
+                    is_model_error = ("404" in error_str and "not found" in error_str) or "empty" in error_str or "safety" in error_str
+
+                    print(f"[WARN] Gemini error (Key#{self.current_key_index+1}, {use_model}): {e}", flush=True)
+
+                    if is_rate_limit or is_auth_error:
+                        # Дараагийн key рүү шилж
+                        self.current_key_index = (self.current_key_index + 1) % total_keys
+                        self._configure_gemini()
+                        keys_tried += 1
+                        print(f"[INFO] Key#{self.current_key_index+1}-рүү шилжлээ ({keys_tried}/{total_keys})", flush=True)
+                        continue  # retry with new key
+
+                    # Model error эсвэл бусад — Pollinations руу унагана
+                    print(f"[WARN] Model/Safety error, Pollinations fallback руу шилжнэ.", flush=True)
+                    break
+
+            if keys_tried >= total_keys:
+                print(f"[WARN] Бүх {total_keys} Gemini key хязгаар тулсан. Pollinations fallback.", flush=True)
+
+        # 2. Fallback to Pollinations
         url = "https://text.pollinations.ai/"
         final_prompt = prompt
         if force_json:
-             final_prompt += "\n\nCRITICAL: RESPONSE MUST BE VALID JSON ONLY. NO OTHER TEXT."
+            final_prompt += "\n\nCRITICAL: RESPONSE MUST BE VALID JSON ONLY. NO OTHER TEXT."
 
         for attempt in range(retries):
             try:
-                # Use POST instead of GET for long prompts
                 response = requests.post(url, data=final_prompt.encode('utf-8'), timeout=60)
-                
                 if response.status_code == 200:
                     text = response.text.strip()
-                    # Clean up Pollinations ads/headers
-                    if "**Support Pollinations.AI:**" in text:
-                        text = text.split("**Support Pollinations.AI:**")[0]
-                    if "**Ad**" in text:
-                        text = text.split("**Ad**")[0]
-                    if "---" in text:
-                        text = text.split("---")[0]
+                    for marker in ["**Support Pollinations.AI:**", "**Ad**", "---"]:
+                        if marker in text:
+                            text = text.split(marker)[0]
                     return text.strip()
                 time.sleep(1)
             except Exception as e:
@@ -321,7 +290,7 @@ class MarketAnalyst:
             3. Keep the response concise (under 3 sentences).
             """
             
-            response = self._call_ai(prompt)
+            response = self._call_ai(prompt, model=self.LITE_MODEL)
             return response if response else "AI холболт амжилтгүй боллоо."
         except Exception as e:
             print(f"Detailed analysis error: {e}")
@@ -378,7 +347,7 @@ class MarketAnalyst:
             Output ONLY the Mongolian sentence. No other text.
             """
             
-            analysis_text = self._call_ai(prompt)
+            analysis_text = self._call_ai(prompt, model=self.LITE_MODEL)
             if not analysis_text: return "Analysis failed."
             
             self.news_collection.insert_one({
@@ -480,7 +449,7 @@ class MarketAnalyst:
             insight = None
             
             for attempt in range(max_retries):
-                response_text = self._call_ai(prompt, force_json=True)
+                response_text = self._call_ai(prompt, force_json=True, model=self.FLASH_MODEL)
                 
                 if not response_text:
                     print(f"[WARN] Attempt {attempt+1}: Empty response from AI")
