@@ -367,18 +367,20 @@ class MarketAnalyst:
         """Generate detailed analysis for a specific event"""
         try:
             prompt = f"""
-            Analyze this economic news event for Forex traders in Mongolian language.
-            Event: {event_data.get('title')}
-            Currency: {event_data.get('currency', 'Unknown')}
-            Actual Value: {event_data.get('actual', 'N/A')}
-            Forecast Value: {event_data.get('forecast', 'N/A')}
-            
-            Task:
-            1. Explain what this data means simply.
-            2. Predict the short-term impact on the {event_data.get('currency', 'currency')}.
-            3. Keep the response concise (under 3 sentences).
-            """
-            
+Та туршлагатай форекс трейдерт зориулж эдийн засгийн мэдээний тайлбар бичиж байна.
+
+Мэдээ: {event_data.get('title')}
+Үүдэс валют: {event_data.get('currency', 'Unknown')}
+Гарсан утга: {event_data.get('actual', 'N/A')}
+Таамаглалсан утга: {event_data.get('forecast', 'N/A')}
+
+Даалгавар (монгол хэлээр, 2-3 өгүүлэл):
+1. Энэ утга яаг агаарга таарагдаа үзүүлэл тайлбарла. (Жишээ: таамаглалаас {event_data.get('forecast', 'N/A')}-аас илүү гарсан утга {event_data.get('actual', 'N/A')} бол нь.)
+2. Энэ үр дүн дотор {event_data.get('currency', '')}-д яаг нөлөөлөх бололцыг учир үндслэл тайлбарла.
+3. Трейдерт анхаарлах нэг зүйл гэсэн зүйл мэдээлэл үлдэв хэлээ.
+
+Зөвхөн монгол өгүүллэл бич. Бусад тайлбар, гарчаа үгүй.
+"""
             response = self._call_ai(prompt, model=self.LITE_MODEL)
             return response if response else "AI холболт амжилтгүй боллоо."
         except Exception as e:
@@ -428,14 +430,14 @@ class MarketAnalyst:
 
         try:
             prompt = f"""
-            Analyze this economic news event and its impact on the currency market in 1 sentence (Mongolian).
-            Event: {news_item.get('name')} ({news_item.get('currency')})
-            Actual: {news_item.get('actual')}
-            Forecast: {news_item.get('forecast')}
-            
-            Output ONLY the Mongolian sentence. No other text.
-            """
-            
+Та форекс зах зээлийн шинжээгч байна. 1 өгүүллэл цохон дүгнэлт гарга. Дарах формат өгсөн бич промпт оруулах байдалгүй:
+
+Мэдээ: {news_item.get('name')} ({news_item.get('currency')})
+Гарсан утга: {news_item.get('actual')}  |Таамаглалсан: {news_item.get('forecast')}
+
+Дүгнэлт (монголаар 1 оглом):
+- Гарсан утга таамаглалаас [илүү/доор]гүй тул [X нэгж дээрХ]. Тиймээс {news_item.get('currency')} яаг [... байдалтай] учир үндслэл дүгнэлт гар.
+"""
             analysis_text = self._call_ai(prompt, model=self.LITE_MODEL)
             if not analysis_text: return "Analysis failed."
             
@@ -488,52 +490,74 @@ class MarketAnalyst:
             return cached["data"]
         
         try:
-            news_list = self.get_latest_news(limit=5)
-            news_summary = "\n".join([f"- {n['title']} ({n['date']}): {n['summary']}" for n in news_list]) if news_list else "No major economic events."
+            news_list = self.get_latest_news(limit=6)
+            if news_list:
+                news_lines = []
+                for n in news_list:
+                    line = f"- [{n.get('date','')}] {n['title']}"
+                    actual   = n.get('actual', '')
+                    forecast = n.get('forecast', '')
+                    impact   = n.get('sentiment', n.get('impact', ''))
+                    if actual or forecast:
+                        line += f" | Гарсан: {actual}, Хүлээлт: {forecast}"
+                    if impact:
+                        line += f" | Impact: {impact}"
+                    news_lines.append(line)
+                news_summary = "\n".join(news_lines)
+            else:
+                news_summary = "Тухайн үеийн томоохон эдийн засгийн мэдээ байхгүй байна."
 
             signal_type = technical_signal.get('signal', 'NEUTRAL')
             confidence = technical_signal.get('confidence', 0)
             
             if pair == "MARKET":
                 prompt = f"""
-                Act as a professional Forex Market Analyst. Analyze the GLOBAL FOREX MARKET situation.
-                
-                Economic Calendar / News Events:
-                {news_summary}
-                
-                Provide a detailed market analysis in JSON format with the following keys:
-                - pair: "MARKET"
-                - outlook: "Bullish", "Bearish", or "Neutral" (Translate to Mongolian)
-                - summary: A detailed paragraph (3-4 sentences) explaining the global market sentiment in Mongolian.
-                - recent_events: ["Event 1", "Event 2"] (List of 2-3 recent major economic events in Mongolian)
-                - event_impacts: "Explanation of how these events are affecting the market" (in Mongolian)
-                - risk_factors: ["Factor 1", "Factor 2"] (List of 2-3 specific risk factors in Mongolian)
-                - forecast: A general forecast for major pairs in Mongolian.
-                - market_sentiment: "Risk-On" or "Risk-Off" (Translate explanation to Mongolian).
-                
-                IMPORTANT: Return ONLY valid JSON. Use double quotes for all keys and string values. Escape double quotes inside strings. NO markdown.
-                """
+Та дэлхийн форекс зах зээлийн мэргэжлийн шинжээч. Одоогийн зах зээлийн нөхцөл байдлыг дүгнэж байна.
+
+Эдийн засгийн мэдээ / үйл явдлууд:
+{news_summary}
+
+Дараах JSON бүтцийг ашиглан ГҮНЗГИЙ ШИНЖИЛГЭЭ хий. Мэдэгдэл бүр дэлхийн мэдээнд тулгуурласан байх ёстой. Ерөнхий дүгнэлт, таамаглал биш:
+
+{{
+  "pair": "MARKET",
+  "summary": "3-4 өгүүлбэр. Яг одоо зах зээлт юу болж байгааг тайлбарла — ямар улсын ямар мэдээ ямар нөлөө үзүүлж байгааг нэрлэ. Ерөнхий дүгнэлт болголгүй конкрет жишээ ашигла.",
+  "key_drivers": ["Зах зээлийг одоо жолоодж буй 3-4 бодит хүчин зүйл. Жишээ нь: 'АНУ-ын ажилгүйдлийн мэдээ хүлээлтээс дутсан → USD сулрав'"],
+  "recent_events": ["2-3 конкрет үйл явдал гарсан огноотойгоо. Жишээ нь: 'ЕЦБ хүүгийн шийдвэр — 2025.01.23'"],
+  "event_impacts": "Дэлгэрэнгүй: эдгээр үйл явдал яаж EUR, USD, JPY гэх мэт валютуудад нөлөөлж байгааг тайлбарла. Учир шалтгаан заавал байх ёстой.",
+  "risk_factors": ["Зах зээлд нөлөөлж болох 2-3 бодит эрсдэл — конкрет, ерөнхий биш"],
+  "forecast": "Зах зээлийн динамик хэрхэн үргэлжлэх талаар дэлгэрэнгүй тайлбар. Хэдэн цаг эсвэл хэдэн өдрийн хүрээнд юу хүлээж болохыг тайлбарла.",
+  "market_sentiment": "Risk-On эсвэл Risk-Off — Яагаад тийм байгааг өгүүлбэрлэж тайлбарла."
+}}
+
+ЧУХАЛ: Зөвхөн хүчинтэй JSON буцаа. Markdown, тайлбар текст байхгүй. Бүх утга монгол хэлээр.
+"""
             else:
+                # Хосолсон валютын шинжилгээ — ЧИГЛЭЛ ЗААХГҮЙ
+                base, quote = (pair.split("/") + [""])[:2]
                 prompt = f"""
-                Act as a professional Forex Market Analyst. Analyze the current situation for {pair}.
-                
-                Technical Signal: {signal_type} (Confidence: {confidence}%)
-                
-                Economic Calendar / News Events:
-                {news_summary}
-                
-                Based on the technical signal and recent news, provide a detailed market analysis in JSON format with the following keys:
-                - pair: "{pair}"
-                - outlook: "Bullish", "Bearish", or "Neutral" (Translate to Mongolian: "Өсөх хандлагатай", "Унах хандлагатай", "Тодорхойгүй")
-                - summary: A detailed paragraph (3-4 sentences) explaining the reasoning in Mongolian. Explain HOW the news impacts the pair.
-                - recent_events: ["Event 1", "Event 2"] (List of 2-3 recent major economic events in Mongolian)
-                - event_impacts: "Explanation of how these events are affecting the pair" (in Mongolian)
-                - risk_factors: ["Factor 1", "Factor 2"] (List of 2-3 specific risk factors in Mongolian)
-                - forecast: A specific forecast for the next 24 hours in Mongolian.
-                - market_sentiment: "Risk-On" or "Risk-Off" (Translate explanation to Mongolian).
-                
-                IMPORTANT: Return ONLY valid JSON. Use double quotes for all keys and string values. Escape double quotes inside strings. NO markdown.
-                """
+Та форекс зах зээлийн мэргэжлийн шинжээч. {pair} хосолсон валютын ОДООГИЙН НӨХЦӨЛ БАЙДЛЫГ шинжиллийн дүн гаргаж байна.
+
+Техник дөхөоллолт: {signal_type} (итгээс хүч: {confidence}%)
+
+Эдийн засгийн мэдээ:
+{news_summary}
+
+Дараах JSON бүтцийг ашиглан шинжилгээ хий. Хосолсон валютын ЧИГЛЭЛ үнэлэхгүй — зах зээлийн контекст, хүчин зүйлс, эрсдэлийг тайлбарла:
+
+{{
+  "pair": "{pair}",
+  "summary": "3-4 өгүүлбэр. {base} болон {quote}-ын одоогийн нөхцөл байдлыг тайлбарла — ямар эдийн засгийн мэдээ ямар нөлөө үзүүлж байгааг конкрет нэрлэ. Техник дохио ({signal_type}, {confidence}%) мэдээтэй хэрхэн уялдаж байгааг тайлбарла.",
+  "key_drivers": ["{base} болон {quote}-ыг одоо жолоодж буй 3-4 бодит хүчин зүйл. Тус тусын эдийн засгийн мэдээ, мөнгөний бодлого, геополитикийг оруул."],
+  "recent_events": ["2-3 конкрет үйл явдал — ямар мэдээ хэзээ гарсан, яг ямар утга гарсан"],
+  "event_impacts": "Мэдээнүүд {pair}-д яаж нөлөөлж байгааг дэлгэрэнгүй тайлбарла. {base} болон {quote}-ын хоорондын харьцааг нөлөөлж буй хүчин зүйлсийг нэрлэ.",
+  "risk_factors": ["{pair}-д нөлөөлж болох 2-3 бодит эрсдэл — конкрет үйл явдал эсвэл мэдээ"],
+  "forecast": "Ойрын 24 цагт {pair}-д юу хүлээж болохыг сценари хэлбэрээр тайлбарла. Ямар мэдээ эсвэл үйл явдал нөлөөлөх вэ гэдгийг дурдаарай.",
+  "market_sentiment": "Risk-On эсвэл Risk-Off — {pair}-д яагаад тийм байгааг тайлбарла."
+}}
+
+ЧУХАЛ: Зөвхөн хүчинтэй JSON буцаа. Markdown, тайлбар текст байхгүй. Бүх утга монгол хэлээр. Ерөнхий хариулт биш — КОНКРЕТ МЭДЭЭНД ТУЛГУУРЛАН бич.
+"""
             
             # Retry logic for JSON parsing
             max_retries = 3
@@ -590,14 +614,17 @@ class MarketAnalyst:
             normalized_insight = {}
             for k, v in insight.items():
                 normalized_insight[k.lower()] = v
-            
+
             # Defaults
             if 'forecast' not in normalized_insight:
                 normalized_insight['forecast'] = "Таамаглал одоогоор тодорхойгүй байна."
-            if 'outlook' not in normalized_insight:
-                normalized_insight['outlook'] = normalized_insight.get('market_sentiment', 'Neutral')
             if 'summary' not in normalized_insight:
-                normalized_insight['summary'] = "Зах зээлийн мэдээлэлд үндэслэн автомат дүгнэлт гаргахад алдаа гарлаа. Гэхдээ техник үзүүлэлтүүд хэвийн ажиллаж байна."
+                normalized_insight['summary'] = "Зах зээлийн мэдээлэлд үндэслэн автомат дүгнэлт гаргахад алдаа гарлаа."
+            if 'key_drivers' not in normalized_insight:
+                normalized_insight['key_drivers'] = []
+            # outlook — зөвхөн MARKET-т байна, хосолсонд шаардахгүй
+            if pair == "MARKET" and 'outlook' not in normalized_insight:
+                normalized_insight['outlook'] = normalized_insight.get('market_sentiment', 'Тодорхойгүй')
 
             insight = normalized_insight
 
