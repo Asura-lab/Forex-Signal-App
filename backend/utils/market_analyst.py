@@ -367,19 +367,22 @@ class MarketAnalyst:
         """Generate detailed analysis for a specific event"""
         try:
             prompt = f"""
-Та туршлагатай форекс трейдерт зориулж эдийн засгийн мэдээний тайлбар бичиж байна.
+ROLE: Professional Forex Analyst explaining economic data to traders.
+TASK: Analyze the following economic news event and write a structured explanation in MONGOLIAN.
 
-Мэдээ: {event_data.get('title')}
-Үүдэс валют: {event_data.get('currency', 'Unknown')}
-Гарсан утга: {event_data.get('actual', 'N/A')}
-Таамаглалсан утга: {event_data.get('forecast', 'N/A')}
+EVENT DETAILS:
+- Event: {event_data.get('title')}
+- Currency: {event_data.get('currency', 'Unknown')}
+- Actual Value: {event_data.get('actual', 'N/A')}
+- Forecast Value: {event_data.get('forecast', 'N/A')}
 
-Даалгавар (монгол хэлээр, 2-3 өгүүлэл):
-1. Энэ утга яаг агаарга таарагдаа үзүүлэл тайлбарла. (Жишээ: таамаглалаас {event_data.get('forecast', 'N/A')}-аас илүү гарсан утга {event_data.get('actual', 'N/A')} бол нь.)
-2. Энэ үр дүн дотор {event_data.get('currency', '')}-д яаг нөлөөлөх бололцыг учир үндслэл тайлбарла.
-3. Трейдерт анхаарлах нэг зүйл гэсэн зүйл мэдээлэл үлдэв хэлээ.
+INSTRUCTIONS:
+Write 3 short paragraphs in Mongolian (Cyrillic):
+1. **Context**: Explain simply what this economic indicator measures.
+2. **Analysis**: Compare Actual vs Forecast. Explain LOGICALLY why this result is bullish or bearish for the {event_data.get('currency', 'Unknown')}. (e.g., "Actual is higher than forecast, implying stronger inflation, thus potential rate hike...").
+3. **Takeaway**: What should the trader watch next?
 
-Зөвхөн монгол өгүүллэл бич. Бусад тайлбар, гарчаа үгүй.
+TONE: Professional, objective, and clear. No financial advice.
 """
             response = self._call_ai(prompt, model=self.LITE_MODEL)
             return response if response else "AI холболт амжилтгүй боллоо."
@@ -430,13 +433,17 @@ class MarketAnalyst:
 
         try:
             prompt = f"""
-Та форекс зах зээлийн шинжээгч байна. 1 өгүүллэл цохон дүгнэлт гарга. Дарах формат өгсөн бич промпт оруулах байдалгүй:
+ROLE: Forex News Analyst.
+TASK: Write ONLY ONE highly logical sentence explaining the impact of the following news event on the currency.
 
-Мэдээ: {news_item.get('name')} ({news_item.get('currency')})
-Гарсан утга: {news_item.get('actual')}  |Таамаглалсан: {news_item.get('forecast')}
+NEWS EVENT:
+- Title: {news_item.get('name')} ({news_item.get('currency')})
+- Actual: {news_item.get('actual')}
+- Forecast: {news_item.get('forecast')}
 
-Дүгнэлт (монголаар 1 оглом):
-- Гарсан утга таамаглалаас [илүү/доор]гүй тул [X нэгж дээрХ]. Тиймээс {news_item.get('currency')} яаг [... байдалтай] учир үндслэл дүгнэлт гар.
+INSTRUCTION:
+Compare Actual vs Forecast. Explain the deviation and its logical consequence for the currency (e.g., Inflation up -> rate hike expectation -> currency strengthens).
+Output ONLY the Mongolian sentence. No intro, no markdown.
 """
             analysis_text = self._call_ai(prompt, model=self.LITE_MODEL)
             if not analysis_text: return "Analysis failed."
@@ -512,51 +519,60 @@ class MarketAnalyst:
             
             if pair == "MARKET":
                 prompt = f"""
-Та дэлхийн форекс зах зээлийн мэргэжлийн шинжээч. Одоогийн зах зээлийн нөхцөл байдлыг дүгнэж байна.
+ACT AS: Senior Global Market Strategist.
+TASK: Analyze the current GLOBAL FOREX MARKET conditions based on the provided news.
 
-Эдийн засгийн мэдээ / үйл явдлууд:
+ECONOMIC DATA / NEWS INPUT:
 {news_summary}
 
-Дараах JSON бүтцийг ашиглан ГҮНЗГИЙ ШИНЖИЛГЭЭ хий. Мэдэгдэл бүр дэлхийн мэдээнд тулгуурласан байх ёстой. Ерөнхий дүгнэлт, таамаглал биш:
+INSTRUCTIONS:
+Generate a detailed market analysis JSON in PROFESSIONAL MONGOLIAN language.
+Focus on major central banks (Fed, ECB, BOJ), commodities (Gold, Oil), and risk sentiment.
 
+REQUIRED JSON STRUCTURE:
 {{
   "pair": "MARKET",
-  "summary": "3-4 өгүүлбэр. Яг одоо зах зээлт юу болж байгааг тайлбарла — ямар улсын ямар мэдээ ямар нөлөө үзүүлж байгааг нэрлэ. Ерөнхий дүгнэлт болголгүй конкрет жишээ ашигла.",
-  "key_drivers": ["Зах зээлийг одоо жолоодж буй 3-4 бодит хүчин зүйл. Жишээ нь: 'АНУ-ын ажилгүйдлийн мэдээ хүлээлтээс дутсан → USD сулрав'"],
-  "recent_events": ["2-3 конкрет үйл явдал гарсан огноотойгоо. Жишээ нь: 'ЕЦБ хүүгийн шийдвэр — 2025.01.23'"],
-  "event_impacts": "Дэлгэрэнгүй: эдгээр үйл явдал яаж EUR, USD, JPY гэх мэт валютуудад нөлөөлж байгааг тайлбарла. Учир шалтгаан заавал байх ёстой.",
-  "risk_factors": ["Зах зээлд нөлөөлж болох 2-3 бодит эрсдэл — конкрет, ерөнхий биш"],
-  "forecast": "Зах зээлийн динамик хэрхэн үргэлжлэх талаар дэлгэрэнгүй тайлбар. Хэдэн цаг эсвэл хэдэн өдрийн хүрээнд юу хүлээж болохыг тайлбарла.",
-  "market_sentiment": "Risk-On эсвэл Risk-Off — Яагаад тийм байгааг өгүүлбэрлэж тайлбарла."
+  "summary": "Detailed 4-5 sentences in Mongolian. Explain HOW the news (e.g. US CPI, ECB rate) is driving the global market. Be specific. Do not use generic statements like 'market is volatile'. Explain WHY.",
+  "key_drivers": ["List 3-4 specific drivers in Mongolian (e.g., 'Rising US Treasury Yields due to robust NFP', 'Weak Chinese manufacturing data')."],
+  "recent_events": ["List 2-3 specific past events with dates (e.g., 'FOMC Meeting - Jan 25')."],
+  "event_impacts": "Explain in Mongolian how these specific events impacted major currencies (USD, EUR, JPY). Connect the dots logically.",
+  "risk_factors": ["List 2-3 specific risks (e.g., 'Upcoming US CPI data volatility', 'Geopolitical tension in Middle East')."],
+  "forecast": "Detailed Mongolian forecast for the next 24-48 hours. What is the expected market direction based on the current data? (e.g., 'Dollar likely to remain strong until CPI release...').",
+  "market_sentiment": "Risk-On / Risk-Off / Mixed (Explain WHY in Mongolian in 1 sentence)."
 }}
 
-ЧУХАЛ: Зөвхөн хүчинтэй JSON буцаа. Markdown, тайлбар текст байхгүй. Бүх утга монгол хэлээр.
+CRITICAL: Return ONLY valid JSON. No markdown formatting. Ensure all text values are in MONGOLIAN.
 """
             else:
                 # Хосолсон валютын шинжилгээ — ЧИГЛЭЛ ЗААХГҮЙ
                 base, quote = (pair.split("/") + [""])[:2]
                 prompt = f"""
-Та форекс зах зээлийн мэргэжлийн шинжээч. {pair} хосолсон валютын ОДООГИЙН НӨХЦӨЛ БАЙДЛЫГ шинжиллийн дүн гаргаж байна.
+ACT AS: Senior Forex Analyst specializing in {pair}.
+TASK: Analyze the CURRENT MARKET CONDITIONS for {pair} based on technicals and news.
+DO NOT provide a trade signal (Buy/Sell). Provide deep contextual analysis.
 
-Техник дөхөоллолт: {signal_type} (итгээс хүч: {confidence}%)
-
-Эдийн засгийн мэдээ:
+INPUTS:
+- Pair: {pair}
+- Technical Bias: {signal_type} (Confidence: {confidence}%)
+- News Context:
 {news_summary}
 
-Дараах JSON бүтцийг ашиглан шинжилгээ хий. Хосолсон валютын ЧИГЛЭЛ үнэлэхгүй — зах зээлийн контекст, хүчин зүйлс, эрсдэлийг тайлбарла:
+INSTRUCTIONS:
+Generate a detailed analysis JSON in PROFESSIONAL MONGOLIAN language.
 
+REQUIRED JSON STRUCTURE:
 {{
   "pair": "{pair}",
-  "summary": "3-4 өгүүлбэр. {base} болон {quote}-ын одоогийн нөхцөл байдлыг тайлбарла — ямар эдийн засгийн мэдээ ямар нөлөө үзүүлж байгааг конкрет нэрлэ. Техник дохио ({signal_type}, {confidence}%) мэдээтэй хэрхэн уялдаж байгааг тайлбарла.",
-  "key_drivers": ["{base} болон {quote}-ыг одоо жолоодж буй 3-4 бодит хүчин зүйл. Тус тусын эдийн засгийн мэдээ, мөнгөний бодлого, геополитикийг оруул."],
-  "recent_events": ["2-3 конкрет үйл явдал — ямар мэдээ хэзээ гарсан, яг ямар утга гарсан"],
-  "event_impacts": "Мэдээнүүд {pair}-д яаж нөлөөлж байгааг дэлгэрэнгүй тайлбарла. {base} болон {quote}-ын хоорондын харьцааг нөлөөлж буй хүчин зүйлсийг нэрлэ.",
-  "risk_factors": ["{pair}-д нөлөөлж болох 2-3 бодит эрсдэл — конкрет үйл явдал эсвэл мэдээ"],
-  "forecast": "Ойрын 24 цагт {pair}-д юу хүлээж болохыг сценари хэлбэрээр тайлбарла. Ямар мэдээ эсвэл үйл явдал нөлөөлөх вэ гэдгийг дурдаарай.",
-  "market_sentiment": "Risk-On эсвэл Risk-Off — {pair}-д яагаад тийм байгааг тайлбарла."
+  "summary": "Detailed 3-4 sentences in Mongolian. Synthesize the technical bias with the fundamental news. Explain any divergence (e.g., 'Technicals show Sell but weak US data suggests potential reversal'). Be specific about {base} and {quote} drivers.",
+  "key_drivers": ["List 3-4 drivers specific to {base} and {quote} (e.g. 'ECB hawkish comments', 'US weak retail sales'). in Mongolian."],
+  "recent_events": ["List 2-3 specific news events relevant to this pair."],
+  "event_impacts": "Explain in Mongolian how the news impacted {pair} price action recently.",
+  "risk_factors": ["List specific risks for this pair (e.g., 'Upcoming NFP release', 'Key support level at 1.0500')."],
+  "forecast": "Scenario-based forecast in Mongolian for next 24h. 'If X happens, Y might follow'. Do NOT say 'Price will go up'. Say 'Upside potential if resistance breaks'.",
+  "market_sentiment": "Risk-On / Risk-Off (Explain relevance to {pair} in Mongolian)."
 }}
 
-ЧУХАЛ: Зөвхөн хүчинтэй JSON буцаа. Markdown, тайлбар текст байхгүй. Бүх утга монгол хэлээр. Ерөнхий хариулт биш — КОНКРЕТ МЭДЭЭНД ТУЛГУУРЛАН бич.
+CRITICAL: Return ONLY valid JSON. No markdown formatting. Ensure all text values are in MONGOLIAN.
 """
             
             # Retry logic for JSON parsing
