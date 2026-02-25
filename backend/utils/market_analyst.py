@@ -171,8 +171,7 @@ class MarketAnalyst:
                     if switched and retries > 0:
                         return self._call_ai(prompt, force_json, retries=retries - 1)
                     # All models exhausted → fall through to Pollinations
-                    print("[WARN] All Gemini models quota exhausted, using fallback.", flush=True)
-                    break
+                    print("[WARN] All Gemini models quota exhausted, using Pollinations fallback.", flush=True)
 
                 # 404 / Empty: switch model
                 if is_not_found or is_empty:
@@ -183,7 +182,6 @@ class MarketAnalyst:
                 if is_auth_error:
                     if self._rotate_key() and retries > 0:
                         return self._call_ai(prompt, force_json, retries=retries - 1)
-                    break
 
         # 2. Fallback to Pollinations (Legacy)
         url = "https://text.pollinations.ai/"
