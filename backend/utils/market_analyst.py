@@ -65,14 +65,19 @@ class MarketAnalyst:
         # Cache settings (per-pair)
         self._insight_cache = {}  # { pair: { "data": ..., "time": ... } }
         self.cache_duration_market = 3600  # 1 цаг — зах зээлийн ерөнхий төлөв
-        self.cache_duration_pair   = 1800  # 30 минут — хосолсон шинжилгээ
+        self.cache_duration_pair   = 600  # 10 минут — хосолсон шинжилгээ
 
-        # Flash model exhaustion tracking
-        # Бүх 21 key 429 тулсвал Flash хязгаар тулсан гэж төлж хадгалагддах
-        # 6 цаг дараа key-үүд дахин шалгаад ашиглах боломжтой болох долх тоон
-        self._flash_exhausted     = False
-        self._flash_exhausted_at  = None
-        self.FLASH_RECOVERY_SECS  = 6 * 3600  # 6 цаг
+        # ─── Flash exhaustion tracking ───
+        # Тойрог: key#1→key#21→key#1 (circular)
+        # Key#21 нь тойргийн сүүлийн sentinel болж ажиллана:
+        #   5мин дотор 2 удаа key#21 Flash 429 → Flash exhausted гэж тэмдэглэнэ
+        # 2 цаг тутамд key#1-ээр probe хийж Flash сэргэсэн эсэхийг шалгана
+        self._flash_exhausted        = False
+        self._flash_last_probe_at    = None   # сүүлийн probe цаг (None=probe хийгдээгүй)
+        self._flash_key21_fail_times = []     # key#21 Flash 429 timestamp-ууд
+        self.FLASH_EXHAUSTION_WINDOW = 5 * 60   # 5 минут
+        self.FLASH_EXHAUSTION_COUNT  = 2        # 5мин дотор хэдэн удаа fail бол exhausted
+        self.FLASH_PROBE_INTERVAL    = 2 * 3600 # 2 цаг тутамд probe
 
     def _configure_gemini(self):
         """Initialize Gemini client with current API key"""
@@ -83,43 +88,80 @@ class MarketAnalyst:
         except Exception as e:
             print(f"[ERROR] Gemini Configuration Error: {e}", flush=True)
 
-    def _rotate_key(self):
-        """Switch to next available API key (wrap around)"""
-        next_index = (self.current_key_index + 1) % len(self.api_keys)
-        if next_index == self.current_key_index:
-            return False  # зөвхөн 1 key байвал rotate хийх боломжгүй
-        self.current_key_index = next_index
-        self._configure_gemini()
-        return True
+    def _probe_flash(self):
+        """Key#1-ээр Flash-г туршиж сэргэсэн эсэхийг шалгана.
+        Returns True хэрэв Flash ажилласан бол, False бол.
+        """
+        if not self.gemini or not GENAI_AVAILABLE:
+            return False
+        saved_index = self.current_key_index
+        try:
+            self.current_key_index = 0
+            self._configure_gemini()
+            response = self.gemini.models.generate_content(
+                model=self.FLASH_MODEL,
+                contents="Say 'ok'",
+                config=genai_types.GenerateContentConfig(
+                    safety_settings=[
+                        genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_NONE"),
+                    ]
+                )
+            )
+            text = response.text.strip() if response.text else ""
+            if text:
+                print(f"[INFO] Flash probe key#1 OK: '{text[:30]}'", flush=True)
+                return True
+            return False
+        except Exception as e:
+            error_str = str(e).lower()
+            if any(x in error_str for x in ["429", "quota", "resource_exhausted"]):
+                print(f"[INFO] Flash probe key#1: 429 → хоёр цаг болоогүй.", flush=True)
+            else:
+                print(f"[WARN] Flash probe error: {e}", flush=True)
+            # Probe амжилтгүй → index-ийг сэргээ
+            self.current_key_index = saved_index
+            self._configure_gemini()
+            return False
 
-    def _call_ai(self, prompt, force_json=False, model=None, fallback_model=None, retries=3):
-        """Unified AI caller (Gemini → key rotation on 429 → Pollinations)
-        
-        model: FLASH_MODEL — хосолсон / зах зээлийн тойм
-               LITE_MODEL  — бусад мэдээний шинжилгээ (default)
-        Flash хязгаар тулсвал Lite-рүү шилжэнэ (Lite руу буцах хориотой).
-        6 цаг дараа флаш key-үүд эхнээс дахин шалгана.
+    def _call_ai(self, prompt, force_json=False, model=None, retries=3):
+        """Unified AI caller: Gemini (key circular rotation) → Pollinations.
+
+        Flash логик:
+          • Key#1→Key#21→Key#1 тойрог хэлбэрээр ажиллана
+          • Key#21 Flash 429: sentinel болж 5мин дотор 2x гарвал Flash exhausted
+          • Flash exhausted: Lite-д key#1-ээс тойрог эхэлнэ
+          • 2 цаг тутамд key#1-ээр probe → сэргэсэн бол Flash тойрогт буцна
         """
         use_model = model or self.LITE_MODEL
 
-        # ─── Flash 6-цагийн сэргэлт шалгалт ───
+        # ─── Flash exhausted үед: 2ц probe эсвэл Lite руу шилжих ───
         if use_model == self.FLASH_MODEL and self._flash_exhausted:
-            elapsed = time.time() - self._flash_exhausted_at
-            if elapsed >= self.FLASH_RECOVERY_SECS:
-                print(f"[INFO] Flash сэргэлт: {elapsed/3600:.1f}ц өнгөрсөн → key#1-ээс дахин туршина.", flush=True)
-                self._flash_exhausted    = False
-                self._flash_exhausted_at = None
-                self.current_key_index   = 0
-                self._configure_gemini()
-                # хязгаарлалт цэвэрлсэн тул урагш энэ функц ургалжлая флаш-ийг туршина
-            else:
-                remaining_min = int((self.FLASH_RECOVERY_SECS - elapsed) / 60)
-                print(f"[INFO] Flash exhausted (үлдсэн: {remaining_min}мин) → Lite ашиглана.", flush=True)
-                return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, fallback_model=None, retries=retries)
+            now = time.time()
+            elapsed = now - self._flash_last_probe_at if self._flash_last_probe_at else self.FLASH_PROBE_INTERVAL + 1
 
-        # 1. Try Gemini — бүх 21 key-г дараалан туршина
+            if elapsed >= self.FLASH_PROBE_INTERVAL:
+                print(f"[INFO] Flash probe эхэлнэ (өмнөх probe-оос {elapsed/60:.0f}мин өнгөрсөн)...", flush=True)
+                if self._probe_flash():
+                    # Flash сэргэсэн → tühül state-г цэвэрлэж тойрогт буцна
+                    self._flash_exhausted        = False
+                    self._flash_last_probe_at    = None
+                    self._flash_key21_fail_times = []
+                    # current_key_index = 0 аль хэдийн probe дотор тохируулсан
+                    print(f"[INFO] Flash сэргэсэн → Flash тойрогт буцлаа.", flush=True)
+                    # use_model = FLASH_MODEL хэвээрээ → доорх тойрог логик ажиллана
+                else:
+                    # Probe амжилтгүй → probe timer шинэчил, Lite ашиглана
+                    self._flash_last_probe_at = now
+                    remaining_min = int(self.FLASH_PROBE_INTERVAL / 60)
+                    print(f"[INFO] Flash probe амжилтгүй → {remaining_min}мин-д дахин туршина. Lite ашиглана.", flush=True)
+                    return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, retries=retries)
+            else:
+                remaining_min = int((self.FLASH_PROBE_INTERVAL - elapsed) / 60)
+                print(f"[INFO] Flash exhausted (probe-д үлдсэн: {remaining_min}мин) → Lite ашиглана.", flush=True)
+                return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, retries=retries)
+
+        # 1. Try Gemini — тойрог: key#1→key#21→key#1
         if self.gemini:
-            start_key_index = self.current_key_index
             keys_tried = 0
             total_keys = len(self.api_keys)
 
@@ -138,7 +180,6 @@ class MarketAnalyst:
                         genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
                         genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
                     ]
-
                     config_kwargs = {"safety_settings": safety_settings}
                     if force_json:
                         config_kwargs["response_mime_type"] = "application/json"
@@ -157,40 +198,54 @@ class MarketAnalyst:
                     if not text:
                         raise Exception("Gemini returned empty text string")
 
-                    print(f"[DEBUG] Gemini [{use_model}] Key#{self.current_key_index+1} Response: {text[:80]}...", flush=True)
+                    print(f"[DEBUG] Gemini [{use_model}] Key#{self.current_key_index+1} OK: {text[:80]}...", flush=True)
                     return text
 
                 except Exception as e:
                     error_str = str(e).lower()
-                    is_rate_limit  = any(x in error_str for x in ["429", "quota", "resource_exhausted", "exhausted"])
-                    is_auth_error  = any(x in error_str for x in ["403", "leaked", "permission", "invalid", "unauthenticated"])
-                    is_model_error = ("404" in error_str and "not found" in error_str) or "empty" in error_str or "safety" in error_str
+                    is_rate_limit = any(x in error_str for x in ["429", "quota", "resource_exhausted", "exhausted"])
+                    is_auth_error = any(x in error_str for x in ["403", "leaked", "permission", "invalid", "unauthenticated"])
 
-                    print(f"[WARN] Gemini error (Key#{self.current_key_index+1}, {use_model}): {e}", flush=True)
+                    print(f"[WARN] Gemini [{use_model}] Key#{self.current_key_index+1}: {e}", flush=True)
 
                     if is_rate_limit or is_auth_error:
-                        # Дараагийн key рүү шилж
+                        was_last_key = (self.current_key_index == total_keys - 1)
+
+                        # ─── Key#21 sentinel: Flash exhaustion шалгах ───
+                        if use_model == self.FLASH_MODEL and is_rate_limit and was_last_key:
+                            now = time.time()
+                            self._flash_key21_fail_times.append(now)
+                            # 5 минут хуучирсан fail-уудыг арилга
+                            self._flash_key21_fail_times = [
+                                t for t in self._flash_key21_fail_times
+                                if now - t <= self.FLASH_EXHAUSTION_WINDOW
+                            ]
+                            fail_count = len(self._flash_key21_fail_times)
+                            print(f"[WARN] Key#21 Flash 429: {fail_count}/{self.FLASH_EXHAUSTION_COUNT} (5мин дотор)", flush=True)
+
+                            if fail_count >= self.FLASH_EXHAUSTION_COUNT:
+                                # Flash exhausted — Lite тойрогт шилж
+                                self._flash_exhausted        = True
+                                self._flash_last_probe_at    = now
+                                self._flash_key21_fail_times = []
+                                self.current_key_index       = 0
+                                self._configure_gemini()
+                                print(f"[WARN] Flash exhausted (key#21 5мин дотор {self.FLASH_EXHAUSTION_COUNT}x 429) → 2ц-д probe. Lite ашиглана.", flush=True)
+                                return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, retries=retries)
+
+                        # Тойрог: дараагийн key рүү шилж (circular)
                         self.current_key_index = (self.current_key_index + 1) % total_keys
                         self._configure_gemini()
                         keys_tried += 1
                         print(f"[INFO] Key#{self.current_key_index+1}-рүү шилжлээ ({keys_tried}/{total_keys})", flush=True)
-                        continue  # retry with new key
+                        continue
 
-                    # Model error эсвэл бусад — Pollinations руу унагана
-                    print(f"[WARN] Model/Safety error, Pollinations fallback руу шилжнэ.", flush=True)
+                    # Загвар/safety алдаа → Pollinations руу
+                    print(f"[WARN] Model/Safety error → Pollinations fallback.", flush=True)
                     break
 
             if keys_tried >= total_keys:
-                if use_model == self.FLASH_MODEL:
-                    # Flash бүх key дуусан → exhausted тэмдэлээд
-                    self._flash_exhausted    = True
-                    self._flash_exhausted_at = time.time()
-                    self.current_key_index   = 0      # Lite-д key#1-ээс эхлэнэ
-                    self._configure_gemini()
-                    print(f"[WARN] Flash: бүх {total_keys} key хязгаар тулсан → 6ц-д сэргэнэ. Lite ашиглана.", flush=True)
-                    return self._call_ai(prompt, force_json=force_json, model=self.LITE_MODEL, fallback_model=None, retries=retries)
-                # Lite бүх key дуусан → Pollinations
-                print(f"[WARN] Lite: бүх {total_keys} key хязгаар тулсан. Pollinations fallback.", flush=True)
+                print(f"[WARN] [{use_model}] Бүх {total_keys} key хязгаар тулсан → Pollinations fallback.", flush=True)
 
         # 2. Fallback to Pollinations
         url = "https://text.pollinations.ai/"
@@ -485,7 +540,7 @@ class MarketAnalyst:
             insight = None
             
             for attempt in range(max_retries):
-                response_text = self._call_ai(prompt, force_json=True, model=self.FLASH_MODEL, fallback_model=self.LITE_MODEL)
+                response_text = self._call_ai(prompt, force_json=True, model=self.FLASH_MODEL)
                 
                 if not response_text:
                     print(f"[WARN] Attempt {attempt+1}: Empty response from AI")
