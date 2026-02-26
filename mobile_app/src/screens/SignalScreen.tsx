@@ -68,9 +68,9 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
         dataInfo: result.data.data_info 
       };
     },
-    staleTime: 60000, // Data is fresh for 60s — won't refetch on re-mount
-    gcTime: 5 * 60 * 1000, // Keep in cache for 5 min
-    refetchInterval: 60000, // Auto refetch every 1 min
+    staleTime: 60000, // Refetch every 1 min to catch high-confidence signals in real-time
+    gcTime: 5 * 60 * 1000,
+    refetchInterval: 60000, // Poll every 1 min — model runs continuously, notify on high-confidence BUY/SELL
     retry: 2
   });
 
@@ -285,12 +285,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
               <View style={styles.signalTop}>
                 <View>
                   <Text style={styles.signalLabel}>ДОХИО</Text>
-                  <Text style={styles.updateTime}>Шинэчлэгдсэн: {lastUpdate}</Text>
-                  {signal.target_time && (
-                    <Text style={styles.updateTime}>
-                      Хүчинтэй: {new Date(signal.target_time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })} хүртэл
-                    </Text>
-                  )}
+                  <Text style={styles.updateTime}>4 цагийн таамаглал · {lastUpdate}</Text>
                 </View>
                 <View style={[styles.signalBadge, { backgroundColor: getSignalColor(signal.signal) }]}>
                   <Text style={styles.signalBadgeText}>
