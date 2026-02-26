@@ -95,9 +95,14 @@ try:
             print("[INFO] Dropped old idx_created_desc index", flush=True)
     except Exception as drop_err:
         print(f"[WARN] drop idx_created_desc: {drop_err}", flush=True)
-    # TTL index: auto-delete old notifications after 7 days
+    # TTL index: auto-delete via expires_at field (news=20min, others=7days)
     try:
-        in_app_notifications.create_index("created_at", expireAfterSeconds=7*86400)
+        # Drop old created_at TTL index if exists
+        in_app_notifications.drop_index('created_at_1')
+    except Exception:
+        pass
+    try:
+        in_app_notifications.create_index('expires_at', expireAfterSeconds=0)
     except Exception as idx_err:
         print(f"[WARN] in_app_notifications TTL index: {idx_err}", flush=True)
     print("✓ MongoDB холбогдлоо", flush=True)
@@ -528,12 +533,15 @@ def save_in_app_notification(ntype: str, title: str, body: str, data: dict = Non
     ntype: 'signal' | 'news' | 'security' | 'system'
     """
     try:
+        now = datetime.now(timezone.utc)
+        ttl_minutes = 20 if ntype == 'news' else 7 * 24 * 60
         doc = {
             'type': ntype,
             'title': title,
             'body': body,
             'data': data or {},
-            'created_at': datetime.now(timezone.utc),
+            'created_at': now,
+            'expires_at': now + timedelta(minutes=ttl_minutes),
             'read_by': [],
         }
         in_app_notifications.insert_one(doc)
