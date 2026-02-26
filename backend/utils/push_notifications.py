@@ -116,9 +116,13 @@ class PushNotificationService:
 
             result = self.push_tokens.update_one(
                 {"user_id": user_id},
-                {"$set": update_fields}
+                {
+                    "$set": update_fields,
+                    "$setOnInsert": {"user_id": user_id, "created_at": datetime.now(timezone.utc)}
+                },
+                upsert=True
             )
-            return result.modified_count > 0 or result.matched_count > 0
+            return True
         except Exception as e:
             print(f"[ERROR] Update preferences failed: {e}")
             return False

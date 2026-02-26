@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { registerUser } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
+import { ChevronLeft, Sun, Moon, Eye, EyeOff, Check } from 'lucide-react-native';
 
 interface SignUpScreenProps {
   navigation: NavigationProp<any>;
@@ -127,26 +128,14 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
           <View style={styles.headerContainer}>
             <View style={styles.topRow}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Text style={styles.backText}>{"<"} Back</Text>
+                <ChevronLeft size={20} color={colors.textSecondary} />
+                <Text style={styles.backText}>Back</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
                 {isDark ? (
-                  <View style={styles.sunIcon}>
-                    <View style={styles.sunCore} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '0deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '45deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '90deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '135deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '180deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '225deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '270deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '315deg' }, { translateY: -10 }] }]} />
-                  </View>
+                  <Sun size={22} color={colors.textSecondary} />
                 ) : (
-                  <View style={styles.moonIcon}>
-                    <View style={styles.moonOuter} />
-                    <View style={[styles.moonInner, { backgroundColor: colors.background }]} />
-                  </View>
+                  <Moon size={22} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
@@ -203,7 +192,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                   autoCapitalize="none"
                 />
                 <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.toggleButton}>
-                  <Text style={styles.toggleText}>{showPassword ? "HIDE" : "SHOW"}</Text>
+                  {showPassword ? <EyeOff size={18} color={colors.textSecondary} /> : <Eye size={18} color={colors.textSecondary} />}
                 </TouchableOpacity>
               </View>
             </View>
@@ -222,7 +211,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                   autoCapitalize="none"
                 />
                 <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.toggleButton}>
-                  <Text style={styles.toggleText}>{showConfirmPassword ? "HIDE" : "SHOW"}</Text>
+                  {showConfirmPassword ? <EyeOff size={18} color={colors.textSecondary} /> : <Eye size={18} color={colors.textSecondary} />}
                 </TouchableOpacity>
               </View>
             </View>
@@ -234,7 +223,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
               activeOpacity={0.7}
             >
               <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-                {acceptedTerms && <Text style={styles.checkmark}>✓</Text>}
+                {acceptedTerms && <Check size={14} color="#FFFFFF" />}
               </View>
               <Text style={styles.termsText}>
                 I agree to the{" "}
@@ -296,50 +285,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   themeToggle: {
     padding: 8,
   },
-  sunIcon: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sunCore: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.textSecondary,
-  },
-  sunRay: {
-    position: 'absolute',
-    width: 2,
-    height: 6,
-    top: 12,
-    left: 14,
-    backgroundColor: colors.textSecondary,
-    borderRadius: 1,
-  },
-  moonIcon: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moonOuter: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.textSecondary,
-    top: 5,
-    left: 3,
-  },
-  moonInner: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    top: 3,
-    left: 9,
-  },
   appIcon: {
     width: 160,
     height: 160,
@@ -354,6 +299,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   backText: {
     color: colors.textSecondary,
@@ -403,12 +351,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   toggleButton: {
     paddingHorizontal: 8,
   },
-  toggleText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.success,
-    letterSpacing: 1,
-  },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -429,11 +371,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   checkboxChecked: {
     backgroundColor: colors.success,
     borderColor: colors.success,
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   termsText: {
     flex: 1,

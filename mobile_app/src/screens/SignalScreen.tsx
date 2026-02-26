@@ -19,6 +19,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NavigationProp, RouteProp } from "@react-navigation/native";
 import { CurrencyPair } from "../utils/helpers";
 import { updateNotificationPreferences } from "../services/notificationService";
+import { ChevronLeft } from 'lucide-react-native';
 
 const { width } = Dimensions.get("window");
 
@@ -202,7 +203,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
           style={styles.backBtn} 
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>&lt;</Text>
+          <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>

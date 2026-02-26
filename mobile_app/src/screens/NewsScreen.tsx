@@ -16,6 +16,7 @@ import {
 import { useTheme } from '../context/ThemeContext';
 import { getColors } from '../config/theme';
 import { getNews, analyzeNewsEvent } from '../services/api';
+import { X } from 'lucide-react-native';
 
 const NewsScreen: React.FC = () => {
   const { isDark } = useTheme();
@@ -135,7 +136,7 @@ const NewsScreen: React.FC = () => {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>AI Дүгнэлт</Text>
             <TouchableOpacity onPress={() => setSelectedEvent(null)}>
-              <Text style={styles.closeButton}>✕</Text>
+              <X size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           
@@ -723,11 +724,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.primary,
-  },
-  closeButton: {
-    fontSize: 24,
-    color: colors.textSecondary,
-    padding: 5,
   },
   eventTitle: {
     fontSize: 16,

@@ -534,6 +534,7 @@ def save_in_app_notification(ntype: str, title: str, body: str, data: dict = Non
             'body': body,
             'data': data or {},
             'created_at': datetime.now(timezone.utc),
+            'read_by': [],
         }
         in_app_notifications.insert_one(doc)
     except Exception as e:
@@ -1012,21 +1013,109 @@ def get_in_app_notifications():
     limit = min(int(request.args.get('limit', 20)), 50)
     ntype = request.args.get('type', None)
 
-    query = {}
+    user_id = payload['user_id']
+
+    # Resolve user's news_impact_filter preference
+    prefs_doc = push_service.push_tokens.find_one({'user_id': user_id}, {'news_impact_filter': 1})
+    impact_filter = (prefs_doc or {}).get('news_impact_filter', 'high')
+    if impact_filter == 'all':
+        allowed_impacts = ['high', 'medium', 'low']
+    elif impact_filter == 'medium':
+        allowed_impacts = ['high', 'medium']
+    else:  # 'high'
+        allowed_impacts = ['high']
+
+    # Build query: non-news always shown; news filtered by impact preference
+    news_clause = {'type': 'news', 'data.impact': {'$in': allowed_impacts}}
+    non_news_clause = {'type': {'$ne': 'news'}}
+    query = {'$or': [non_news_clause, news_clause]}
     if ntype:
-        query['type'] = ntype
+        if ntype == 'news':
+            query = news_clause
+        else:
+            query = {'type': ntype}
 
     try:
         docs = list(
-            in_app_notifications.find(query, {'_id': 0})
+            in_app_notifications.find(query, {'_id': 1, 'type': 1, 'title': 1, 'body': 1, 'data': 1, 'created_at': 1, 'read_by': 1})
             .sort('created_at', -1)
             .limit(limit)
         )
-        # Convert datetime to ISO string for JSON serialization
+        # Convert datetime to ISO string and compute is_read per user
         for doc in docs:
             if 'created_at' in doc:
                 doc['created_at'] = doc['created_at'].isoformat()
+            read_by = doc.get('read_by', [])
+            doc['is_read'] = user_id in [str(r) for r in read_by]
+            doc['_id'] = str(doc['_id'])
         return jsonify({'success': True, 'notifications': docs, 'count': len(docs)})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/notifications/in-app/unread-count', methods=['GET'])
+def get_unread_notification_count():
+    """Уншаагүй мэдэгдлийн тоо буцаах."""
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+
+    user_id = payload['user_id']
+    try:
+        # Resolve user's news_impact_filter preference
+        prefs_doc = push_service.push_tokens.find_one({'user_id': user_id}, {'news_impact_filter': 1})
+        impact_filter = (prefs_doc or {}).get('news_impact_filter', 'high')
+        if impact_filter == 'all':
+            allowed_impacts = ['high', 'medium', 'low']
+        elif impact_filter == 'medium':
+            allowed_impacts = ['high', 'medium']
+        else:  # 'high'
+            allowed_impacts = ['high']
+
+        count = in_app_notifications.count_documents({
+            'read_by': {'$nin': [user_id]},
+            '$or': [
+                {'type': {'$ne': 'news'}},
+                {'type': 'news', 'data.impact': {'$in': allowed_impacts}}
+            ]
+        })
+        return jsonify({'success': True, 'unread_count': count})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/notifications/in-app/mark-read', methods=['POST'])
+def mark_notifications_read():
+    """Мэдэгдлүүдийг уншсан гэж тэмдэглэх.
+    Body: { ids: ['id1','id2',...] }  — хоосон бол бүгдийг тэмдэглэнэ.
+    """
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify({'error': 'Token шаардлагатай'}), 401
+    payload = verify_token(auth.split(' ')[1])
+    if not payload:
+        return jsonify({'error': 'Token буруу'}), 401
+
+    user_id = payload['user_id']
+    body = request.get_json(silent=True) or {}
+    ids = body.get('ids', [])
+
+    try:
+        from bson import ObjectId
+        if ids:
+            object_ids = [ObjectId(i) for i in ids if i]
+            query_filter = {'_id': {'$in': object_ids}}
+        else:
+            query_filter = {}
+
+        result = in_app_notifications.update_many(
+            {**query_filter, 'read_by': {'$nin': [user_id]}},
+            {'$addToSet': {'read_by': user_id}}
+        )
+        return jsonify({'success': True, 'modified': result.modified_count})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

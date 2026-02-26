@@ -233,7 +233,7 @@ export const getSignalText = (label: number): string => {
  * Сигналын emoji авах
  */
 export const getSignalEmoji = (label: number): string => {
-  return SIGNAL_TYPES[label]?.emoji || "❓";
+  return SIGNAL_TYPES[label]?.emoji || "?";
 };
 
 /**

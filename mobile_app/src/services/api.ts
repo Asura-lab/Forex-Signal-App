@@ -476,11 +476,13 @@ export const analyzeNewsEvent = async (eventData: any) => {
 // ==================== IN-APP NOTIFICATIONS ====================
 
 export interface InAppNotification {
+  _id: string;
   type: string;
   title: string;
   body: string;
   data: any;
   created_at: string;
+  is_read: boolean;
 }
 
 /**
@@ -500,6 +502,24 @@ export const getInAppNotifications = async (limit: number = 20, type?: string): 
       success: false,
       error: error.response?.data?.error || error.message,
     };
+  }
+};
+
+export const getUnreadNotificationCount = async (): Promise<ApiResponse<{ unread_count: number }>> => {
+  try {
+    const response = await apiClient.get('/notifications/in-app/unread-count');
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    return { success: false, error: error.response?.data?.error || error.message };
+  }
+};
+
+export const markNotificationsRead = async (ids?: string[]): Promise<ApiResponse<{ modified: number }>> => {
+  try {
+    const response = await apiClient.post('/notifications/in-app/mark-read', { ids: ids || [] });
+    return { success: true, data: response.data };
+  } catch (error: any) {
+    return { success: false, error: error.response?.data?.error || error.message };
   }
 };
 
@@ -527,4 +547,6 @@ export default {
   getNews,
   analyzeNewsEvent,
   getInAppNotifications,
+  getUnreadNotificationCount,
+  markNotificationsRead,
 };

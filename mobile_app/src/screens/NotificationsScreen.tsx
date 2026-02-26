@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,10 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
-import { getInAppNotifications, InAppNotification } from "../services/api";
-import { NavigationProp } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { getInAppNotifications, markNotificationsRead, InAppNotification } from "../services/api";
+import { NavigationProp, useFocusEffect } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, BellOff, TrendingUp, TrendingDown, Newspaper } from 'lucide-react-native';
 
 interface NotificationsScreenProps {
   navigation: NavigationProp<any>;
@@ -23,6 +24,8 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const queryClient = useQueryClient();
+  const [marking, setMarking] = useState(false);
 
   const {
     data: notifications,
@@ -37,8 +40,27 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
       }
       return [];
     },
-    staleTime: 30000,
+    staleTime: 0,
   });
+
+  // Дэлгэц нээгдэх үед жагсаалт шинэчлэх (auto-mark хийхгүй)
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
+
+  const handleMarkAllRead = async () => {
+    setMarking(true);
+    try {
+      await markNotificationsRead([]);
+      // Шинэ data татаж UI шинэчлэх
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["inAppNotificationsCount"] });
+    } finally {
+      setMarking(false);
+    }
+  };
 
   const getTimeAgo = useCallback((isoString: string) => {
     const diff = Date.now() - new Date(isoString).getTime();
@@ -51,12 +73,24 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
     return `${days} өдрийн өмнө`;
   }, []);
 
-  const handleNotifPress = (notif: InAppNotification) => {
-    if (notif.type === "signal" && notif.data?.pair) {
-      const pairName = notif.data.pair.replace("_", "/");
-      navigation.navigate("Signal", {
-        pair: { name: pairName, display: pairName },
-      });
+  const handleNotifPress = async (notif: InAppNotification) => {
+    // Уншсан гэж тэмдэглэх
+    if (!notif.is_read && notif._id) {
+      await markNotificationsRead([notif._id]);
+      queryClient.invalidateQueries({ queryKey: ["inAppNotificationsCount"] });
+      refetch();
+    }
+    // Навигаци
+    if (notif.type === "signal") {
+      const rawPair = notif.data?.pair || notif.data?.symbol || "";
+      if (rawPair) {
+        const pairName = rawPair.replace("_", "/");
+        navigation.navigate("Signal", {
+          pair: { name: pairName, display: pairName },
+        });
+      }
+    } else if (notif.type === "news") {
+      navigation.navigate("Main", { screen: "NewsTab" } as never);
     }
   };
 
@@ -70,21 +104,20 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
 
     return (
       <TouchableOpacity
-        style={styles.notifItem}
+        style={[styles.notifItem, !item.is_read && styles.notifItemUnread]}
         activeOpacity={0.7}
         onPress={() => handleNotifPress(item)}
       >
+        {!item.is_read && <View style={styles.unreadDot} />}
         <View style={[styles.notifIcon, { backgroundColor: iconBg }]}>
-          <Text style={styles.notifIconText}>
-            {isSignal
-              ? item.data?.signal_type === "BUY"
-                ? "↑"
-                : "↓"
-              : "📰"}
-          </Text>
+          {isSignal
+            ? item.data?.signal_type === "BUY"
+              ? <TrendingUp size={18} color="#FFFFFF" />
+              : <TrendingDown size={18} color="#FFFFFF" />
+            : <Newspaper size={18} color="#FFFFFF" />}
         </View>
         <View style={styles.notifContent}>
-          <Text style={styles.notifItemTitle} numberOfLines={1}>
+          <Text style={[styles.notifItemTitle, !item.is_read && styles.notifItemTitleUnread]} numberOfLines={1}>
             {item.title}
           </Text>
           <Text style={styles.notifItemBody} numberOfLines={2}>
@@ -97,6 +130,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
   };
 
   const notifList: InAppNotification[] = notifications ?? [];
+  const unreadCount = notifList.filter((n) => !n.is_read).length;
 
   return (
     <View style={styles.container}>
@@ -111,12 +145,27 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backText}>{"<"}</Text>
+          <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Мэдэгдэл</Text>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle}>Мэдэгдэл</Text>
+          {unreadCount > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unreadCount} шинэ</Text>
+            </View>
+          )}
+        </View>
         <View style={styles.headerRight}>
           {notifList.length > 0 && (
-            <Text style={styles.countText}>{notifList.length}</Text>
+            <TouchableOpacity
+              onPress={handleMarkAllRead}
+              disabled={marking || unreadCount === 0}
+              style={[styles.markAllBtn, (marking || unreadCount === 0) && styles.markAllBtnDisabled]}
+            >
+              <Text style={[styles.markAllText, (marking || unreadCount === 0) && styles.markAllTextDisabled]}>
+                {marking ? "Хадгалж байна..." : "Бүгд уншсан"}
+              </Text>
+            </TouchableOpacity>
           )}
         </View>
       </View>
@@ -127,11 +176,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         </View>
       ) : notifList.length === 0 ? (
         <View style={styles.centerContainer}>
-          <View style={styles.emptyBellIcon}>
-            <View style={[styles.emptyBellDome, { borderColor: colors.textSecondary }]} />
-            <View style={[styles.emptyBellRim, { backgroundColor: colors.textSecondary }]} />
-            <View style={[styles.emptyBellClapper, { backgroundColor: colors.textSecondary }]} />
-          </View>
+          <BellOff size={48} color={colors.textSecondary} />
           <Text style={styles.emptyTitle}>Мэдэгдэл байхгүй</Text>
           <Text style={styles.emptySubtitle}>
             Шинэ сигнал болон мэдээний мэдэгдлүүд энд харагдана
@@ -141,7 +186,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         <FlatList
           data={notifList}
           renderItem={renderItem}
-          keyExtractor={(_, idx) => idx.toString()}
+          keyExtractor={(item) => item._id || item.created_at}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
@@ -181,10 +226,10 @@ const createStyles = (colors: any) =>
       justifyContent: "center",
       alignItems: "center",
     },
-    backText: {
-      fontSize: 22,
-      color: colors.textPrimary,
-      fontWeight: "300",
+    headerCenter: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
     },
     headerTitle: {
       fontSize: 18,
@@ -192,13 +237,37 @@ const createStyles = (colors: any) =>
       color: colors.textPrimary,
       letterSpacing: 1,
     },
+    unreadBadge: {
+      backgroundColor: "#2563EB",
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    unreadBadgeText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: "#FFFFFF",
+    },
     headerRight: {
-      width: 36,
       alignItems: "flex-end",
     },
-    countText: {
-      fontSize: 13,
+    markAllBtn: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "#2563EB",
+    },
+    markAllBtnDisabled: {
+      borderColor: colors.border,
+      opacity: 0.4,
+    },
+    markAllText: {
+      fontSize: 11,
       fontWeight: "600",
+      color: "#2563EB",
+    },
+    markAllTextDisabled: {
       color: colors.textSecondary,
     },
     centerContainer: {
@@ -206,29 +275,6 @@ const createStyles = (colors: any) =>
       justifyContent: "center",
       alignItems: "center",
       paddingHorizontal: 40,
-    },
-    emptyBellIcon: {
-      alignItems: 'center',
-      marginBottom: 20,
-    },
-    emptyBellDome: {
-      width: 36,
-      height: 26,
-      borderWidth: 3,
-      borderBottomWidth: 0,
-      borderTopLeftRadius: 18,
-      borderTopRightRadius: 18,
-    },
-    emptyBellRim: {
-      width: 44,
-      height: 4,
-      borderRadius: 2,
-    },
-    emptyBellClapper: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      marginTop: 2,
     },
     emptyTitle: {
       fontSize: 16,
@@ -251,6 +297,17 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 16,
       paddingVertical: 14,
     },
+    notifItemUnread: {
+      backgroundColor: colors.card + "80",
+    },
+    unreadDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: "#2563EB",
+      marginRight: 8,
+      flexShrink: 0,
+    },
     notifIcon: {
       width: 38,
       height: 38,
@@ -258,11 +315,6 @@ const createStyles = (colors: any) =>
       justifyContent: "center",
       alignItems: "center",
       marginRight: 14,
-    },
-    notifIconText: {
-      color: "#FFFFFF",
-      fontSize: 18,
-      fontWeight: "700",
     },
     notifContent: {
       flex: 1,
@@ -273,6 +325,10 @@ const createStyles = (colors: any) =>
       fontWeight: "600",
       color: colors.textPrimary,
       marginBottom: 3,
+    },
+    notifItemTitleUnread: {
+      fontWeight: "800",
+      color: colors.textPrimary,
     },
     notifItemBody: {
       fontSize: 13,

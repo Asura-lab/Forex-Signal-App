@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import {
   unregisterPushTokenFromServer,
   NewsImpactFilter,
 } from "../services/notificationService";
+import { ChevronRight, Check } from 'lucide-react-native';
 
 interface UserData {
   name: string;
@@ -435,42 +436,46 @@ Email: support@predictrix.com
       },
       about: {
         title: "Апп-ын тухай",
-        content: `ФОРЕКС СИГНАЛ АПП
+        content: `PREDICTRIX
+AI-Powered Forex Trading Signals
 
-Хувилбар: 1.1.1
-Шинэчилсэн: 2025.10.18
+Хувилбар: 0.4.2
+Шинэчилсэн: 2026.02.26
+Платформ: Android / iOS (Expo SDK 51)
 
 Зорилго:
-Hidden Markov Model (HMM) машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах, хэрэглэгчдэд техникийн шинжилгээний мэдээлэл өгөх.
+Олон давхар GBDT ensemble машин сургалт ашиглан форекс валютын ханшийн хөдөлгөөнийг таамаглах, хэрэглэгчдэд бодит цагийн арилжааны дохио, техникийн шинжилгээг өгөх.
 
-Технологи:
-• Frontend: React Native + Expo
-• Backend: Python Flask
-• Database: MongoDB Atlas
-• ML Model: Hidden Markov Model
-• Security: JWT + bcrypt
+ML Загвар:
+• Алгоритм: GBDT Ensemble (Gradient Boosted Decision Trees)
+• Timeframe: М15, Н1, Н4 олон хэмжигдэхүүний нэгтгэл
+• Итгэлцлийн калибраци: Platt Scaling
+• Хамрах хүрээ: 5 ангилал (Strong Sell → Strong Buy)
 
-Дэмждэг валютууд:
-• EUR/USD (Евро/Ам.доллар)
-• GBP/USD (Фунт/Ам.доллар)
-• USD/CAD (Ам.доллар/Канад доллар)
-• USD/CHF (Ам.доллар/Швейцар франк)
-• USD/JPY (Ам.доллар/Иен)
-• XAU/USD (Алт/Ам.доллар)
+Технологийн стек:
+• Frontend: React Native + Expo SDK 51
+• Backend: Python Flask + MongoDB Atlas
+• ML: scikit-learn GBDT + joblib
+• Auth: JWT + bcrypt
+• Push: Expo Notifications
+
+Дэмждэг валют хосууд:
+• EUR/USD  • GBP/USD  • USD/CAD
+• USD/CHF  • USD/JPY  • XAU/USD
 
 Судалгааны ажил:
-Энэ апп нь судалгааны зориулалтаар хөгжүүлэгдсэн бөгөөд боловсролын зорилготой.
+Энэ апп нь дипломын судалгааны ажлын хүрээнд хөгжүүлэгдсэн бөгөөд судалгааны зорилготой.
 
-[!] Санамж:
-Энэ нь санхүүгийн зөвлөгөө биш. Форекс арилжаа маш өндөр эрсдэлтэй бөгөөд таны бүх хөрөнгийг алдах магадлалтай.
+[!] Эрсдлийн анхааруулга:
+Энэ нь санхүүгийн зөвлөгөө биш. Forex арилжаа маш өндөр эрсдэлтэй бөгөөд таны бүх хөрөнгийг алдах магадлалтай. Арилжаа хийхээс өмнө өөрийн санхүүгийн зөвлөхөөс зааж уу.
 
 Хөгжүүлэгч:
 GitHub: github.com/Asura-lab/Predictrix
 
-📄 Лиценз:
+Лиценз:
 Судалгааны зориулалтаар үнэгүй ашиглаж болно.
 
-© 2025 Predictrix`,
+© 2026 Predictrix`,
       },
     };
 
@@ -667,7 +672,7 @@ GitHub: github.com/Asura-lab/Predictrix
                           Min confidence: {(signalThreshold * 100).toFixed(0)}%
                         </Text>
                       </View>
-                      <Text style={styles.chevron}>{">"}</Text>
+                      <ChevronRight size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </>
                 )}
@@ -698,15 +703,16 @@ GitHub: github.com/Asura-lab/Predictrix
                     >
                       <View style={styles.infoContent}>
                         <Text style={styles.infoLabel}>NEWS IMPACT FILTER</Text>
-                        <Text style={styles.infoDescription}>
-                          {newsImpactFilter === "high"
-                            ? "🔴 High impact only"
-                            : newsImpactFilter === "medium"
-                            ? "🔴🟡 High + Medium"
-                            : "🔴🟡🟢 All impact levels"}
-                        </Text>
+                        <View style={styles.impactRow}>
+                          <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
+                          {newsImpactFilter !== "high" && <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />}
+                          {newsImpactFilter === "all" && <View style={[styles.impactDot, { backgroundColor: '#4CAF50' }]} />}
+                          <Text style={styles.infoDescription}>
+                            {newsImpactFilter === "high" ? "High impact only" : newsImpactFilter === "medium" ? "High + Medium" : "All impact levels"}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={styles.chevron}>{">"}</Text>
+                      <ChevronRight size={16} color={colors.textSecondary} />
                     </TouchableOpacity>
                   </>
                 )}
@@ -746,7 +752,7 @@ GitHub: github.com/Asura-lab/Predictrix
                     : "System"}
                 </Text>
               </View>
-              <Text style={styles.chevron}>{">"}</Text>
+              <ChevronRight size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         </View>
@@ -760,7 +766,7 @@ GitHub: github.com/Asura-lab/Predictrix
             onPress={handleChangePassword}
           >
             <Text style={styles.menuItemText}>Change Password</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
@@ -773,7 +779,7 @@ GitHub: github.com/Asura-lab/Predictrix
             onPress={() => openDocument("help")}
           >
             <Text style={styles.menuItemText}>Help</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -781,7 +787,7 @@ GitHub: github.com/Asura-lab/Predictrix
             onPress={() => openDocument("terms")}
           >
             <Text style={styles.menuItemText}>Terms of Service</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -789,7 +795,7 @@ GitHub: github.com/Asura-lab/Predictrix
             onPress={() => openDocument("privacy")}
           >
             <Text style={styles.menuItemText}>Privacy Policy</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -797,12 +803,12 @@ GitHub: github.com/Asura-lab/Predictrix
             onPress={() => openDocument("about")}
           >
             <Text style={styles.menuItemText}>About App</Text>
-            <Text style={styles.chevron}>{">"}</Text>
+            <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <View style={styles.menuItem}>
             <Text style={styles.menuItemText}>Version</Text>
-            <Text style={styles.versionText}>1.1.0</Text>
+            <Text style={styles.versionText}>0.4.2</Text>
           </View>
         </View>
 
@@ -963,7 +969,7 @@ GitHub: github.com/Asura-lab/Predictrix
               }}
             >
               <Text style={styles.themeOptionText}>System</Text>
-              {themeMode === 'auto' && <Text style={styles.checkmark}>✓</Text>}
+              {themeMode === 'auto' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -977,7 +983,7 @@ GitHub: github.com/Asura-lab/Predictrix
               }}
             >
               <Text style={styles.themeOptionText}>Light</Text>
-              {themeMode === 'light' && <Text style={styles.checkmark}>✓</Text>}
+              {themeMode === 'light' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -992,7 +998,7 @@ GitHub: github.com/Asura-lab/Predictrix
               }}
             >
               <Text style={styles.themeOptionText}>Dark</Text>
-              {themeMode === 'dark' && <Text style={styles.checkmark}>✓</Text>}
+              {themeMode === 'dark' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -1020,8 +1026,11 @@ GitHub: github.com/Asura-lab/Predictrix
               ]}
               onPress={() => handleNewsImpactFilterChange('high')}
             >
-              <Text style={styles.themeOptionText}>🔴 High Impact Only</Text>
-              {newsImpactFilter === 'high' && <Text style={styles.checkmark}>✓</Text>}
+              <View style={styles.impactRow}>
+                <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
+                <Text style={styles.themeOptionText}>High Impact Only</Text>
+              </View>
+              {newsImpactFilter === 'high' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1031,8 +1040,12 @@ GitHub: github.com/Asura-lab/Predictrix
               ]}
               onPress={() => handleNewsImpactFilterChange('medium')}
             >
-              <Text style={styles.themeOptionText}>🔴🟡 High + Medium</Text>
-              {newsImpactFilter === 'medium' && <Text style={styles.checkmark}>✓</Text>}
+              <View style={styles.impactRow}>
+                <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
+                <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />
+                <Text style={styles.themeOptionText}>High + Medium</Text>
+              </View>
+              {newsImpactFilter === 'medium' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -1043,8 +1056,13 @@ GitHub: github.com/Asura-lab/Predictrix
               ]}
               onPress={() => handleNewsImpactFilterChange('all')}
             >
-              <Text style={styles.themeOptionText}>🔴🟡🟢 All Levels</Text>
-              {newsImpactFilter === 'all' && <Text style={styles.checkmark}>✓</Text>}
+              <View style={styles.impactRow}>
+                <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
+                <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />
+                <View style={[styles.impactDot, { backgroundColor: '#4CAF50' }]} />
+                <Text style={styles.themeOptionText}>All Levels</Text>
+              </View>
+              {newsImpactFilter === 'all' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
@@ -1076,7 +1094,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 onPress={() => handleSignalThresholdChange(val)}
               >
                 <Text style={styles.themeOptionText}>{(val * 100).toFixed(0)}%{val === 0.90 ? ' (Default)' : val === 1.0 ? ' (Maximum)' : ''}</Text>
-                {signalThreshold === val && <Text style={styles.checkmark}>✓</Text>}
+                {signalThreshold === val && <Check size={16} color={colors.success} />}
               </TouchableOpacity>
             ))}
           </View>
@@ -1462,10 +1480,15 @@ const createStyles = (colors: any) =>
       fontSize: 15,
       color: colors.textPrimary,
     },
-    checkmark: {
-      color: colors.success,
-      fontSize: 18,
-      fontWeight: '700',
+    impactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    impactDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
     },
   });
 

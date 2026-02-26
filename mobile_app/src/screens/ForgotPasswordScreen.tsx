@@ -20,6 +20,7 @@ import {
   verifyResetCode,
   resetPassword,
 } from "../services/api";
+import { ChevronLeft, Sun, Moon, Eye, EyeOff } from 'lucide-react-native';
 
 /**
  * Forgot Password Screen - Professional minimal design
@@ -262,7 +263,7 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
             secureTextEntry={!showNewPassword}
           />
           <TouchableOpacity onPress={() => setShowNewPassword(!showNewPassword)} style={styles.toggleButton}>
-            <Text style={styles.toggleText}>{showNewPassword ? "HIDE" : "SHOW"}</Text>
+            {showNewPassword ? <EyeOff size={18} color={colors.textSecondary} /> : <Eye size={18} color={colors.textSecondary} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -279,7 +280,7 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
             secureTextEntry={!showConfirmPassword}
           />
           <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} style={styles.toggleButton}>
-            <Text style={styles.toggleText}>{showConfirmPassword ? "HIDE" : "SHOW"}</Text>
+            {showConfirmPassword ? <EyeOff size={18} color={colors.textSecondary} /> : <Eye size={18} color={colors.textSecondary} />}
           </TouchableOpacity>
         </View>
       </View>
@@ -310,26 +311,14 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
           <View style={styles.headerContainer}>
             <View style={styles.topRow}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                <Text style={styles.backText}>{"<"} Буцах</Text>
+                <ChevronLeft size={20} color={colors.textSecondary} />
+                <Text style={styles.backText}>Буцах</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
                 {isDark ? (
-                  <View style={styles.sunIcon}>
-                    <View style={styles.sunCore} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '0deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '45deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '90deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '135deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '180deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '225deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '270deg' }, { translateY: -10 }] }]} />
-                    <View style={[styles.sunRay, { transform: [{ rotate: '315deg' }, { translateY: -10 }] }]} />
-                  </View>
+                  <Sun size={22} color={colors.textSecondary} />
                 ) : (
-                  <View style={styles.moonIcon}>
-                    <View style={styles.moonOuter} />
-                    <View style={[styles.moonInner, { backgroundColor: colors.background }]} />
-                  </View>
+                  <Moon size={22} color={colors.textSecondary} />
                 )}
               </TouchableOpacity>
             </View>
@@ -391,50 +380,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   themeToggle: {
     padding: 8,
   },
-  sunIcon: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sunCore: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.textSecondary,
-  },
-  sunRay: {
-    position: 'absolute',
-    width: 2,
-    height: 6,
-    top: 12,
-    left: 14,
-    backgroundColor: colors.textSecondary,
-    borderRadius: 1,
-  },
-  moonIcon: {
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  moonOuter: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.textSecondary,
-    top: 5,
-    left: 3,
-  },
-  moonInner: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    top: 3,
-    left: 9,
-  },
   appIcon: {
     width: 160,
     height: 160,
@@ -449,6 +394,9 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   backButton: {
     padding: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
   },
   backText: {
     color: colors.textSecondary,
@@ -516,12 +464,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   toggleButton: {
     paddingHorizontal: 8,
-  },
-  toggleText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.success,
-    letterSpacing: 1,
   },
   primaryButton: {
     backgroundColor: colors.success,

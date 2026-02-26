@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -12,10 +12,11 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
 import CurrencyList from "../components/CurrencyList";
-import { checkApiStatus, getLiveRates, getInAppNotifications } from "../services/api";
+import { checkApiStatus, getLiveRates, getUnreadNotificationCount } from "../services/api";
 import { CurrencyPair } from "../utils/helpers";
-import { NavigationProp } from "@react-navigation/native";
-import { useQuery } from "@tanstack/react-query";
+import { NavigationProp, useFocusEffect } from "@react-navigation/native";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell } from 'lucide-react-native';
 
 interface HomeScreenProps {
   navigation: NavigationProp<any>;
@@ -32,6 +33,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const queryClient = useQueryClient();
+
+  // Буцаж ирэх үед уншаагүй тоог шинэчлэх
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: ["inAppNotificationsCount"] });
+    }, [queryClient])
+  );
 
   // Status Query
   const { data: statusData } = useQuery({
@@ -67,16 +76,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   // In-App Notifications Count Query
   const { data: notifCount } = useQuery({
-    queryKey: ["inAppNotifications"],
+    queryKey: ["inAppNotificationsCount"],
     queryFn: async () => {
-      const result = await getInAppNotifications(50);
+      const result = await getUnreadNotificationCount();
       if (result.success && result.data) {
-        return (result.data.notifications || []).length;
+        return result.data.unread_count;
       }
       return 0;
     },
-    staleTime: 60000,
-    refetchInterval: 120000,
+    staleTime: 30000,
+    refetchInterval: 60000,
   });
 
   const lastUpdateTime = new Date().toLocaleTimeString("en-US", { hour12: false });
@@ -118,9 +127,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               activeOpacity={0.7}
             >
               <View style={styles.bellIcon}>
-                <View style={[styles.bellDome, { borderColor: colors.textSecondary }]} />
-                <View style={[styles.bellRim, { backgroundColor: colors.textSecondary }]} />
-                <View style={[styles.bellClapper, { backgroundColor: colors.textSecondary }]} />
+                <Bell size={22} color={colors.textSecondary} />
               </View>
               {badgeCount > 0 && (
                 <View style={styles.bellBadge}>
@@ -221,25 +228,6 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   bellIcon: {
     alignItems: 'center',
-  },
-  bellDome: {
-    width: 16,
-    height: 12,
-    borderWidth: 2,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-  },
-  bellRim: {
-    width: 20,
-    height: 2.5,
-    borderRadius: 1,
-  },
-  bellClapper: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    marginTop: 1,
   },
   bellBadge: {
     position: 'absolute',

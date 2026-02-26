@@ -41,7 +41,7 @@ const StatisticsChart: React.FC<StatisticsChartProps> = ({ statistics }) => {
         return (
           <View key={trendName} style={styles.row}>
             <View style={styles.labelContainer}>
-              <Text style={styles.emoji}>{signal?.emoji || "❓"}</Text>
+              <Text style={styles.emoji}>{signal?.emoji || "?"}</Text>
               <Text style={styles.label} numberOfLines={1}>
                 {signal?.shortName || trendName}
               </Text>
