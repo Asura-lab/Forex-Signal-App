@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import warnings
 from typing import Dict, Any, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 
 warnings.filterwarnings('ignore', message='.*feature names.*')
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -493,6 +493,8 @@ class GBDTSignalGenerator:
                     },
                     "model_probabilities": model_probs,
                     "timestamp": datetime.now().isoformat(),
+                    "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
+                    "horizon_hours": 4,
                     "model_version": "GBDT_v7b",
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),
@@ -525,6 +527,8 @@ class GBDTSignalGenerator:
                     },
                     "model_probabilities": model_probs,
                     "timestamp": datetime.now().isoformat(),
+                    "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
+                    "horizon_hours": 4,
                     "model_version": "GBDT_v7b",
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),

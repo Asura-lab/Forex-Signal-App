@@ -286,6 +286,11 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                 <View>
                   <Text style={styles.signalLabel}>ДОХИО</Text>
                   <Text style={styles.updateTime}>Шинэчлэгдсэн: {lastUpdate}</Text>
+                  {signal.target_time && (
+                    <Text style={styles.updateTime}>
+                      Хүчинтэй: {new Date(signal.target_time).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })} хүртэл
+                    </Text>
+                  )}
                 </View>
                 <View style={[styles.signalBadge, { backgroundColor: getSignalColor(signal.signal) }]}>
                   <Text style={styles.signalBadgeText}>
