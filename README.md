@@ -287,7 +287,9 @@ npx eas build --platform android --profile preview
 
 | Хувилбар | Огноо | Өөрчлөлт |
 |---------|-------|----------|
-| **v0.4.0** | 2026-02-24 | Backend Azure App Service-д байршсан |
+| **v0.4.2** | 2026-02-26 | News impact filter засвар, мэдэгдлийн тохиргоо upsert засвар |
+| v0.4.1 | 2026-02-26 | Бүх emoji-г icon-оор сольсон, About хэсэг шинэчилсэн, GBDT загварын мэдээлэл нэмсэн |
+| v0.4.0 | 2026-02-24 | Backend Azure App Service-д байршсан |
 | v0.3.3 | 2026-02-23 | Bug fix, UI сайжруулалт |
 | v0.3.2 | 2026-02-23 | Push notification |
 | v0.3.1 | 2026-02-22 | Market analysis, news feed |
