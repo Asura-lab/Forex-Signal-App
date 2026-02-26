@@ -32,7 +32,7 @@ class TwelveDataHandler:
         # Cache for rate limiting
         self.cache = {}
         self.cache_ttl = 120  # 2 minutes for live rate
-        self.historical_cache_ttl = 300  # 5 minutes for historical data (longer!)
+        self.historical_cache_ttl = 60  # Match continuous_signal_generator 60s interval — fresh data every minute
         self.last_request_time = 0
         self.min_request_interval = 60  # 1 minute between API calls
         self._lock = threading.Lock()
