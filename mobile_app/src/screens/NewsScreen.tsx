@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -34,15 +34,28 @@ const NewsScreen: React.FC = () => {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [analysisLoading, setAnalysisLoading] = useState<boolean>(false);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
+  // Cache: event key -> analysis text (session-wide, no re-fetch)
+  const analysisCache = useRef<Record<string, string>>({});
 
   const handleEventPress = async (item: any) => {
     setSelectedEvent(item);
+    // Unique key per event (title + date)
+    const cacheKey = `${item.title}__${item.date}`;
+
+    // Return cached result immediately — no re-fetch
+    if (analysisCache.current[cacheKey]) {
+      setAiAnalysis(analysisCache.current[cacheKey]);
+      setAnalysisLoading(false);
+      return;
+    }
+
     setAiAnalysis('');
     setAnalysisLoading(true);
 
     try {
       const result = await analyzeNewsEvent(item);
       if (result.success && result.data?.status === 'success') {
+        analysisCache.current[cacheKey] = result.data.analysis;
         setAiAnalysis(result.data.analysis);
       } else {
         setAiAnalysis('Дүгнэлт хийх боломжгүй байна.');
@@ -141,16 +154,11 @@ const NewsScreen: React.FC = () => {
           </View>
           
           <Text style={styles.eventTitle}>{selectedEvent?.title}</Text>
-          
-          <View style={styles.dataRow}>
-            <Text style={styles.modalData}>Actual: {selectedEvent?.actual}</Text>
-            <Text style={styles.modalData}>Forecast: {selectedEvent?.forecast}</Text>
-          </View>
 
           {analysisLoading ? (
             <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
           ) : (
-            <ScrollView style={styles.analysisScroll}>
+            <ScrollView style={styles.analysisScroll} showsVerticalScrollIndicator={false}>
               <Text style={styles.analysisText}>{aiAnalysis}</Text>
             </ScrollView>
           )}
@@ -188,10 +196,6 @@ const NewsScreen: React.FC = () => {
   const renderNewsItem = ({ item }: { item: any }) => {
     const impactColor = getImpactColor(item.sentiment);
     const time = item.date.split(' ')[1] || item.date;
-    
-    const summaryParts = (item.summary as string).split('. ');
-    const actualPart = summaryParts.find(p => p.includes('Actual:'))?.replace('Actual: ', '') || '-';
-    const forecastPart = summaryParts.find(p => p.includes('Forecast:'))?.replace('Forecast: ', '') || '-';
     const currency = item.title.split(' - ')[0];
     const eventName = item.title.split(' - ')[1] || item.title;
 
@@ -205,16 +209,6 @@ const NewsScreen: React.FC = () => {
         <View style={styles.centerColumn}>
           <Text style={styles.eventText} numberOfLines={2}>{eventName}</Text>
           <Text style={[styles.impactText, { color: impactColor }]}>{item.sentiment}</Text>
-        </View>
-        <View style={styles.rightColumn}>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Act:</Text>
-            <Text style={[styles.dataValue, { color: colors.textPrimary }]}>{actualPart}</Text>
-          </View>
-          <View style={styles.dataRow}>
-            <Text style={styles.dataLabel}>Fcst:</Text>
-            <Text style={[styles.dataValue, { color: colors.textSecondary }]}>{forecastPart}</Text>
-          </View>
         </View>
       </TouchableOpacity>
     );
@@ -232,10 +226,6 @@ const NewsScreen: React.FC = () => {
       <View style={styles.impactHeader}>
         <Text style={styles.impactCardTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.impactDate}>{item.date.split(' ')[0]}</Text>
-      </View>
-      <View style={styles.impactDataRow}>
-        <Text style={styles.impactData}>Act: {item.actual}</Text>
-        <Text style={styles.impactData}>Fcst: {item.forecast}</Text>
       </View>
       <Text style={styles.impactAnalysis}>{item.impact_analysis}</Text>
     </TouchableOpacity>
@@ -261,6 +251,7 @@ const NewsScreen: React.FC = () => {
     return (
       <ScrollView 
         contentContainerStyle={styles.outlookScroll}
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <View style={styles.outlookSection}>
@@ -365,6 +356,7 @@ const NewsScreen: React.FC = () => {
               renderItem={renderNewsItem}
               renderSectionHeader={renderSectionHeader}
               contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
               }
@@ -381,6 +373,7 @@ const NewsScreen: React.FC = () => {
               keyExtractor={(item, index) => index.toString()}
               renderItem={renderPastNewsItem}
               contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
               }
@@ -696,6 +689,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: 22,
     marginBottom: 4,
     color: colors.textPrimary,
+    textAlign: 'justify',
   },
   // Modal Styles
   modalOverlay: {
@@ -724,12 +718,15 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.primary,
+    flex: 1,
+    textAlign: 'center',
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: 12,
+    textAlign: 'center',
   },
   modalData: {
     fontSize: 14,

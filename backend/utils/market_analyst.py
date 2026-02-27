@@ -33,7 +33,7 @@ class MarketAnalyst:
     """
     
     # Model constants
-    FLASH_MODEL = 'gemini-2.5-flash'       # Хосолсон болон зах зээлийн тойм
+    FLASH_MODEL = 'gemini-2.5-flash'       # Хослол болон зах зээлийн тойм
     LITE_MODEL  = 'gemini-2.5-flash-lite'  # Бусад (мэдээний шинжилгээ гэх мэт)
 
     def __init__(self):
@@ -53,14 +53,24 @@ class MarketAnalyst:
 
         # MongoDB Connection
         try:
-            self.client = MongoClient(MONGO_URI)
+            self.client = MongoClient(
+                MONGO_URI,
+                serverSelectionTimeoutMS=5000,   # 5 секунд хүлээнэ
+                connectTimeoutMS=5000,
+                socketTimeoutMS=10000,
+            )
+            # Холболтыг verify хийнэ (timeout дотор)
+            self.client.admin.command('ping')
             self.db = self.client.get_database()
             self.news_collection = self.db.news_analysis
             self.insights_collection = self.db.ai_insights
             print("[OK] MarketAnalyst connected to MongoDB")
         except Exception as e:
-            print(f"[ERROR] MongoDB Connection Error: {e}")
+            print(f"[WARN] MongoDB холбогдсонгүй, offline горимд ажиллана: {e}", flush=True)
+            self.client = None
             self.db = None
+            self.news_collection = None
+            self.insights_collection = None
 
         # Cache settings (per-pair)
         self._insight_cache = {}  # { pair: { "data": ..., "time": ... } }
@@ -367,8 +377,8 @@ class MarketAnalyst:
         """Generate detailed analysis for a specific event"""
         try:
             prompt = f"""
-ROLE: Professional Forex Analyst explaining economic data to traders.
-TASK: Analyze the following economic news event and write a structured explanation in MONGOLIAN.
+ROLE: Senior Macroeconomic Analyst & Institutional Forex Strategist.
+TASK: Provide a highly professional, institutional-grade analysis of the following economic event in MONGOLIAN (Cyrillic).
 
 EVENT DETAILS:
 - Event: {event_data.get('title')}
@@ -376,13 +386,19 @@ EVENT DETAILS:
 - Actual Value: {event_data.get('actual', 'N/A')}
 - Forecast Value: {event_data.get('forecast', 'N/A')}
 
-INSTRUCTIONS:
-Write 3 short paragraphs in Mongolian (Cyrillic):
-1. **Context**: Explain simply what this economic indicator measures.
-2. **Analysis**: Compare Actual vs Forecast. Explain LOGICALLY why this result is bullish or bearish for the {event_data.get('currency', 'Unknown')}. (e.g., "Actual is higher than forecast, implying stronger inflation, thus potential rate hike...").
-3. **Takeaway**: What should the trader watch next?
+STRICT FORMATTING REQUIREMENTS:
+You must output EXACTLY three sections using the exact headers below. Do not add any introductory or concluding remarks. Use highly professional financial terminology.
 
-TONE: Professional, objective, and clear. No financial advice.
+**1. Үзүүлэлтийн танилцуулга:**
+(Explain the macroeconomic significance of this indicator in 1-2 precise sentences. What does it measure and why do central banks care?)
+
+**2. Үр дүнгийн шинжилгээ:**
+(Analyze the Actual vs Forecast deviation. Explain the fundamental transmission mechanism: how this specific result impacts inflation expectations, monetary policy (interest rates), and consequently the {event_data.get('currency', 'Unknown')} valuation. Be highly logical and objective.)
+
+**3. Зах зээлийн хүлээлт:**
+(What is the immediate market implication? What subsequent data points or central bank actions should traders monitor next?)
+
+TONE: Institutional, analytical, objective. No financial advice.
 """
             response = self._call_ai(prompt, model=self.LITE_MODEL)
             return response if response else "AI холболт амжилтгүй боллоо."
@@ -433,8 +449,8 @@ TONE: Professional, objective, and clear. No financial advice.
 
         try:
             prompt = f"""
-ROLE: Forex News Analyst.
-TASK: Write ONLY ONE highly logical sentence explaining the impact of the following news event on the currency.
+ROLE: Institutional Quantitative Macro Strategist.
+TASK: Write EXACTLY ONE highly professional, analytical sentence in MONGOLIAN explaining the fundamental impact of this event.
 
 NEWS EVENT:
 - Title: {news_item.get('name')} ({news_item.get('currency')})
@@ -442,8 +458,9 @@ NEWS EVENT:
 - Forecast: {news_item.get('forecast')}
 
 INSTRUCTION:
-Compare Actual vs Forecast. Explain the deviation and its logical consequence for the currency (e.g., Inflation up -> rate hike expectation -> currency strengthens).
-Output ONLY the Mongolian sentence. No intro, no markdown.
+Analyze the Actual vs Forecast deviation. State the logical macroeconomic consequence (e.g., impact on yield spreads, central bank policy divergence) and the resulting directional pressure on the {news_item.get('currency')}.
+Use advanced financial terminology.
+CRITICAL: Output ONLY the single Mongolian sentence. No markdown, no bullet points, no intro/outro.
 """
             analysis_text = self._call_ai(prompt, model=self.LITE_MODEL)
             if not analysis_text: return "Analysis failed."
@@ -519,60 +536,80 @@ Output ONLY the Mongolian sentence. No intro, no markdown.
             
             if pair == "MARKET":
                 prompt = f"""
-ACT AS: Senior Global Market Strategist.
-TASK: Analyze the current GLOBAL FOREX MARKET conditions based on the provided news.
+ROLE: Chief Global Macro Strategist at a Tier-1 Investment Bank.
+TASK: Provide an institutional-grade macroeconomic analysis of the current GLOBAL FOREX MARKET based on the provided data.
 
 ECONOMIC DATA / NEWS INPUT:
 {news_summary}
 
 INSTRUCTIONS:
-Generate a detailed market analysis JSON in PROFESSIONAL MONGOLIAN language.
-Focus on major central banks (Fed, ECB, BOJ), commodities (Gold, Oil), and risk sentiment.
+Generate a highly analytical, data-driven market analysis JSON in PROFESSIONAL MONGOLIAN (Cyrillic).
+Focus on central bank monetary policy divergence, yield curve dynamics, macroeconomic indicators, and global risk sentiment. Avoid retail trading clichés.
 
 REQUIRED JSON STRUCTURE:
 {{
   "pair": "MARKET",
-  "summary": "Detailed 4-5 sentences in Mongolian. Explain HOW the news (e.g. US CPI, ECB rate) is driving the global market. Be specific. Do not use generic statements like 'market is volatile'. Explain WHY.",
-  "key_drivers": ["List 3-4 specific drivers in Mongolian (e.g., 'Rising US Treasury Yields due to robust NFP', 'Weak Chinese manufacturing data')."],
-  "recent_events": ["List 2-3 specific past events with dates (e.g., 'FOMC Meeting - Jan 25')."],
-  "event_impacts": "Explain in Mongolian how these specific events impacted major currencies (USD, EUR, JPY). Connect the dots logically.",
-  "risk_factors": ["List 2-3 specific risks (e.g., 'Upcoming US CPI data volatility', 'Geopolitical tension in Middle East')."],
-  "forecast": "Detailed Mongolian forecast for the next 24-48 hours. What is the expected market direction based on the current data? (e.g., 'Dollar likely to remain strong until CPI release...').",
-  "market_sentiment": "Risk-On / Risk-Off / Mixed (Explain WHY in Mongolian in 1 sentence)."
+  "outlook": "BULLISH USD / BEARISH USD / MIXED / RISK-ON / RISK-OFF (Choose one that best fits the macro environment)",
+  "summary": "Write a dense, professional 4-5 sentence macroeconomic summary in Mongolian. Synthesize how recent data impacts central bank rate expectations (Fed, ECB, BOE, BOJ) and global liquidity. Explain the fundamental drivers behind current currency valuations.",
+  "key_drivers": [
+    "List 3-4 highly specific fundamental drivers in Mongolian (e.g., 'АНУ-ын инфляцын өсөлтөөс шалтгаалсан Холбооны Нөөцийн Сангийн бодлогын хүүгийн хүлээлт', 'Евро бүсийн аж үйлдвэрийн салбарын уналт')."
+  ],
+  "recent_events": [
+    "List 2-3 critical recent macroeconomic events."
+  ],
+  "event_impacts": "Explain in Mongolian the transmission mechanism of recent events into the FX market (e.g., how a specific CPI print altered bond yields and consequently the USD index).",
+  "risk_factors": [
+    "List 2-3 specific systemic or event-driven risks (e.g., 'Ойрх Дорнодын геополитикийн хурцадмал байдал', 'Удахгүй гарах АНУ-ын хөдөлмөрийн зах зээлийн тайлан')."
+  ],
+  "forecast": "Provide a 24-48 hour institutional outlook in Mongolian. Focus on expected capital flows, yield differentials, and potential volatility catalysts. Do not predict exact prices.",
+  "market_sentiment": "State the current sentiment (e.g., 'Risk-Off: Хөрөнгө оруулагчид эрсдэлээс зайлсхийж, алт болон ам.доллар руу шилжиж байна') in 1-2 professional sentences in Mongolian."
 }}
 
-CRITICAL: Return ONLY valid JSON. No markdown formatting. Ensure all text values are in MONGOLIAN.
+CRITICAL CONSTRAINTS:
+1. Return ONLY valid JSON. No markdown blocks (```json), no introductory text.
+2. All text values MUST be in highly professional, grammatically correct Mongolian (Cyrillic).
+3. Use institutional financial terminology (e.g., мөнгөний бодлого, өгөөжийн муруй, инфляцын дарамт, хөрвөх чадвар).
 """
             else:
                 # Хосолсон валютын шинжилгээ — ЧИГЛЭЛ ЗААХГҮЙ
                 base, quote = (pair.split("/") + [""])[:2]
                 prompt = f"""
-ACT AS: Senior Forex Analyst specializing in {pair}.
-TASK: Analyze the CURRENT MARKET CONDITIONS for {pair} based on technicals and news.
-DO NOT provide a trade signal (Buy/Sell). Provide deep contextual analysis.
+ROLE: Institutional Quantitative Macro Strategist specializing in {pair}.
+TASK: Provide a deep, institutional-grade fundamental and technical synthesis for {pair}.
+DO NOT provide retail trade signals. Focus on macroeconomic drivers, yield differentials, and institutional order flow context.
 
 INPUTS:
 - Pair: {pair}
-- Technical Bias: {signal_type} (Confidence: {confidence}%)
-- News Context:
+- Algorithmic Technical Bias: {signal_type} (Confidence: {confidence}%)
+- Macroeconomic Context:
 {news_summary}
 
 INSTRUCTIONS:
-Generate a detailed analysis JSON in PROFESSIONAL MONGOLIAN language.
+Generate a highly analytical JSON response in PROFESSIONAL MONGOLIAN (Cyrillic).
 
 REQUIRED JSON STRUCTURE:
 {{
   "pair": "{pair}",
-  "summary": "Detailed 3-4 sentences in Mongolian. Synthesize the technical bias with the fundamental news. Explain any divergence (e.g., 'Technicals show Sell but weak US data suggests potential reversal'). Be specific about {base} and {quote} drivers.",
-  "key_drivers": ["List 3-4 drivers specific to {base} and {quote} (e.g. 'ECB hawkish comments', 'US weak retail sales'). in Mongolian."],
-  "recent_events": ["List 2-3 specific news events relevant to this pair."],
-  "event_impacts": "Explain in Mongolian how the news impacted {pair} price action recently.",
-  "risk_factors": ["List specific risks for this pair (e.g., 'Upcoming NFP release', 'Key support level at 1.0500')."],
-  "forecast": "Scenario-based forecast in Mongolian for next 24h. 'If X happens, Y might follow'. Do NOT say 'Price will go up'. Say 'Upside potential if resistance breaks'.",
-  "market_sentiment": "Risk-On / Risk-Off (Explain relevance to {pair} in Mongolian)."
+  "outlook": "BULLISH / BEARISH / NEUTRAL (Based on combined macro & technical view)",
+  "summary": "Write a dense 3-4 sentence institutional summary in Mongolian. Synthesize the algorithmic technical bias ({signal_type}) with the fundamental macroeconomic context. Explain the interaction between {base} monetary policy/data and {quote} monetary policy/data.",
+  "key_drivers": [
+    "List 3-4 highly specific fundamental drivers for {base} and {quote} in Mongolian (e.g., '{base} төв банкны бодлогын хүүгийн зөрүү', '{quote} инфляцын дарамт')."
+  ],
+  "recent_events": [
+    "List 2-3 critical recent macroeconomic events affecting {pair}."
+  ],
+  "event_impacts": "Explain in Mongolian the fundamental transmission mechanism of recent data into {pair}'s valuation and yield spread.",
+  "risk_factors": [
+    "List 2-3 specific systemic or event-driven risks for {pair} (e.g., 'Удахгүй гарах хөдөлмөрийн зах зээлийн тайлангийн савалгаа')."
+  ],
+  "forecast": "Provide a scenario-based institutional outlook in Mongolian for the next 24h. Focus on key macroeconomic catalysts and structural resistance/support zones. (e.g., 'Хэрэв инфляцын мэдээлэл хүлээлтээс давбал...').",
+  "market_sentiment": "State the current sentiment relevance to {pair} in 1-2 professional sentences in Mongolian."
 }}
 
-CRITICAL: Return ONLY valid JSON. No markdown formatting. Ensure all text values are in MONGOLIAN.
+CRITICAL CONSTRAINTS:
+1. Return ONLY valid JSON. No markdown blocks (```json), no introductory text.
+2. All text values MUST be in highly professional, grammatically correct Mongolian (Cyrillic).
+3. Use institutional financial terminology.
 """
             
             # Retry logic for JSON parsing

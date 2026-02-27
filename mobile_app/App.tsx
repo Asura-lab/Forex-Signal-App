@@ -66,14 +66,15 @@ function AppContent() {
         (response) => {
           const data = response.notification.request.content.data;
           // Navigate to appropriate screen based on notification type
-          if (data?.screen && navigationRef.current) {
+          if (navigationRef.current) {
             try {
-              if (data.screen === "Signal") {
-                navigationRef.current.navigate("Signal");
-              } else if (data.screen === "News") {
-                navigationRef.current.navigate("Main", { screen: "News" });
-              } else if (data.screen === "Profile") {
-                navigationRef.current.navigate("Main", { screen: "Profile" });
+              if (data?.type === "signal" || data?.screen === "Signal") {
+                // Signal мэдэгдэл → Predict хуудас
+                navigationRef.current.navigate("Main", { screen: "PredictionTab" });
+              } else if (data?.screen === "News") {
+                navigationRef.current.navigate("Main", { screen: "NewsTab" });
+              } else if (data?.screen === "Profile") {
+                navigationRef.current.navigate("Main", { screen: "ProfileTab" });
               }
             } catch (e) {
               console.log("[WARN] Navigation from notification failed:", e);

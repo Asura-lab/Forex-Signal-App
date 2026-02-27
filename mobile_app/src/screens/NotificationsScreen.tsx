@@ -82,13 +82,8 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
     }
     // Навигаци
     if (notif.type === "signal") {
-      const rawPair = notif.data?.pair || notif.data?.symbol || "";
-      if (rawPair) {
-        const pairName = rawPair.replace("_", "/");
-        navigation.navigate("Signal", {
-          pair: { name: pairName, display: pairName },
-        });
-      }
+      // Predict хуудас руу шилжих (PredictionTab)
+      navigation.navigate("Main", { screen: "PredictionTab" } as never);
     } else if (notif.type === "news") {
       navigation.navigate("Main", { screen: "NewsTab" } as never);
     }
@@ -188,6 +183,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
           renderItem={renderItem}
           keyExtractor={(item) => item._id || item.created_at}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
               refreshing={isLoading}

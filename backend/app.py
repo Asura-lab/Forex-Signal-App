@@ -2,7 +2,7 @@
 """
 Forex Signal API
 - MongoDB + JWT Authentication
-- Twelve Data API for live rates
+- Yahoo Finance (yfinance) for live rates — no API key required
 - GBDT Signal Generator (Multi-Timeframe Ensemble)
 """
 
@@ -32,10 +32,10 @@ from config.settings import (
 import threading
 import time
 
-# Import Twelve Data handler (real-time + historical forex data)
-from utils.twelvedata_handler import (
-    get_twelvedata_live_rate, 
-    get_twelvedata_historical, 
+# Import Yahoo Finance handler (real-time + historical forex data, no API key)
+from utils.yfinance_handler import (
+    get_twelvedata_live_rate,
+    get_twelvedata_historical,
     get_twelvedata_dataframe,
     get_twelvedata_multitf,
     get_all_forex_rates
@@ -438,7 +438,14 @@ def continuous_signal_generator():
                 sig_conf = result.get('confidence', 0)  # This is 0-100 percentage
                 conf_decimal = sig_conf / 100.0 if sig_conf > 1 else sig_conf
 
-                print(f"[SIGNAL] {pair}: {sig_type} @ {sig_conf:.1f}% (threshold: {SAVE_CONFIDENCE_THRESHOLD*100}%)")
+                # For logging: HOLD-д hold_confidence (HOLD-ийн магадлал) харуулна
+                # BUY/SELL-д тухайн signal-ийн confidence харуулна
+                if sig_type == 'HOLD':
+                    hold_conf_pct = result.get('hold_confidence', sig_conf)
+                    dir_signal = result.get('directional_signal', '')
+                    print(f"[SIGNAL] {pair}: HOLD (hold={hold_conf_pct:.1f}%, lean={dir_signal} {sig_conf:.1f}%) (threshold: {SAVE_CONFIDENCE_THRESHOLD*100}%)")
+                else:
+                    print(f"[SIGNAL] {pair}: {sig_type} @ {sig_conf:.1f}% (threshold: {SAVE_CONFIDENCE_THRESHOLD*100}%)")
 
                 # Only process BUY/SELL signals with confidence >= 0.9 (90%)
                 if sig_type in ('BUY', 'SELL') and conf_decimal >= SAVE_CONFIDENCE_THRESHOLD:
@@ -1127,12 +1134,12 @@ def mark_notifications_read():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-# ==================== LIVE RATES (Twelve Data) ====================
+# ==================== LIVE RATES (Yahoo Finance) ====================
 
 @app.route('/rates/live', methods=['GET'])
 def get_live_rates():
     """
-    Get live rates for all 20 forex pairs from Twelve Data API
+    Get live rates for all 20 forex pairs from Yahoo Finance (yfinance)
     Returns rate, change, and change_percent for each pair
     """
     try:
@@ -1449,7 +1456,7 @@ def save_signal():
         # Required fields
         signal_type = data.get('signal')
         confidence = data.get('confidence')
-        pair = data.get('pair', 'EUR_USD')
+        pair = data.get('pair', 'EUR_USD').replace('/', '_')  # Normalize: EUR/USD → EUR_USD
         
         if not signal_type or confidence is None:
             return jsonify({'success': False, 'error': 'signal, confidence шаардлагатай'}), 400
@@ -1598,42 +1605,45 @@ def get_signals_stats():
 @app.route('/signals/latest', methods=['GET'])
 def get_latest_signal():
     """
-    Сүүлийн auto-generated сигнал авах endpoint
+    Сүүлийн auto-generated сигнал(ууд) авах endpoint
     Query params:
         - pair: Валютын хослол (default: EUR_USD)
+        - limit: Хэдэн сигнал авах (default: 1, max: 20)
     """
     try:
         pair = request.args.get('pair', 'EUR_USD')
-        
-        # Get the most recent auto-generated signal
-        latest = signals_collection.find_one(
-            {'pair': pair, 'signal': {'$in': ['BUY', 'SELL']}, 'source': 'auto'},
+        limit = min(int(request.args.get('limit', 1)), 20)
+
+        # Support both EUR_USD and EUR/USD formats in DB
+        pair_slash = pair.replace('_', '/')
+        pair_under = pair.replace('/', '_')
+        query = {'pair': {'$in': [pair_under, pair_slash]}, 'signal': {'$in': ['BUY', 'SELL']}}
+
+        # Return all BUY/SELL signals (auto + manual), sorted by newest
+        results = list(signals_collection.find(
+            query,
             sort=[('created_at', -1)]
-        )
-        
-        if not latest:
-            # Fallback: get any recent signal
-            latest = signals_collection.find_one(
-                {'pair': pair, 'signal': {'$in': ['BUY', 'SELL']}},
-                sort=[('created_at', -1)]
-            )
-        
-        if latest:
-            latest['_id'] = str(latest['_id'])
-            if latest.get('created_at'):
-                latest['created_at'] = latest['created_at'].isoformat()
-            
+        ).limit(limit))
+
+        for s in results:
+            s['_id'] = str(s['_id'])
+            if s.get('created_at'):
+                s['created_at'] = s['created_at'].isoformat()
+
+        if limit == 1:
+            # Backward-compatible: return single signal object
             return jsonify({
                 'success': True,
-                'signal': latest
+                'signal': results[0] if results else None,
+                'message': 'Одоогоор сигнал байхгүй байна' if not results else None
             })
-        
-        return jsonify({
-            'success': True,
-            'signal': None,
-            'message': 'Одоогоор сигнал байхгүй байна'
-        })
-    
+        else:
+            return jsonify({
+                'success': True,
+                'signals': results,
+                'count': len(results)
+            })
+
     except Exception as e:
         print(f"Latest signal алдаа: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1710,7 +1720,8 @@ def get_market_analysis():
         # Check if market_analyst already has a valid cache for this pair
         # If so, skip the TwelveData fetch entirely
         cached = market_analyst._insight_cache.get(pair)
-        if cached and (time.time() - cached["time"]) < market_analyst.cache_duration:
+        cache_ttl = market_analyst.cache_duration_market if pair == "MARKET" else market_analyst.cache_duration_pair
+        if cached and (time.time() - cached["time"]) < cache_ttl:
             print(f"[CACHE HIT] /api/market-analysis for {pair}")
             return jsonify({
                 "status": "success",
@@ -1792,9 +1803,10 @@ if __name__ == '__main__':
     print("=" * 60)
     print("PREDICTRIX API v1.0")
     print("=" * 60)
-    print(f"✓ MongoDB: Connected")
+    mongo_status = "Connected" if (getattr(market_analyst, 'db', None) is not None) else "Offline (no connection)"
+    print(f"✓ MongoDB: {mongo_status}")
     print(f"✓ GBDT Signal Generator: {'Loaded (Multi-TF Ensemble)' if (signal_generator and signal_generator.is_loaded) else 'Not loaded'}")
-    print(f"✓ Twelve Data API: Enabled")
+    print(f"✓ Yahoo Finance (yfinance): Enabled — no API key required")
     print(f"✓ Port: {PORT}")
     print(f"\n[+] API Endpoints:")
     print(f"  POST /auth/register, /auth/login")

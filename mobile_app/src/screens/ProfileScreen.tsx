@@ -111,6 +111,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       setNewsImpactFilter(prefs.news_impact_filter ?? "high");
       setSecurityNotifications(prefs.security_notifications ?? true);
       setSignalThreshold(prefs.signal_threshold ?? 0.9);
+      // Also sync to AsyncStorage for cross-screen access
+      await AsyncStorage.setItem("@signal_threshold", String(prefs.signal_threshold ?? 0.9));
       if (prefs.notifications_enabled !== undefined) {
         setNotifications(prefs.notifications_enabled);
       }
@@ -276,6 +278,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     setSignalThreshold(threshold);
     setShowSignalThresholdModal(false);
     try {
+      await AsyncStorage.setItem("@signal_threshold", String(threshold));
       await updateNotificationPreferences({ signal_threshold: threshold });
     } catch (error: any) {
       console.error("Save signal threshold error:", error);
@@ -324,7 +327,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 • Өдрийн тойм статистик
 
 [!] Анхааруулга:
-Энэ апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш. Бүх арилжааны шийдвэр таны хувийн хариуцлага юм.
+Энэ апп нь зөвхөн судалгааны зориулалттай бөгөөд санхүүгийн зөвлөгөө биш. Бүх арилжааны шийдвэр таны хувийн хариуцлага юм.
 
 Холбоо барих:
 • Email: support@predictrix.com
@@ -343,7 +346,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 • Валютын хосын мэдээлэл харуулах
 
 [!] БИД САНАЛ, ЗӨВЛӨМЖ ӨГДӨГГҮЙ
-Манай апп нь зөвхөн мэдээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш.
+Манай апп нь ээллийн зориулалттай бөгөөд санхүүгийн зөвлөгөө биш.
 
 3. ЭРСДЭЛИЙН АНХААРУУЛГА
 • Форекс зах зээл маш өндөр эрсдэлтэй
@@ -439,8 +442,8 @@ Email: support@predictrix.com
         content: `PREDICTRIX
 AI-Powered Forex Trading Signals
 
-Хувилбар: 0.4.2
-Шинэчилсэн: 2026.02.26
+Хувилбар: 0.4.3
+Шинэчилсэн: 2026.02.27
 Платформ: Android / iOS (Expo SDK 51)
 
 Зорилго:
@@ -512,7 +515,7 @@ GitHub: github.com/Asura-lab/Predictrix
         </View>
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Statistics Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>STATISTICS</Text>
@@ -808,7 +811,7 @@ GitHub: github.com/Asura-lab/Predictrix
 
           <View style={styles.menuItem}>
             <Text style={styles.menuItemText}>Version</Text>
-            <Text style={styles.versionText}>0.4.2</Text>
+            <Text style={styles.versionText}>0.4.3</Text>
           </View>
         </View>
 
@@ -924,7 +927,7 @@ GitHub: github.com/Asura-lab/Predictrix
 
             <ScrollView
               style={styles.documentContent}
-              showsVerticalScrollIndicator={true}
+              showsVerticalScrollIndicator={false}
             >
               <Text style={styles.documentText}>
                 {currentDocument?.content}
@@ -1093,7 +1096,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 ]}
                 onPress={() => handleSignalThresholdChange(val)}
               >
-                <Text style={styles.themeOptionText}>{(val * 100).toFixed(0)}%{val === 0.90 ? ' (Default)' : val === 1.0 ? ' (Maximum)' : ''}</Text>
+                <Text style={styles.themeOptionText}>{(val * 100).toFixed(0)}%{val === 0.90 ? ' (Default)' : val === 1.0 ? ' (Өндөр)' : ''}</Text>
                 {signalThreshold === val && <Check size={16} color={colors.success} />}
               </TouchableOpacity>
             ))}

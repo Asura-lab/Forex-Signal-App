@@ -308,14 +308,9 @@ class GBDTSignalGenerator:
         pred_class = ensemble_proba.argmax(axis=1)
         pred_conf = ensemble_proba.max(axis=1)
 
-        # Calibrate confidence if calibrator exists
-        if self.calibrator is not None:
-            try:
-                pred_conf = self.calibrator.predict_proba(
-                    pred_conf.reshape(-1, 1)
-                )[:, 1]
-            except Exception as e:
-                print(f"[GBDT] Calibration warning: {e}")
+        # NOTE: Calibrator disabled — it was outputting constant values (e.g. always 93.4%)
+        # regardless of input, which means it was trained incorrectly.
+        # Raw ensemble max probability is already a reliable confidence estimate.
 
         return pred_class, pred_conf, ensemble_proba
 
@@ -448,6 +443,18 @@ class GBDTSignalGenerator:
             last_proba = ensemble_proba[-1]  # [P(SELL), P(HOLD), P(BUY)]
 
             signal_type = self.CLASS_MAP.get(last_class, "HOLD")
+
+            # For display: if model predicts BUY/SELL but confidence is low,
+            # use the BUY/SELL class confidence (not HOLD confidence)
+            buy_conf  = float(last_proba[2])
+            sell_conf = float(last_proba[0])
+            hold_conf = float(last_proba[1])
+
+            # Dominant directional confidence (BUY or SELL, whichever is higher)
+            directional_conf = max(buy_conf, sell_conf)
+            directional_type = "BUY" if buy_conf >= sell_conf else "SELL"
+
+            print(f"[GBDT] Raw proba — SELL:{sell_conf*100:.1f}% HOLD:{hold_conf*100:.1f}% BUY:{buy_conf*100:.1f}% | pred={signal_type} conf={last_conf*100:.1f}%")
             last_row = df_features.iloc[-1]
             entry_price = float(last_row["close"])
 
@@ -500,24 +507,29 @@ class GBDTSignalGenerator:
                     "features_used": len(self.feature_cols),
                 }
             else:
-                # HOLD - confidence or ATR too low
+                # HOLD — model neutral OR confidence too low OR ATR too low
                 reason_parts = []
                 if signal_type == "HOLD":
-                    reason_parts.append("Model predicts HOLD (neutral)")
-                if last_conf < conf_threshold:
+                    reason_parts.append("Загвар HOLD (саармаг) таамаглаж байна")
+                elif last_conf < conf_threshold:
                     reason_parts.append(
-                        f"Confidence {last_conf*100:.1f}% < threshold {conf_threshold*100:.1f}%"
+                        f"{signal_type} итгэлцүүр {last_conf*100:.1f}% < босго {conf_threshold*100:.1f}%"
                     )
                 if atr_pips < self.MIN_ATR_PIPS:
                     reason_parts.append(
-                        f"ATR {atr_pips:.1f} pips < minimum {self.MIN_ATR_PIPS} pips"
+                        f"ATR {atr_pips:.1f} pips — зах зээл тайван байна"
                     )
 
+                # For frontend: expose directional lean even on HOLD
+                # so it can show "BUY 45%" trend hint
                 return {
                     "signal": "HOLD",
-                    "confidence": round(last_conf * 100, 2),
+                    # Expose directional confidence for trend hint display
+                    "confidence": round(directional_conf * 100, 2),
+                    "directional_signal": directional_type,
+                    "hold_confidence": round(hold_conf * 100, 2),
                     "entry_price": round(entry_price, 5),
-                    "reason": "; ".join(reason_parts) if reason_parts else "No clear signal",
+                    "reason": "; ".join(reason_parts) if reason_parts else "Тодорхой сигнал байхгүй",
                     "raw_signal": signal_type,
                     "atr_pips": round(atr_pips, 2),
                     "probabilities": {

@@ -75,12 +75,11 @@ DEBUG_MODE = os.getenv('DEBUG', 'True').lower() == 'true'
 DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
 
-# Twelve Data API Configuration
+# Data source: Yahoo Finance (yfinance) — no API key required
+# TWELVEDATA_API_KEY kept for backward compatibility only (unused)
 TWELVEDATA_API_KEY = os.getenv('TWELVEDATA_API_KEY')
-if not TWELVEDATA_API_KEY:
-    print("Warning: TWELVEDATA_API_KEY not found in .env")
 
 SUPPORTED_PAIR = "EUR_USD"
 
 print(f"[OK] Configuration V2 loaded from: {ENV_PATH}")
-print(f"[INFO] Using Twelve Data API for EUR/USD live rates")
+print(f"[INFO] Using Yahoo Finance (yfinance) for forex data — no API key required")

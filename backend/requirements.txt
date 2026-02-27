@@ -5,6 +5,7 @@
 # === DATA PROCESSING ===
 pandas>=2.0.0
 numpy>=1.24.0
+yfinance>=0.2.40
 
 # === MACHINE LEARNING ===
 scikit-learn>=1.3.0
@@ -31,6 +32,8 @@ gunicorn>=21.2.0
 
 # === AI & LLM ===
 google-genai>=1.0.0
+# pydantic 2.10+ has compatibility issue with google-genai (alias_generators bug)
+pydantic>=2.7.0,<2.10.0
 
 # === TIMEZONE ===
 pytz>=2024.1
