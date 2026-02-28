@@ -76,8 +76,6 @@ DATA_DIR = BASE_DIR / 'data'
 MODELS_DIR = BASE_DIR / 'models'
 
 # Data source: Yahoo Finance (yfinance) — no API key required
-# TWELVEDATA_API_KEY kept for backward compatibility only (unused)
-TWELVEDATA_API_KEY = os.getenv('TWELVEDATA_API_KEY')
 
 SUPPORTED_PAIR = "EUR_USD"
 

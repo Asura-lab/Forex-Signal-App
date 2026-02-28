@@ -147,7 +147,7 @@ Confidence 0.95+      →  ~97% accuracy
 │    Flask REST API + Gunicorn                   │
 │                                                │
 │  GBDT Signal Engine  │  Gemini AI Analyst      │
-│  JWT + bcrypt Auth   │  Twelve Data Rates      │
+│  JWT + bcrypt Auth   │  Yahoo Finance Rates    │
 │  MongoDB Atlas       │  Expo Push Notifications│
 └────────────────────────────────────────────────┘
         ↕                  ↕               ↕
@@ -197,8 +197,8 @@ Forex-Signal-App/
 │   │   ├── signal_generator_gbdt.py # GBDT inference engine
 │   │   └── models/                  # Trained .joblib files
 │   └── utils/
-│       ├── twelvedata_handler.py    # Live rates
-│       ├── market_analyst.py        # Gemini AI
+│       ├── yfinance_handler.py      # Live rates (yfinance)
+│       ├── market_analyst.py        # Gemini AI Analysis
 │       └── push_notifications.py
 │
 ├── mobile_app/
