@@ -16,8 +16,35 @@ from datetime import datetime, timedelta
 warnings.filterwarnings('ignore', message='.*feature names.*')
 warnings.filterwarnings('ignore', category=UserWarning)
 
-# Paths — model lives alongside this file in backend/ml/models/ (deployed to Render via rootDir: backend)
-MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt.pkl')
+# Paths — model lives alongside this file in backend/ml/models/
+BASELINE_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt.pkl')
+EXPERIMENTAL_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt_experimental.pkl')
+
+
+def resolve_model_path() -> str:
+    """Resolve active model path.
+
+    Priority:
+    1) `GBDT_MODEL_PATH` exact file path override
+    2) `GBDT_MODEL_VARIANT` in {"baseline", "experimental"}
+    3) Experimental file (default if present)
+    4) Baseline file
+    """
+    env_path = os.environ.get("GBDT_MODEL_PATH", "").strip()
+    if env_path:
+        return env_path
+
+    variant = os.environ.get("GBDT_MODEL_VARIANT", "").strip().lower()
+    if variant == "baseline":
+        return BASELINE_MODEL_PATH
+    if variant == "experimental":
+        return EXPERIMENTAL_MODEL_PATH
+
+    # Default to experimental for production rollout if file exists.
+    if os.path.exists(EXPERIMENTAL_MODEL_PATH):
+        return EXPERIMENTAL_MODEL_PATH
+
+    return BASELINE_MODEL_PATH
 
 
 # ==================== Feature Engineering (matches build_from_train.py) ====================
@@ -251,11 +278,12 @@ class GBDTSignalGenerator:
     CLASS_MAP = {0: "SELL", 1: "HOLD", 2: "BUY"}
 
     def __init__(self, model_path: str = None):
-        self.model_path = model_path or MODEL_PATH
+        self.model_path = model_path or resolve_model_path()
         self.models = None
         self.feature_cols = None
         self.calibrator = None
         self.is_loaded = False
+        self.model_version = "GBDT_unknown"
 
     def load_models(self) -> bool:
         """Load the trained GBDT ensemble model"""
@@ -272,8 +300,17 @@ class GBDTSignalGenerator:
             self.feature_cols = model_data["feature_cols"]
             self.calibrator = model_data.get("calibrator")
 
+            meta = model_data.get("metadata") or {}
+            variant = meta.get("variant")
+            if variant:
+                self.model_version = str(variant)
+            else:
+                self.model_version = os.path.splitext(os.path.basename(self.model_path))[0]
+
             self.is_loaded = True
             print(f"[GBDT] ✓ Model loaded successfully")
+            print(f"[GBDT]   Active file: {self.model_path}")
+            print(f"[GBDT]   Version: {self.model_version}")
             print(f"[GBDT]   Models: {list(self.models.keys())}")
             print(f"[GBDT]   Features: {len(self.feature_cols)}")
             print(f"[GBDT]   Calibrator: {'Yes' if self.calibrator else 'No'}")
@@ -502,7 +539,7 @@ class GBDTSignalGenerator:
                     "timestamp": datetime.now().isoformat(),
                     "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
                     "horizon_hours": 4,
-                    "model_version": "GBDT_v7b",
+                    "model_version": self.model_version,
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),
                 }
@@ -561,7 +598,7 @@ def get_signal_generator_gbdt() -> GBDTSignalGenerator:
     """Get or create GBDT signal generator singleton"""
     global _generator_gbdt
     if _generator_gbdt is None:
-        _generator_gbdt = GBDTSignalGenerator()
+        _generator_gbdt = GBDTSignalGenerator(model_path=resolve_model_path())
         _generator_gbdt.load_models()
     return _generator_gbdt
 

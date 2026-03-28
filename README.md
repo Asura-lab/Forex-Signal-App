@@ -263,6 +263,39 @@ Minimum: Android 6.0 (API 23)
 
 ---
 
+## Production Model Activation
+
+Одоогоор backend дээр **experimental model** default-аар идэвхтэй ажиллахаар тохируулсан:
+
+- Default сонголт: `backend/ml/models/EURUSD_gbdt_experimental.pkl` (хэрэв файл байгаа бол)
+- Fallback: `backend/ml/models/EURUSD_gbdt.pkl`
+
+Production дээр model сонголт удирдах env:
+
+```bash
+# 1) Яг файл замаар override хийх
+GBDT_MODEL_PATH=/home/site/wwwroot/ml/models/EURUSD_gbdt_experimental.pkl
+
+# 2) Эсвэл variant-аар сонгох
+GBDT_MODEL_VARIANT=experimental   # эсвэл baseline
+
+# 3) Signal хадгалах босго
+SAVE_CONFIDENCE_THRESHOLD=0.90
+```
+
+Санал болгож буй production утгууд:
+
+- `GBDT_MODEL_VARIANT=experimental`
+- `SAVE_CONFIDENCE_THRESHOLD=0.90`
+
+Rollback (хуучин baseline руу):
+
+```bash
+GBDT_MODEL_VARIANT=baseline
+```
+
+---
+
 ## Хөгжүүлэлтийн орчин
 
 ```bash
@@ -287,6 +320,7 @@ npx eas build --platform android --profile preview
 
 | Хувилбар | Огноо | Өөрчлөлт |
 |---------|-------|----------|
+| **v0.4.4** | 2026-03-29 | Experimental model-ийг production default болгож, model variant env-switch ба deployment docs нэмэв |
 | **v0.4.3** | 2026-02-27 | yfinance data source, AI prompt сайжруулалт, icon шинэчлэл, scrollbar нуух, мэдэгдэлийн navigation засвар, MongoDB offline горим |
 | **v0.4.2** | 2026-02-26 | News impact filter засвар, мэдэгдлийн тохиргоо upsert засвар |
 | v0.4.1 | 2026-02-26 | Бүх emoji-г icon-оор сольсон, About хэсэг шинэчилсэн, GBDT загварын мэдээлэл нэмсэн |
