@@ -17,6 +17,7 @@ warnings.filterwarnings('ignore', message='.*feature names.*')
 warnings.filterwarnings('ignore', category=UserWarning)
 
 # Paths — model lives alongside this file in backend/ml/models/
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 BASELINE_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt.pkl')
 EXPERIMENTAL_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt_experimental.pkl')
 
@@ -578,7 +579,7 @@ class GBDTSignalGenerator:
                     "timestamp": datetime.now().isoformat(),
                     "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
                     "horizon_hours": 4,
-                    "model_version": "GBDT_v7b",
+                    "model_version": self.model_version,
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),
                 }
