@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   StatusBar,
   View,
+  AppState,
+  AppStateStatus,
 } from "react-native";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
@@ -38,6 +40,31 @@ function AppContent() {
 
   useEffect(() => {
     checkAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener(
+      "change",
+      async (nextState: AppStateStatus) => {
+        if (nextState !== "active") return;
+
+        try {
+          const token = await AsyncStorage.getItem("userToken");
+          const isLoggedIn = !!token;
+          setUserLoggedIn(isLoggedIn);
+
+          if (isLoggedIn) {
+            await initializePushNotifications();
+          }
+        } catch (err) {
+          console.log("[WARN] App foreground push sync failed:", err);
+        }
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   // Request notification permission on first app load (before login)

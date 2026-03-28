@@ -1,339 +1,122 @@
-# Predictrix — AI Forex Signal App
+# Predictrix Forex Signal App
 
-**Диплом судалгааны ажил** | React Native | Flask (Azure) | GBDT Ensemble ML | MongoDB
+Predictrix is an AI-assisted EUR/USD signal platform with:
+- React Native mobile app (Expo)
+- Flask backend API
+- GBDT-based signal generation pipeline
+- MongoDB persistence
+- Push notifications for signal events
 
----
+This repository contains production app/backend code and research outputs used in the graduation project.
 
-## Зорилго ба зориулалт
+## 1. Repository Structure
 
-Predictrix нь **EUR/USD** валютын хосын Forex арилжааны дохиог машин сургалтаар таамаглах систем юм. Энэ төсөл нь дипломын ажлын судалгааны хэрэглэгдэхүүн бөгөөд дараах асуудлыг шийдвэрлэхийг зорьсон:
+- `backend/` Flask API, signal generation, integrations, notifications
+- `mobile_app/` React Native app (Expo)
+- `docs/` policy and legal docs
+- `mt5/` MetaTrader 5 backtest EA
+- `model & backtest result/` experiment reports, results, and training/backtest artifacts
+- `tests/` local debug and test scripts
+- `diplom/` thesis repository linked from this workspace
 
-> *"Техникийн дүн шинжилгээний олон timeframe-ийн мэдээллийг нэгтгэсэн GBDT ensemble загвар нь Forex зах зээлд ашигтай арилжааны дохиог найдвартай таамаглах боломжтой юу?"*
+## 2. Backend Overview
 
-Судалгааны гол зорилтууд:
-- 6 өөр timeframe-ийн (M1–H4) техникийн үзүүлэлтүүдийг (48 feature) нэгтгэн загвар бүтээх
-- Overfitting-ийг бодитоор шийдэх — validation дээр calibrated probability үүсгэх
-- Backtest-ийн үр дүнг эрсдэлийн удирдлагатай хамт (Sharpe, Drawdown, PF) үнэлэх
-- Загварыг production мобайл аппликейшнтэй нэгтгэж, бодит цагийн дохио гаргах
+Main entry:
+- `backend/app.py`
 
----
+Signal model runtime:
+- `backend/ml/signal_generator_gbdt.py`
 
-## ML Загварын архитектур
+Model artifacts:
+- `backend/ml/models/EURUSD_gbdt.pkl` (baseline)
+- `backend/ml/models/EURUSD_gbdt_experimental.pkl` (experimental)
 
-### Ensemble GBDT (Phase 7B)
+Model selection priority at runtime:
+1. `GBDT_MODEL_PATH` (explicit absolute/relative path)
+2. `GBDT_MODEL_VARIANT` (`baseline` or `experimental`)
+3. Default auto selection: experimental if available, otherwise baseline
 
-Загвар нь 3 gradient boosting алгоритмыг тэнцүү жинтэйгээр нийлүүлсэн ensemble юм:
+Optional confidence save threshold:
+- `SAVE_CONFIDENCE_THRESHOLD` (float in [0, 1], clamped)
 
-```
-Input: 48 Multi-Timeframe Features (M1, M5, M15, M30, H1, H4)
-         │
-    ┌────┴────────────────────────────────────┐
-    │                                         │
-LightGBM          XGBoost              CatBoost
-(496 trees,       (~400 trees,         (499 trees,
- GPU, L1+L2)       CPU-hist, L1+L2)    GPU, L2=3.0)
-    │                  │                    │
-    └──────────────────┴────────────────────┘
-                       │
-              Equal-Weight Averaging
-                       │
-              Probability Calibration
-              (Logistic Regression)
-                       │
-         3-Class Output: BUY / HOLD / SELL
-                + Confidence Score (0–1)
-```
+## 3. Mobile App Overview
 
-**Anti-overfitting дизайн (Phase 7B шийдэл):**
+Main entry:
+- `mobile_app/App.tsx`
 
-Phase 6B-д training accuracy 100% (overfitting!), backtest win rate зөвхөн 37.2% байсан.
-Phase 7B-д дараах аргуудаар шийдэв:
+Key modules:
+- Authentication flow and persisted session
+- Signal list/details with market outlook labels
+- Push notification registration and token handling
 
-| Техник | Тохиргоо | Нөлөө |
-|--------|----------|-------|
-| Багтаамж бууруулах | max_depth: 8→5, num_leaves: 128→31 | Noise-г цаашид цагхааж чадахгүй |
-| L1/L2 regularization | reg_alpha=0.1, reg_lambda=1.0–3.0 | Жин хасах, sparse features |
-| Early stopping | 50 round, 2023 validation дээр | Overfitting-ийн өмнө зогсоох |
-| Удаан сургалт | learning rate: 0.05→0.03 | Алхам алхмаар ерөнхийлөх |
-| Probability calibration | Logistic Regression | Raw score → бодит магадлал |
+## 4. Local Setup
 
----
-
-## Өгөгдөл ба сургалт
-
-**EUR/USD 1-minute OHLCV өгөгдөл (2015–2025):**
-
-```
-Нийт өгөгдөл:   3,715,131 мөр (3.7M)
-├── Train:       2,972,624 мөр  (2015–2022)
-├── Validation:    371,125 мөр  (2023)    ← Early stopping, calibration
-├── Test:          371,382 мөр  (2024)    ← Загваруудад харуулаагүй
-└── Backtest:      359,639 мөр  (2025)    ← Signal үүсгэх
-```
-
-**48 Feature инженерчлэл (6 timeframe × 8 feature):**
-
-| Feature | Тайлбар |
-|---------|---------|
-| RSI(14), RSI(7) | Momentum oscillator |
-| ATR(14) | Volatility хэмжилт |
-| SMA(20), SMA(50) | Trend чиглэл |
-| MACD, Signal, Hist | Trend хүч |
-| Bollinger Bands | Volatility хүрээ |
-
-**Label үүсгэлт:** 4 цагийн дотор 30+ pips хөдлөх — BUY / SELL, бусад — HOLD
-
-```
-BUY:   451,686  (12.2%)
-SELL:  453,559  (12.2%)
-HOLD:  2,809,886 (75.6%)   ← Зах зээлийн 75% нь range
-```
-
----
-
-## Загварын гүйцэтгэл
-
-### Accuracy (Classification)
-
-| Dataset | Samples | Accuracy | High-conf (≥0.92) accuracy |
-|---------|---------|----------|---------------------------|
-| Train (2015–2022) | 2,378,099 | 77.4% | 97.8% |
-| Validation (2023) | 371,125 | 80.2% | 96.2% |
-| Test (2024) | 371,382 | 87.4% | — |
-
-Train–Validation gap: −2.8% → Overfitting хамгийн бага
-
-**Confidence calibration:**
-```
-Confidence 0.85–0.90  →  ~72% accuracy
-Confidence 0.90–0.92  →  ~84% accuracy
-Confidence 0.92–0.95  →  ~91% accuracy  ✅ Production threshold
-Confidence 0.95+      →  ~97% accuracy
-```
-
-### Backtest үр дүн (2025 он, EUR/USD)
-
-**Систем:**  1% risk per trade, ATR×5 SL, ATR×15 TP (1:3 R/R)
-
-| Хэмжүүр | Утга | Тайлбар |
-|---------|------|---------|
-| **Annual Return** | **+41.61%** | S&P 500 (~10%) -аас хамаагүй өндөр |
-| **Sharpe Ratio** | **9.64** | Институцийн түвшин (>3.0 = сайн) |
-| **Profit Factor** | **2.46** | Ашигтай (>2.0 = маш сайн) |
-| **Max Drawdown** | **3.93%** | Маш бага эрсдэл |
-| **Win Rate** | **44.44%** (20/45) | 1:3 R/R-тэй хамт ашигтай |
-| **Total Trades** | 45 (12 сар) | Overtrading байхгүй |
-| **Recovery Factor** | 6.69 | Drawdown-аас хурдан сэргэдэг |
-| **Avg Confidence** | 0.923 | Зөвхөн өндөр итгэлтэй дохио |
-| **Total Signals gen.** | 1,065 | Маш сонгомол (0.3% нь арилжаа болдог) |
-
-> **Тэмдэглэл:** Win rate 44% харагдах боловч 1:3 risk/reward харьцаатай учир ашигтай.
-> 20 ялалт × ~28 pips = +560 pips, 25 ялагдал × ~9.4 pips = −235 pips → Net: +325 pips
-
----
-
-## Системийн архитектур
-
-```
-┌────────────────────────────────────────────────┐
-│          PREDICTRIX MOBILE APP                 │
-│          React Native + Expo SDK 51            │
-│                                                │
-│  Signal  │  Live Rates  │  News  │  Auth/Profile│
-└────────────────────────────────────────────────┘
-                    ↕ HTTPS + JWT
-┌────────────────────────────────────────────────┐
-│    BACKEND — Azure App Service (Korea Central) │
-│    Flask REST API + Gunicorn                   │
-│                                                │
-│  GBDT Signal Engine  │  Gemini AI Analyst      │
-│  JWT + bcrypt Auth   │  Yahoo Finance Rates    │
-│  MongoDB Atlas       │  Expo Push Notifications│
-└────────────────────────────────────────────────┘
-        ↕                  ↕               ↕
-  MongoDB Atlas      Twelve Data API   ForexFactory
-  (users, signals)  (20+ pairs, OHLCV) (news, events)
-```
-
----
-
-## Технологийн стек
-
-### Backend (Azure App Service, Korea Central)
-
-| Технологи | Зориулалт |
-|-----------|-----------|
-| Python 3.11 + Flask | REST API (30+ endpoint) |
-| Gunicorn | Production WSGI |
-| LightGBM, XGBoost, CatBoost | GBDT ensemble загвар |
-| scikit-learn | Calibration, pipeline |
-| pandas, numpy | Өгөгдлийн боловсруулалт |
-| PyMongo | MongoDB Atlas |
-| PyJWT + bcrypt | Аутентификаци |
-| Flask-Mail | Email OTP |
-| Google Gemini AI | Зах зээлийн AI дүн шинжилгээ |
-
-### Mobile App (React Native + Expo)
-
-| Технологи | Зориулалт |
-|-----------|-----------|
-| React Native 0.74 + Expo SDK 51 | Android/iOS |
-| React Navigation 6 | Дэлгэц навигаци |
-| Axios + TanStack Query | API & cache |
-| AsyncStorage | Token хадгалалт |
-| expo-notifications | Push notification |
-
----
-
-## Файлын бүтэц
-
-```
-Forex-Signal-App/
-├── backend/
-│   ├── app.py                       # Flask API (30+ endpoint)
-│   ├── Procfile / runtime.txt       # Azure deploy тохиргоо
-│   ├── config/settings.py           # Env config
-│   ├── ml/
-│   │   ├── signal_generator_gbdt.py # GBDT inference engine
-│   │   └── models/                  # Trained .joblib files
-│   └── utils/
-│       ├── yfinance_handler.py      # Live rates (yfinance)
-│       ├── market_analyst.py        # Gemini AI Analysis
-│       └── push_notifications.py
-│
-├── mobile_app/
-│   ├── app.json / eas.json          # Expo + EAS config
-│   └── src/
-│       ├── screens/                 # Signal, Rates, News, Auth
-│       ├── services/api.ts          # Backend calls
-│       ├── config/api.ts            # Azure URL
-│       └── context/ navigation/
-│
-├── model & backtest result/
-│   ├── code/                        # train_models.py, generate_signals_2025.py
-│   ├── data/                        # EUR/USD M1–H4 CSV (2015–2025)
-│   ├── models/                      # GBDT .joblib artifacts
-│   ├── figures/                     # equity_curve, drawdown, feature_importance...
-│   ├── results/                     # backtest_summary.txt, signals_2025.csv
-│   └── documentation/               # Phase 7B technical report
-│
-├── diplom/                          # Дипломын ажил (LaTeX, XeLaTeX)
-├── mt5/                             # MetaTrader 5 EA scripts
-├── docs/                            # Privacy policy, terms of service
-└── tests/
-```
-
----
-
-## Backtest харьцуулалт (Хөгжлийн үе шатууд)
-
-| Хувилбар | Win Rate | Profit Factor | Sharpe | Max DD | Тайлбар |
-|---------|----------|---------------|--------|--------|---------|
-| Phase 5 | 46.6% | 1.53 | — | 22.5% | Эхний baseline |
-| Phase 6B | 37.2% | — | — | — | Overfitting (train 100%!) |
-| **Phase 7B** | **44.4%** | **2.46** | **9.64** | **3.93%** | Anti-overfitting, calibrated |
-
-Phase 6B-аас Phase 7B руу шилжихдээ overfitting-ийг арилгаж, Sharpe ratio 9.64-д хүрсэн нь системийн хамгийн том ахиц юм.
-
----
-
-## Android APK
-
-**[⬇ Хамгийн сүүлийн APK татах](https://github.com/Asura-lab/Forex-Signal-App/releases/latest)**
-
-```
-Minimum: Android 6.0 (API 23)
-Суулгахдаа "Unknown sources" зөвшөөрнө үү
-```
-
----
-
-## Backend API (Azure)
-
-`https://predictrix-cvhvhtheawabdahg.koreacentral-01.azurewebsites.net`
-
-| Group | Endpoint | Method |
-|-------|----------|--------|
-| Auth | `/auth/register`, `/auth/login`, `/auth/verify-email` | POST |
-| Auth | `/auth/me`, `/auth/update` | GET/PUT |
-| Signal | `/signal`, `/predict` | GET/POST |
-| Rates | `/rates/live`, `/rates/specific` | GET |
-| Analysis | `/api/market-analysis`, `/api/news` | GET |
-| System | `/health` | GET |
-
----
-
-## Production Model Activation
-
-Одоогоор backend дээр **experimental model** default-аар идэвхтэй ажиллахаар тохируулсан:
-
-- Default сонголт: `backend/ml/models/EURUSD_gbdt_experimental.pkl` (хэрэв файл байгаа бол)
-- Fallback: `backend/ml/models/EURUSD_gbdt.pkl`
-
-Production дээр model сонголт удирдах env:
+### Backend
 
 ```bash
-# 1) Яг файл замаар override хийх
-GBDT_MODEL_PATH=/home/site/wwwroot/ml/models/EURUSD_gbdt_experimental.pkl
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
+```
 
-# 2) Эсвэл variant-аар сонгох
-GBDT_MODEL_VARIANT=experimental   # эсвэл baseline
+### Mobile (Expo)
 
-# 3) Signal хадгалах босго
+```bash
+cd mobile_app
+npm install
+npm start
+```
+
+## 5. Production Model Activation
+
+Use these environment variables in backend deployment:
+
+```bash
+# Recommended: keep experimental active
+GBDT_MODEL_VARIANT=experimental
 SAVE_CONFIDENCE_THRESHOLD=0.90
 ```
 
-Санал болгож буй production утгууд:
+Force a specific file:
 
-- `GBDT_MODEL_VARIANT=experimental`
-- `SAVE_CONFIDENCE_THRESHOLD=0.90`
+```bash
+GBDT_MODEL_PATH=backend/ml/models/EURUSD_gbdt_experimental.pkl
+```
 
-Rollback (хуучин baseline руу):
+Rollback to baseline without code change:
 
 ```bash
 GBDT_MODEL_VARIANT=baseline
 ```
 
----
+## 6. Deployment Notes
 
-## Хөгжүүлэлтийн орчин
+- Ensure backend can read model file path configured by env.
+- Verify startup logs print active model file and model version.
+- Validate health endpoint and at least one signal generation cycle after deploy.
+- Keep `Protrader/` as local-only research workspace (ignored in this repo).
 
-```bash
-# Backend
-git clone https://github.com/Asura-lab/Forex-Signal-App.git
-cd Forex-Signal-App
-python -m venv .venv && .venv\Scripts\activate
-pip install -r backend/requirements.txt
-# backend/config/.env: MONGO_URI, SECRET_KEY, TWELVEDATA_API_KEY, GEMINI_API_KEY_1
-python backend/app.py
+## 7. Data and Large File Policy
 
-# Mobile
-cd mobile_app && npm install
-npx expo start
-# EAS build
-npx eas build --platform android --profile preview
-```
+- Large datasets and temporary training artifacts should stay out of git.
+- Keep only deploy-required model artifacts in `backend/ml/models/`.
+- Experimental notebooks/scripts should remain in local workspace or dedicated research repos.
 
----
+## 8. Changelog (Recent)
 
-## Хувилбарын түүх
+### v0.4.5 (2026-03-29)
+- Ignored local `Protrader/` workspace from root repository.
+- Updated repository documentation and deployment guidance.
+- Pushed thesis (`diplom`) repository updates first, then synchronized root repo.
 
-| Хувилбар | Огноо | Өөрчлөлт |
-|---------|-------|----------|
-| **v0.4.4** | 2026-03-29 | Experimental model-ийг production default болгож, model variant env-switch ба deployment docs нэмэв |
-| **v0.4.3** | 2026-02-27 | yfinance data source, AI prompt сайжруулалт, icon шинэчлэл, scrollbar нуух, мэдэгдэлийн navigation засвар, MongoDB offline горим |
-| **v0.4.2** | 2026-02-26 | News impact filter засвар, мэдэгдлийн тохиргоо upsert засвар |
-| v0.4.1 | 2026-02-26 | Бүх emoji-г icon-оор сольсон, About хэсэг шинэчилсэн, GBDT загварын мэдээлэл нэмсэн |
-| v0.4.0 | 2026-02-24 | Backend Azure App Service-д байршсан |
-| v0.3.3 | 2026-02-23 | Bug fix, UI сайжруулалт |
-| v0.3.2 | 2026-02-23 | Push notification |
-| v0.3.1 | 2026-02-22 | Market analysis, news feed |
-| v0.3.0 | 2026-02-22 | GBDT multi-timeframe ensemble нэвтрүүлсэн |
+### v0.4.4 (2026-03-29)
+- Activated experimental GBDT model as runtime default if present.
+- Added env-based model switching (`GBDT_MODEL_PATH`, `GBDT_MODEL_VARIANT`).
+- Exposed dynamic runtime `model_version` in logs/response.
 
----
+## 9. License and Disclaimer
 
-## Зохиогч
-
-Судалгааны ажил, дипломын зорилгоор хийгдсэн. Бодит арилжаанд ашиглахдаа өөрийн эрсдэлээр хэрэглэнэ үү.
-
-**Asura-lab** · [github.com/Asura-lab](https://github.com/Asura-lab)
+This project is for educational and research purposes.
+Trading financial markets involves risk. Past performance does not guarantee future results.

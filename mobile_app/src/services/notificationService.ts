@@ -16,6 +16,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
 
+const PUSH_TOKEN_KEY = "@push_token";
+const PUSH_TOKEN_LAST_SYNC_KEY = "@push_token_last_sync";
+const PUSH_TOKEN_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+
 // ==================== NOTIFICATION CONFIGURATION ====================
 
 // Configure how notifications are displayed when app is in foreground
@@ -370,10 +374,30 @@ export async function initializePushNotifications(): Promise<string | null> {
     const token = await getExpoPushToken();
 
     if (token) {
-      // Check if token changed
-      const savedToken = await AsyncStorage.getItem("@push_token");
-      if (savedToken !== token) {
-        await registerPushTokenWithServer(token);
+      const userToken = await AsyncStorage.getItem("userToken");
+      if (!userToken) {
+        console.log("[INFO] Push init skipped: user not authenticated");
+        return token;
+      }
+
+      const savedToken = await AsyncStorage.getItem(PUSH_TOKEN_KEY);
+      const lastSyncRaw = await AsyncStorage.getItem(PUSH_TOKEN_LAST_SYNC_KEY);
+      const lastSync = lastSyncRaw ? Number(lastSyncRaw) : 0;
+      const shouldResync =
+        savedToken !== token ||
+        !lastSync ||
+        Number.isNaN(lastSync) ||
+        Date.now() - lastSync > PUSH_TOKEN_SYNC_INTERVAL_MS;
+
+      if (shouldResync) {
+        const ok = await registerPushTokenWithServer(token);
+        if (ok) {
+          await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);
+          await AsyncStorage.setItem(
+            PUSH_TOKEN_LAST_SYNC_KEY,
+            String(Date.now())
+          );
+        }
       }
     }
 

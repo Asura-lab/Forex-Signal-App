@@ -108,3 +108,6 @@ credentials.json
 
 # Metro
 .metro-health-check*
+
+# Local research/training workspace (do not push)
+Protrader/

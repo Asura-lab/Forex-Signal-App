@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -35,6 +35,12 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
+  const [expandedSummary, setExpandedSummary] = useState(false);
+  const [expandedForecast, setExpandedForecast] = useState(false);
+
+  // Truncate text helper
+  const truncateText = (text: string, limit: number = 200) =>
+    text && text.length > limit ? text.substring(0, limit) + "..." : text;
 
   // React Query - Market Analysis
   const {
@@ -98,17 +104,30 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
         ) : aiAnalysis ? (
           (() => {
             const rawOutlook = aiAnalysis.outlook || aiAnalysis.market_sentiment || "Neutral";
-            const isBullish = rawOutlook.includes("Bullish") || rawOutlook.includes("Өсөх");
-            const isBearish = rawOutlook.includes("Bearish") || rawOutlook.includes("Унах");
-            const outlookColor = isBullish ? colors.success : isBearish ? colors.error : colors.warning;
+            const normalizedOutlook = String(rawOutlook).toLowerCase();
+            const isBearish =
+              normalizedOutlook.includes("bear") ||
+              normalizedOutlook.includes("sell") ||
+              normalizedOutlook.includes("буур") ||
+              normalizedOutlook.includes("унах") ||
+              normalizedOutlook.includes("зарах");
+            const isBullish =
+              normalizedOutlook.includes("bull") ||
+              normalizedOutlook.includes("buy") ||
+              normalizedOutlook.includes("өс") ||
+              normalizedOutlook.includes("авах");
+
+            // Required mapping: bearish=red, bullish=green, neutral/stable=mustard-yellow
+            const outlookColor = isBearish
+              ? "#EF4444"
+              : isBullish
+                ? "#22C55E"
+                : "#F59E0B";
             return (
               <>
                 {/* Outlook banner */}
                 <View style={styles.outlookCard}>
-                  <Text style={styles.outlookMeta}>ЗАХ ЗЭЭЛИЙН ТӨЛӨВ</Text>
-                  <View style={[styles.outlookBadge, { backgroundColor: outlookColor + "18", borderColor: outlookColor + "60" }]}>
-                    <Text style={[styles.outlookText, { color: outlookColor }]}>{rawOutlook}</Text>
-                  </View>
+                  <Text style={[styles.outlookText, { color: outlookColor }]}>{rawOutlook}</Text>
                 </View>
 
                 {/* Summary */}
@@ -118,18 +137,42 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                       <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
                       <Text style={styles.sectionTitle}>ДҮГНЭЛТ</Text>
                     </View>
-                    <Text style={styles.sectionText}>{aiAnalysis.summary}</Text>
+                    <Text style={styles.sectionText}>
+                      {expandedSummary ? aiAnalysis.summary : truncateText(aiAnalysis.summary, 180)}
+                    </Text>
+                    {aiAnalysis.summary.length > 180 && (
+                      <TouchableOpacity
+                        onPress={() => setExpandedSummary(!expandedSummary)}
+                        style={styles.expandBtn}
+                      >
+                        <Text style={styles.expandBtnText}>
+                          {expandedSummary ? "Буулгах" : "Дэлгэрэнгүй харах"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
                 {/* Forecast */}
                 {aiAnalysis.forecast && (
-                  <View style={styles.sectionCard}>
+                  <View style={[styles.sectionCard, { borderLeftWidth: 3, borderLeftColor: colors.warning + "80" }]}>
                     <View style={styles.sectionTitleRow}>
                       <View style={[styles.sectionDot, { backgroundColor: colors.warning }]} />
                       <Text style={styles.sectionTitle}>ТААМАГЛАЛ</Text>
                     </View>
-                    <Text style={styles.sectionText}>{aiAnalysis.forecast}</Text>
+                    <Text style={styles.sectionText}>
+                      {expandedForecast ? aiAnalysis.forecast : truncateText(aiAnalysis.forecast, 180)}
+                    </Text>
+                    {aiAnalysis.forecast.length > 180 && (
+                      <TouchableOpacity
+                        onPress={() => setExpandedForecast(!expandedForecast)}
+                        style={styles.expandBtn}
+                      >
+                        <Text style={styles.expandBtnText}>
+                          {expandedForecast ? "Буулгах" : "Дэлгэрэнгүй харах"}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
 
@@ -553,6 +596,94 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
   },
+  sectionCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.textPrimary,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sectionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  sectionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    letterSpacing: 0.5,
+  },
+  sectionText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  expandBtn: {
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: colors.primary + "15",
+    alignSelf: "flex-start",
+  },
+  expandBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  outlookCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.textPrimary,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  outlookText: {
+    fontSize: 24,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+    lineHeight: 32,
+    textAlign: "center",
+  },
+  riskRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 12,
+  },
+  riskBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 8,
+    marginRight: 12,
+  },
+  riskText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 20,
+  },
   disclaimer: {
     fontSize: 12,
     color: colors.textSecondary,
@@ -663,83 +794,6 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
     lineHeight: 22,
-  },
-  outlookCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    alignItems: "center",
-  },
-  outlookMeta: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textSecondary,
-    letterSpacing: 1.2,
-    marginBottom: 12,
-  },
-  outlookBadge: {
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    width: "100%",
-  },
-  outlookText: {
-    fontSize: 14,
-    fontWeight: "600",
-    lineHeight: 22,
-    textAlign: "justify",
-  },
-  sectionCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-  },
-  sectionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 8,
-  },
-  sectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.textPrimary,
-    letterSpacing: 0.8,
-  },
-  sectionText: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    lineHeight: 23,
-    textAlign: "justify" as const,
-  },
-  riskRow: {
-    flexDirection: "row" as const,
-    alignItems: "flex-start" as const,
-    gap: 10,
-    marginBottom: 8,
-  },
-  riskBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginTop: 8,
-    flexShrink: 0,
-  },
-  riskText: {
-    fontSize: 13,
-    color: colors.error,
-    lineHeight: 20,
-    marginBottom: 4,
-    flex: 1,
-    textAlign: "justify" as const,
   },
 });
 

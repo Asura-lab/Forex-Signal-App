@@ -378,8 +378,12 @@ threading.Thread(target=news_notification_scheduler, daemon=True).start()
 # Supported currency pairs for continuous generation
 SIGNAL_PAIRS = ["EUR/USD"]
 
-# Minimum confidence to save signal to DB (0.9 = 90%)
-SAVE_CONFIDENCE_THRESHOLD = 0.9
+# Minimum confidence to save signal to DB (default: 0.9 = 90%)
+try:
+    SAVE_CONFIDENCE_THRESHOLD = float(os.environ.get("SAVE_CONFIDENCE_THRESHOLD", "0.9"))
+except Exception:
+    SAVE_CONFIDENCE_THRESHOLD = 0.9
+SAVE_CONFIDENCE_THRESHOLD = max(0.0, min(1.0, SAVE_CONFIDENCE_THRESHOLD))
 
 # Cache to avoid duplicate signals within the same direction
 _last_signal_cache = {}  # { pair: { signal, timestamp } }

@@ -14,6 +14,7 @@ import { useTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
 import { loginUser } from "../services/api";
+import { initializePushNotifications } from "../services/notificationService";
 import { NavigationProp } from "@react-navigation/native";
 import { Sun, Moon, Eye, EyeOff } from 'lucide-react-native';
 
@@ -51,6 +52,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       const result = await loginUser(email, password);
 
       if (result.success) {
+        // Register/refresh push token right after login so alerts work even when app is closed.
+        try {
+          await initializePushNotifications();
+        } catch (pushErr) {
+          console.log("[WARN] Push init after login failed:", pushErr);
+        }
+
         navigation.reset({
           index: 0,
           routes: [{ name: "Main" }],
