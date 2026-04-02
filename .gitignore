@@ -52,6 +52,7 @@ data/test/*.csv
 
 # Deploy-д шаардлагатай model-уудыг оруулах (must come AFTER *.pkl rule)
 !backend/ml/models/EURUSD_gbdt.pkl
+!backend/ml/models/EURUSD_gbdt_experimental.pkl
 model & backtest result/data/**/*.csv
 model & backtest result/data/**/*.csv.gz
 model & backtest result/data/**/*.pkl

@@ -18,7 +18,7 @@ import { API_BASE_URL } from "../config/api";
 
 const PUSH_TOKEN_KEY = "@push_token";
 const PUSH_TOKEN_LAST_SYNC_KEY = "@push_token_last_sync";
-const PUSH_TOKEN_SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
+const PUSH_TOKEN_SYNC_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 // ==================== NOTIFICATION CONFIGURATION ====================
 
@@ -104,13 +104,19 @@ export async function getExpoPushToken(): Promise<string | null> {
       return null;
     }
 
-    // Get the project ID
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
-    
-    // Get actual push token
-    const tokenData = await Notifications.getExpoPushTokenAsync({
-      projectId: projectId,
-    });
+    // EAS project ID may not always be available in all runtime modes.
+    const projectId =
+      Constants.expoConfig?.extra?.eas?.projectId ??
+      Constants.easConfig?.projectId;
+
+    const tokenData = projectId
+      ? await Notifications.getExpoPushTokenAsync({ projectId })
+      : await Notifications.getExpoPushTokenAsync();
+
+    if (!projectId) {
+      console.log("[WARN] EAS projectId not found, using fallback push token request");
+    }
+
     const token = tokenData.data;
     console.log("[OK] Expo Push Token:", token);
 
@@ -197,9 +203,11 @@ export async function registerPushTokenWithServer(
     }
     return false;
   } catch (error: any) {
+    const serverMessage =
+      error?.response?.data?.error || error?.response?.data?.message;
     console.error(
       "[ERROR] Register push token with server failed:",
-      error.message
+      serverMessage || error.message
     );
     return false;
   }
@@ -342,6 +350,17 @@ export function setupNotificationListeners(
     response: Notifications.NotificationResponse
   ) => void
 ): () => void {
+  // Cold-start tap handling: app was closed and opened by tapping notification.
+  Notifications.getLastNotificationResponseAsync()
+    .then((response) => {
+      if (response) {
+        onNotificationResponse?.(response);
+      }
+    })
+    .catch((error) => {
+      console.log("[WARN] Failed to read last notification response:", error);
+    });
+
   // Foreground notification listener
   const receivedSubscription =
     Notifications.addNotificationReceivedListener((notification) => {

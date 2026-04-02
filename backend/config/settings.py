@@ -1,6 +1,6 @@
 """
-Backend Configuration - V2 (Simplified)
-UniRate API + V2 Signal Generator only
+Backend Configuration
+Predictrix Flask backend + GBDT signal generator
 """
 
 import os
@@ -79,5 +79,5 @@ MODELS_DIR = BASE_DIR / 'models'
 
 SUPPORTED_PAIR = "EUR_USD"
 
-print(f"[OK] Configuration V2 loaded from: {ENV_PATH}")
+print(f"[OK] Configuration loaded from: {ENV_PATH}")
 print(f"[INFO] Using Yahoo Finance (yfinance) for forex data — no API key required")

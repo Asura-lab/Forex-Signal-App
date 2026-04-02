@@ -9,6 +9,7 @@ Sends notifications for:
 
 import requests
 import json
+import re
 from datetime import datetime, timezone
 from pymongo import MongoClient
 from config.settings import MONGO_URI
@@ -17,6 +18,7 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 
 # Impact level hierarchy for filtering
 IMPACT_LEVELS = {"high": 3, "medium": 2, "low": 1}
+EXPO_TOKEN_PATTERN = re.compile(r"^(Exponent|Expo)PushToken\[[^\]]+\]$")
 
 
 class PushNotificationService:
@@ -49,7 +51,8 @@ class PushNotificationService:
             device_id: Unique device identifier
         """
         try:
-            if not push_token or not push_token.startswith("ExponentPushToken"):
+            # Support both legacy ExponentPushToken[...] and newer ExpoPushToken[...] formats.
+            if not push_token or not EXPO_TOKEN_PATTERN.match(push_token):
                 print(f"[WARN] Invalid push token format: {push_token}")
                 return False
 
@@ -61,16 +64,16 @@ class PushNotificationService:
                         "push_token": push_token,
                         "platform": platform,
                         "device_id": device_id,
+                        "updated_at": datetime.now(timezone.utc)
+                    },
+                    "$setOnInsert": {
+                        "created_at": datetime.now(timezone.utc),
                         "notifications_enabled": True,
                         "signal_notifications": True,
                         "news_notifications": True,
                         "news_impact_filter": "high",     # "high" | "medium" | "all"
                         "security_notifications": True,
-                        "signal_threshold": 0.9,          # 0.9-1.0 (user's personal confidence threshold)
-                        "updated_at": datetime.now(timezone.utc)
-                    },
-                    "$setOnInsert": {
-                        "created_at": datetime.now(timezone.utc)
+                        "signal_threshold": 0.9,           # 0.9-1.0 (user's personal confidence threshold)
                     }
                 },
                 upsert=True
@@ -223,8 +226,10 @@ class PushNotificationService:
             return {"success": False, "error": "No messages to send"}
 
         try:
-            # Expo API accepts batches of up to 100
+            # Expo API accepts batches of up to 100.
             results = []
+            had_http_error = False
+
             for i in range(0, len(messages), 100):
                 batch = messages[i:i + 100]
                 response = requests.post(
@@ -237,25 +242,40 @@ class PushNotificationService:
                     },
                     timeout=10
                 )
-                if response.status_code == 200:
-                    data = response.json()
-                    results.extend(data.get("data", []))
-                else:
-                    print(f"[ERROR] Expo push API error: {response.status_code} - {response.text}")
 
-            # Check for invalid tokens and remove them
-            for i, result in enumerate(results):
-                if result.get("status") == "error":
-                    details = result.get("details", {})
-                    if details.get("error") == "DeviceNotRegistered":
-                        token = messages[i]["to"] if i < len(messages) else None
-                        if token:
-                            self.push_tokens.delete_one({"push_token": token})
-                            print(f"[INFO] Removed invalid token: {token[:30]}...")
+                if response.status_code != 200:
+                    had_http_error = True
+                    print(f"[ERROR] Expo push API error: {response.status_code} - {response.text}")
+                    continue
+
+                try:
+                    data = response.json()
+                except Exception as parse_err:
+                    had_http_error = True
+                    print(f"[ERROR] Expo push response parse error: {parse_err}")
+                    continue
+
+                batch_results = data.get("data", [])
+                results.extend(batch_results)
+
+                # Check for invalid tokens and remove them (batch-local mapping).
+                for j, result in enumerate(batch_results):
+                    if result.get("status") == "error":
+                        details = result.get("details", {})
+                        if details.get("error") == "DeviceNotRegistered":
+                            token = batch[j].get("to") if j < len(batch) else None
+                            if token:
+                                self.push_tokens.delete_one({"push_token": token})
+                                print(f"[INFO] Removed invalid token: {token[:30]}...")
 
             success_count = sum(1 for r in results if r.get("status") == "ok")
             print(f"[OK] Push notifications sent: {success_count}/{len(messages)}")
-            return {"success": True, "sent": success_count, "total": len(messages)}
+            return {
+                "success": not had_http_error,
+                "sent": success_count,
+                "total": len(messages),
+                "http_error": had_http_error,
+            }
 
         except Exception as e:
             print(f"[ERROR] Send push notifications failed: {e}")
@@ -398,7 +418,7 @@ class PushNotificationService:
                 "title": title,
                 "body": body,
                 "sound": "default",
-                "priority": "high" if impact == "high" else "default",
+                "priority": "high",
                 "channelId": "news",
                 "data": {
                     "type": "news",

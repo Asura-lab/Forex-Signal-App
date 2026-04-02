@@ -176,11 +176,9 @@ class NewsCache:
             outlook = market_analyst.get_market_outlook()
             latest = market_analyst.get_latest_news()
 
-            # Detect high-impact upcoming news and send push notifications
-            try:
-                self._check_and_notify_news(upcoming)
-            except Exception as notif_err:
-                print(f"[WARN] News notification error: {notif_err}")
+            # Push dispatch is handled by the dedicated news scheduler below.
+            # Avoid sending/marking events during cache refresh, which can suppress
+            # proper 10-minute advance alerts.
 
             with self.lock:
                 old_upcoming = self.cache.get('upcoming')
@@ -320,9 +318,10 @@ def news_notification_scheduler():
                     except (ValueError, TypeError):
                         continue
                     
-                    # Check if event is 5-12 minutes from now (window to catch ~10 min before)
+                    # Check if event is within a practical notification window.
+                    # A wider range helps recover from brief downtime/cache lag.
                     diff_minutes = (event_time - now).total_seconds() / 60
-                    if 5 <= diff_minutes <= 12:
+                    if 0 <= diff_minutes <= 20:
                         raw_impact = str(event.get('impact', event.get('sentiment', ''))).lower()
                         if raw_impact in ('high', 'red', '3', 'critical'):
                             impact = 'high'
@@ -336,32 +335,50 @@ def news_notification_scheduler():
                         
                         if push_service.is_event_notified(event_key):
                             continue
-                        
-                        push_service.mark_event_notified(event_key)
+
                         time_str = event_time.strftime("%H:%M UTC")
                         currency = event.get('currency', 'USD')
-                        
-                        # Save in-app notification (always)
-                        impact_emoji = "\U0001f534" if impact == "high" else "\U0001f7e1" if impact == "medium" else "\U0001f7e2"
-                        save_in_app_notification(
-                            ntype='news',
-                            title=f"{impact_emoji} {currency} - News Alert",
-                            body=f"\u23f0 {time_str}\n{event_title}",
-                            data={'impact': impact, 'currency': currency, 'event_time': time_str}
-                        )
-                        
-                        threading.Thread(
-                            target=push_service.send_news_notification,
-                            args=({
-                                'title': event_title,
-                                'impact': impact,
-                                'currency': currency,
-                                'description': event.get('forecast', event.get('description', '')),
-                                'event_time': time_str,
-                            },),
-                            daemon=True
-                        ).start()
-                        print(f"[INFO] Scheduled news notification: {event_title} at {time_str} ({impact})")
+
+                        send_result = push_service.send_news_notification({
+                            'title': event_title,
+                            'impact': impact,
+                            'currency': currency,
+                            'description': event.get('forecast', event.get('description', '')),
+                            'event_time': time_str,
+                        })
+
+                        sent_count = 0
+                        total_count = 0
+                        if isinstance(send_result, dict):
+                            try:
+                                sent_count = int(send_result.get('sent', 0))
+                            except Exception:
+                                sent_count = 0
+                            try:
+                                total_count = int(send_result.get('total', 0))
+                            except Exception:
+                                total_count = 0
+
+                        # Mark as notified only on full send success.
+                        if (
+                            isinstance(send_result, dict)
+                            and send_result.get('success')
+                            and total_count > 0
+                            and sent_count >= total_count
+                        ):
+                            push_service.mark_event_notified(event_key)
+
+                            impact_emoji = "\U0001f534" if impact == "high" else "\U0001f7e1" if impact == "medium" else "\U0001f7e2"
+                            save_in_app_notification(
+                                ntype='news',
+                                title=f"{impact_emoji} {currency} - News Alert",
+                                body=f"\u23f0 {time_str}\n{event_title}",
+                                data={'impact': impact, 'currency': currency, 'event_time': time_str}
+                            )
+
+                            print(f"[INFO] Scheduled news notification: {event_title} at {time_str} ({impact}) sent={sent_count}/{total_count}")
+                        else:
+                            print(f"[INFO] News notification skipped/retry later: {event_title} ({impact}) result={send_result}")
         
         except Exception as e:
             print(f"[WARN] News notification scheduler error: {e}")
@@ -922,6 +939,9 @@ def register_push_token():
     
     if not push_token:
         return jsonify({'error': 'Push token шаардлагатай'}), 400
+
+    if not re.match(r'^(Exponent|Expo)PushToken\[[^\]]+\]$', push_token):
+        return jsonify({'error': 'Push token формат буруу байна'}), 400
     
     success = push_service.register_token(
         payload['user_id'], push_token, platform, device_id

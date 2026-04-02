@@ -1,6 +1,6 @@
 # Terms of Service
 
-**Last Updated:** October 18, 2025
+**Last Updated:** March 29, 2026
 
 ## 1. Acceptance of Terms
 
@@ -10,10 +10,9 @@ By using the Forex Signal app, you agree to be bound by these Terms of Service. 
 
 ### 2.1 Forex Signal App Provides:
 
-- Artificial Intelligence (Hidden Markov Model) based forex market trend predictions
+- Multi-timeframe GBDT ensemble based forex market trend predictions
 - Technical analysis information for users
 - Dynamic currency pair information display
-- Personal portfolio management capabilities
 
 ### 2.2 We DO NOT Provide Financial Advice
 
@@ -30,7 +29,7 @@ Our app is for informational purposes only and does not constitute financial adv
 
 ### 3.2 AI Model Limitations
 
-- HMM (Hidden Markov Model) is based on mathematical probability
+- The GBDT ensemble model is based on statistical learning and probability estimates
 - Models can make prediction errors
 - Cannot account for sudden market changes or news events
 - Technical analysis is a tool, not a guarantee
@@ -56,7 +55,7 @@ Our app is for informational purposes only and does not constitute financial adv
 ### 5.1 Our Ownership:
 
 - All Forex Signal app code, design, and models
-- HMM machine learning models and algorithms
+- GBDT machine learning models and algorithms
 - Logos, branding, and terminology
 - All content, manuals, and documentation
 
@@ -98,16 +97,13 @@ Our total liability under any circumstance shall not exceed the amount you paid 
 
 ## 8. Payment and Refunds
 
-### 8.1 Free Service:
+### 8.1 Current Service:
 
-Currently, Forex Signal app is available free of charge. A premium version may be introduced in the future.
+The current Predictrix app is provided free of charge.
 
-### 8.2 Premium Features (Future):
+### 8.2 Payment Policy:
 
-- Additional currency pairs
-- More detailed analysis
-- Notifications and automation
-- Refund policy will be specified separately
+If paid features are introduced in the future, these Terms will be updated officially.
 
 ## 9. Service Termination
 
@@ -148,8 +144,8 @@ Any disputes shall first be resolved through mutual discussion. If unresolved, d
 
 For questions regarding these Terms of Service:
 
-**Email:** support@forexsignal.mn  
-**GitHub:** https://github.com/Asura-lab/Forex-Signal-App  
+**Email:** support@predictrix.com  
+**GitHub:** https://github.com/Asura-lab/Predictrix  
 **Response Time:** 2-3 business days
 
 ## 13. Additional Provisions
@@ -170,4 +166,4 @@ These Terms of Service and the Privacy Policy constitute the entire agreement be
 
 **Disclaimer:** These Terms of Service do not constitute legal advice. If you face financial issues, consult with a professional financial advisor.
 
-**© 2025 Forex Signal. All rights reserved.**
+**© 2026 Predictrix. All rights reserved.**

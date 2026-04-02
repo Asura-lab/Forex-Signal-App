@@ -37,6 +37,29 @@ function AppContent() {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
+  const pendingNotificationDataRef = useRef<any | null>(null);
+
+  const navigateFromNotificationData = (data: any) => {
+    if (!data) return;
+
+    const nav = navigationRef.current;
+    if (!nav || !nav.isReady()) {
+      pendingNotificationDataRef.current = data;
+      return;
+    }
+
+    try {
+      if (data?.type === "signal" || data?.screen === "Signal") {
+        nav.navigate("Main", { screen: "PredictionTab" });
+      } else if (data?.screen === "News") {
+        nav.navigate("Main", { screen: "NewsTab" });
+      } else if (data?.screen === "Profile") {
+        nav.navigate("Main", { screen: "ProfileTab" });
+      }
+    } catch (e) {
+      console.log("[WARN] Navigation from notification failed:", e);
+    }
+  };
 
   useEffect(() => {
     checkAuthStatus();
@@ -92,21 +115,7 @@ function AppContent() {
         // User tapped a notification
         (response) => {
           const data = response.notification.request.content.data;
-          // Navigate to appropriate screen based on notification type
-          if (navigationRef.current) {
-            try {
-              if (data?.type === "signal" || data?.screen === "Signal") {
-                // Signal мэдэгдэл → Predict хуудас
-                navigationRef.current.navigate("Main", { screen: "PredictionTab" });
-              } else if (data?.screen === "News") {
-                navigationRef.current.navigate("Main", { screen: "NewsTab" });
-              } else if (data?.screen === "Profile") {
-                navigationRef.current.navigate("Main", { screen: "ProfileTab" });
-              }
-            } catch (e) {
-              console.log("[WARN] Navigation from notification failed:", e);
-            }
-          }
+          navigateFromNotificationData(data);
         }
       );
 
@@ -148,7 +157,16 @@ function AppContent() {
         backgroundColor={colors.primary}
       />
       <AppAlert />
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer
+        ref={navigationRef}
+        onReady={() => {
+          if (pendingNotificationDataRef.current) {
+            const pending = pendingNotificationDataRef.current;
+            pendingNotificationDataRef.current = null;
+            navigateFromNotificationData(pending);
+          }
+        }}
+      >
         <Stack.Navigator
           initialRouteName={userLoggedIn ? "Main" : "Login"}
           screenOptions={{

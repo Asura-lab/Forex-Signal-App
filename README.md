@@ -1,57 +1,35 @@
 # Predictrix Forex Signal App
 
-Predictrix is an AI-assisted EUR/USD signal platform with:
-- React Native mobile app (Expo)
-- Flask backend API
-- GBDT-based signal generation pipeline
-- MongoDB persistence
-- Push notifications for signal events
+## English
 
-This repository contains production app/backend code and research outputs used in the graduation project.
+Predictrix is a mobile + backend forex signal system focused on **EUR/USD live signal generation** using a locked production ML model.
 
-## 1. Repository Structure
+### Current Version Scope
 
-- `backend/` Flask API, signal generation, integrations, notifications
-- `mobile_app/` React Native app (Expo)
-- `docs/` policy and legal docs
-- `mt5/` MetaTrader 5 backtest EA
-- `model & backtest result/` experiment reports, results, and training/backtest artifacts
-- `tests/` local debug and test scripts
-- `diplom/` thesis repository linked from this workspace
+- Mobile app: React Native (Expo), version 0.4.3
+- Backend: Flask API + MongoDB
+- Signal model: Multi-timeframe GBDT ensemble
+- Runtime policy: **single active model only**
 
-## 2. Backend Overview
+### Single-Model Runtime Policy
 
-Main entry:
-- `backend/app.py`
+- Backend loads only: `backend/ml/models/EURUSD_gbdt_experimental.pkl`
+- No model switching via environment variables
+- No baseline/secondary model fallback
+- If this file is missing, model loading fails by design
 
-Signal model runtime:
-- `backend/ml/signal_generator_gbdt.py`
+### Main Components
 
-Model artifacts:
-- `backend/ml/models/EURUSD_gbdt.pkl` (baseline)
-- `backend/ml/models/EURUSD_gbdt_experimental.pkl` (experimental)
+- `backend/app.py`: API server, auth, signal endpoints, background jobs
+- `backend/ml/signal_generator_gbdt.py`: feature build + prediction engine
+- `mobile_app/App.tsx`: app entry
+- `mobile_app/src/screens/PredictionScreen.tsx`: live signal UI
+- `mobile_app/src/screens/ProfileScreen.tsx`: in-app help/legal text modal
+- `docs/`: privacy policy and terms
 
-Model selection priority at runtime:
-1. `GBDT_MODEL_PATH` (explicit absolute/relative path)
-2. `GBDT_MODEL_VARIANT` (`baseline` or `experimental`)
-3. Default auto selection: experimental if available, otherwise baseline
+### Local Setup
 
-Optional confidence save threshold:
-- `SAVE_CONFIDENCE_THRESHOLD` (float in [0, 1], clamped)
-
-## 3. Mobile App Overview
-
-Main entry:
-- `mobile_app/App.tsx`
-
-Key modules:
-- Authentication flow and persisted session
-- Signal list/details with market outlook labels
-- Push notification registration and token handling
-
-## 4. Local Setup
-
-### Backend
+Backend:
 
 ```bash
 cd backend
@@ -61,7 +39,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-### Mobile (Expo)
+Mobile:
 
 ```bash
 cd mobile_app
@@ -69,54 +47,71 @@ npm install
 npm start
 ```
 
-## 5. Production Model Activation
+### Environment Notes
 
-Use these environment variables in backend deployment:
+- `SAVE_CONFIDENCE_THRESHOLD` is optional and controls DB save threshold for auto-signals.
+- Do not configure model-path/model-variant environment variables; they are not used.
+
+### Disclaimer
+
+This project is for research and educational use.
+It does not provide financial advice.
+
+---
+
+## Монгол
+
+Predictrix нь **EUR/USD хос дээр бодит цагийн сигнал гаргахад төвлөрсөн** mobile + backend систем бөгөөд ML runtime нь нэг тогтмол моделтой ажиллана.
+
+### Одоогийн хувилбарын хүрээ
+
+- Mobile апп: React Native (Expo), 0.4.3
+- Backend: Flask API + MongoDB
+- Сигнал модел: олон timeframe-тэй GBDT ensemble
+- Runtime бодлого: **зөвхөн нэг идэвхтэй модел**
+
+### Нэг моделийн runtime бодлого
+
+- Backend зөвхөн энэ файлыг ачаална: `backend/ml/models/EURUSD_gbdt_experimental.pkl`
+- Environment variable-аар модел солих боломжгүй
+- Baseline эсвэл өөр fallback модел ашиглахгүй
+- Энэ файл байхгүй бол зориуд алдаа өгч ачаалахгүй
+
+### Гол бүрэлдэхүүн хэсгүүд
+
+- `backend/app.py`: API сервер, нэвтрэлт, сигнал endpoint-ууд, background job-ууд
+- `backend/ml/signal_generator_gbdt.py`: feature тооцоо + таамаглалын хөдөлгүүр
+- `mobile_app/App.tsx`: аппын эхлэл
+- `mobile_app/src/screens/PredictionScreen.tsx`: live сигналын дэлгэц
+- `mobile_app/src/screens/ProfileScreen.tsx`: апп доторх тусламж/эрх зүйн текст
+- `docs/`: нууцлал ба үйлчилгээний нөхцлийн баримт бичиг
+
+### Local ажиллуулах
+
+Backend:
 
 ```bash
-# Recommended: keep experimental active
-GBDT_MODEL_VARIANT=experimental
-SAVE_CONFIDENCE_THRESHOLD=0.90
+cd backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
 ```
 
-Force a specific file:
+Mobile:
 
 ```bash
-GBDT_MODEL_PATH=backend/ml/models/EURUSD_gbdt_experimental.pkl
+cd mobile_app
+npm install
+npm start
 ```
 
-Rollback to baseline without code change:
+### Орчны тохиргооны тэмдэглэл
 
-```bash
-GBDT_MODEL_VARIANT=baseline
-```
+- `SAVE_CONFIDENCE_THRESHOLD` хувьсагч нь автоматаар хадгалах босгыг удирдана (сонголтот).
+- Model path/model variant хувьсагчид ашиглагдахгүй.
 
-## 6. Deployment Notes
+### Анхааруулга
 
-- Ensure backend can read model file path configured by env.
-- Verify startup logs print active model file and model version.
-- Validate health endpoint and at least one signal generation cycle after deploy.
-- Keep `Protrader/` as local-only research workspace (ignored in this repo).
-
-## 7. Data and Large File Policy
-
-- Large datasets and temporary training artifacts should stay out of git.
-- Keep only deploy-required model artifacts in `backend/ml/models/`.
-- Experimental notebooks/scripts should remain in local workspace or dedicated research repos.
-
-## 8. Changelog (Recent)
-
-### v0.4.5 (2026-03-29)
-- Ignored local `Protrader/` workspace from root repository.
-- Updated repository documentation and deployment guidance.
-- Pushed thesis (`diplom`) repository updates first, then synchronized root repo.
-
-### v0.4.4 (2026-03-29)
-- Activated experimental GBDT model as runtime default if present.
-- Added env-based model switching (`GBDT_MODEL_PATH`, `GBDT_MODEL_VARIANT`).
-- Exposed dynamic runtime `model_version` in logs/response.
-
-## 9. License and Disclaimer
-
-This project is for educational and research purposes.
-Trading financial markets involves risk. Past performance does not guarantee future results.
+Энэ төсөл нь судалгаа, сургалтын зориулалттай.
+Санхүүгийн зөвлөгөө өгөхгүй.

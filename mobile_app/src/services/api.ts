@@ -254,10 +254,10 @@ export const checkApiStatus = async () => {
   }
 };
 
-// ==================== LIVE RATES ENDPOINTS (UniRate API) ====================
+// ==================== LIVE RATES ENDPOINTS ====================
 
 /**
- * Бодит цагийн EUR/USD ханш авах (UniRate API-аас)
+ * Бодит цагийн EUR/USD ханш авах
  * @returns {Object} { success, data: { pair, rate, bid, ask, spread, time, source } }
  */
 export const getLiveRates = async () => {
@@ -276,7 +276,7 @@ export const getLiveRates = async () => {
 // ==================== SIGNAL ENDPOINTS ====================
 
 /**
- * Get Best Signal (Currently V10)
+ * Get live signal from current production model
  * @param {number} minConfidence - Minimum confidence threshold (default: 80)
  * @param {string} pair - Currency pair (default: "EUR/USD")
  * @returns Signal object with entry, SL, TP, confidence

@@ -251,7 +251,7 @@ You can download your data:
 - Your settings
 
 **Make a Request:**  
-Email support@forexsignal.mn
+Email support@predictrix.com
 
 ## 7. Children's Privacy
 
@@ -335,15 +335,15 @@ New policy becomes effective 7 days after publication. Continued use of the app 
 
 For privacy policy questions:
 
-**Email:** privacy@forexsignal.mn  
-**Support:** support@forexsignal.mn  
-**GitHub:** https://github.com/Asura-lab/Forex-Signal-App/issues
+**Email:** privacy@predictrix.com  
+**Support:** support@predictrix.com  
+**GitHub:** https://github.com/Asura-lab/Predictrix/issues
 
 ### 11.2 File a Complaint
 
 If you believe your rights have been violated:
 
-1. First contact us (privacy@forexsignal.mn)
+1. First contact us (privacy@predictrix.com)
 2. We will respond within 7 days
 3. If unresolved, file a complaint with authorities
 
@@ -470,8 +470,8 @@ Last update: October 18, 2025
 ---
 
 **Contact:**  
-📧 privacy@forexsignal.mn  
-📧 support@forexsignal.mn  
-🌐 https://github.com/Asura-lab/Forex-Signal-App
+📧 privacy@predictrix.com  
+📧 support@predictrix.com  
+🌐 https://github.com/Asura-lab/Predictrix
 
 **© 2025 Forex Signal. Your privacy is our top priority.**

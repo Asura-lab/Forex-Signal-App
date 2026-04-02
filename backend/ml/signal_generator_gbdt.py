@@ -18,34 +18,15 @@ warnings.filterwarnings('ignore', category=UserWarning)
 
 # Paths — model lives alongside this file in backend/ml/models/
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-BASELINE_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt.pkl')
-EXPERIMENTAL_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt_experimental.pkl')
+LATEST_MODEL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'models', 'EURUSD_gbdt_experimental.pkl')
 
 
 def resolve_model_path() -> str:
     """Resolve active model path.
 
-    Priority:
-    1) `GBDT_MODEL_PATH` exact file path override
-    2) `GBDT_MODEL_VARIANT` in {"baseline", "experimental"}
-    3) Experimental file (default if present)
-    4) Baseline file
+    App policy: always use the latest trained production model only.
     """
-    env_path = os.environ.get("GBDT_MODEL_PATH", "").strip()
-    if env_path:
-        return env_path
-
-    variant = os.environ.get("GBDT_MODEL_VARIANT", "").strip().lower()
-    if variant == "baseline":
-        return BASELINE_MODEL_PATH
-    if variant == "experimental":
-        return EXPERIMENTAL_MODEL_PATH
-
-    # Default to experimental for production rollout if file exists.
-    if os.path.exists(EXPERIMENTAL_MODEL_PATH):
-        return EXPERIMENTAL_MODEL_PATH
-
-    return BASELINE_MODEL_PATH
+    return LATEST_MODEL_PATH
 
 
 # ==================== Feature Engineering (matches build_from_train.py) ====================
@@ -278,8 +259,8 @@ class GBDTSignalGenerator:
     # Class mapping: model output -> signal
     CLASS_MAP = {0: "SELL", 1: "HOLD", 2: "BUY"}
 
-    def __init__(self, model_path: str = None):
-        self.model_path = model_path or resolve_model_path()
+    def __init__(self):
+        self.model_path = resolve_model_path()
         self.models = None
         self.feature_cols = None
         self.calibrator = None
@@ -291,7 +272,8 @@ class GBDTSignalGenerator:
         try:
             if not os.path.exists(self.model_path):
                 print(f"[GBDT] Model file not found: {self.model_path}")
-                print(f"[GBDT] Please run 'model & backtest result/code/train_models.py' to train the model first.")
+                print("[GBDT] Latest model is required and no fallback model is allowed.")
+                print(f"[GBDT] Please export latest model to: {LATEST_MODEL_PATH}")
                 return False
 
             print(f"[GBDT] Loading model from {self.model_path}...")
@@ -599,7 +581,7 @@ def get_signal_generator_gbdt() -> GBDTSignalGenerator:
     """Get or create GBDT signal generator singleton"""
     global _generator_gbdt
     if _generator_gbdt is None:
-        _generator_gbdt = GBDTSignalGenerator(model_path=resolve_model_path())
+        _generator_gbdt = GBDTSignalGenerator()
         _generator_gbdt.load_models()
     return _generator_gbdt
 
