@@ -7,9 +7,9 @@ import { Platform } from "react-native";
 
 // ─── Environment switch ───────────────────────────────────────────────────────
 // __DEV__ = true  → local backend (npm start / expo go)
-// __DEV__ = false → Azure production backend (release build)
+// __DEV__ = false → Fly.io production backend (release build)
 
-const AZURE_URL = 'https://predictrix-cvhvhtheawabdahg.koreacentral-01.azurewebsites.net';
+const PRODUCTION_URL = 'https://predictrix-api.fly.dev';
 
 // Android emulator uses 10.0.2.2 to reach host machine; iOS uses localhost
 const LOCAL_URL = Platform.OS === 'android'
@@ -20,7 +20,7 @@ const getApiUrl = () => {
   if (__DEV__) {
     return LOCAL_URL;
   }
-  return AZURE_URL;
+  return PRODUCTION_URL;
 };
 
 export const API_URL = getApiUrl(); // Export API_URL directly as well for convenience
