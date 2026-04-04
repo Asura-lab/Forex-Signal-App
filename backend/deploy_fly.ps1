@@ -124,8 +124,8 @@ if (-not $appExists) {
 
 Info "Updating fly.toml app + region"
 $content = Get-Content .\fly.toml -Raw
-$content = $content -replace 'app = ".*?"', ('app = "' + $AppName + '"')
-$content = $content -replace 'primary_region = ".*?"', ('primary_region = "' + $Region + '"')
+$content = $content -replace '(?m)^app\s*=\s*".*?"\s*$', ('app = "' + $AppName + '"')
+$content = $content -replace '(?m)^primary_region\s*=\s*".*?"\s*$', ('primary_region = "' + $Region + '"')
 Set-Content .\fly.toml $content
 
 Info "Validating Fly secrets (local import policy: disabled)"
@@ -167,8 +167,9 @@ Info "Deploying"
 Run-Fly -Args @("deploy", "--remote-only", "-a", $AppName)
 
 # Ensure cost profile after deployment (works for both first and subsequent deploys)
-Run-Fly -Args @("scale", "count", "app=1", "worker=1", "-a", $AppName)
-Run-Fly -Args @("scale", "vm", "shared-cpu-1x", "--memory", "1024", "-a", $AppName)
+Run-Fly -Args @("scale", "count", "app=1", "worker=1", "-a", $AppName, "--yes")
+Run-Fly -Args @("scale", "vm", "shared-cpu-1x", "--memory", "1024", "-a", $AppName, "--process-group", "app")
+Run-Fly -Args @("scale", "vm", "shared-cpu-1x", "--memory", "1024", "-a", $AppName, "--process-group", "worker")
 
 Info "Deployment complete."
 Run-Fly -Args @("status", "-a", $AppName)

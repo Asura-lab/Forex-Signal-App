@@ -35,8 +35,7 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F172A"
-      },
-      "useNextNotificationsApi": true
+      }
     },
     "plugins": [
       [
@@ -46,7 +45,8 @@
           "color": "#1a237e",
           "sounds": []
         }
-      ]
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {

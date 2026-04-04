@@ -1,6 +1,5 @@
 app = "predictrix-api"
 primary_region = "nrt"
-
 [build]
   dockerfile = "Dockerfile"
 
@@ -33,6 +32,8 @@ primary_region = "nrt"
   path = "/health"
   protocol = "http"
   timeout = "5s"
+
+
 
 
 

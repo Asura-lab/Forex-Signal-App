@@ -14,6 +14,9 @@
     "preview": {
       "distribution": "internal",
       "credentialsSource": "remote",
+      "env": {
+        "EXPO_NO_DOCTOR": "1"
+      },
       "android": {
         "buildType": "apk"
       },
@@ -22,6 +25,18 @@
       }
     },
     "production": {
+      "env": {
+        "EXPO_NO_DOCTOR": "1"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "android-local-release": {
+      "credentialsSource": "local",
+      "env": {
+        "EXPO_NO_DOCTOR": "1"
+      },
       "android": {
         "buildType": "app-bundle"
       }
