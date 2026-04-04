@@ -10,14 +10,23 @@ import {
   Modal,
   ActivityIndicator,
   StatusBar,
-  Platform,
   Linking,
 } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 import { useTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
-import { logoutUser, updateUserProfile, changeUserPassword } from "../services/api";
+import { UI_COPY } from "../config/copy";
+import {
+  logoutUser,
+  updateUserProfile,
+  changeUserPassword,
+} from "../services/api";
+import {
+  getStoredUserData,
+  setStoredUserData,
+} from "../services/authTokenStorage";
 import { NavigationProp } from "@react-navigation/native";
 import {
   getNotificationPreferences,
@@ -46,6 +55,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const colors = getColors(isDark);
   const styles = createStyles(colors);
   const { showAlert } = useAlert();
+  const appVersion = Constants.expoConfig?.version ?? "0.5.0";
 
   const [userData, setUserData] = useState<UserData | null>(null);
   const [editMode, setEditMode] = useState<boolean>(false);
@@ -67,21 +77,15 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const [showDocumentModal, setShowDocumentModal] = useState<boolean>(false);
   const [currentDocument, setCurrentDocument] = useState<any>(null);
   const [showThemeModal, setShowThemeModal] = useState<boolean>(false);
-  const [stats, setStats] = useState({
-    daysUsed: 0,
-    signalsReceived: 0,
-    lastActive: null as string | null,
-  });
 
   useEffect(() => {
     loadUserData();
     loadSettings();
-    loadStats();
   }, []);
 
   const loadUserData = async () => {
     try {
-      const data = await AsyncStorage.getItem("userData");
+      const data = await getStoredUserData();
       if (data) {
         const parsed = JSON.parse(data);
         setUserData(parsed);
@@ -121,24 +125,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const createdAt = await AsyncStorage.getItem("@user_created_at");
-      if (createdAt) {
-        const daysDiff = Math.floor(
-          (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-        );
-        setStats((prev) => ({
-          ...prev,
-          daysUsed: daysDiff,
-          lastActive: new Date().toLocaleDateString("mn-MN"),
-        }));
-      }
-    } catch (error: any) {
-      console.error("Load stats error:", error);
-    }
-  };
-
   const handleSave = async () => {
     if (!name.trim()) {
       showAlert("Алдаа", "Нэр хоосон байж болохгүй");
@@ -152,7 +138,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       if (result.success) {
         // Update local storage
         const updatedUser = { ...userData, name };
-        await AsyncStorage.setItem("@user_data", JSON.stringify(updatedUser));
+        await setStoredUserData(JSON.stringify(updatedUser));
         setUserData(updatedUser as UserData);
 
         showAlert("Амжилттай", "Таны мэдээлэл шинэчлэгдлээ", [
@@ -179,8 +165,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      showAlert("Алдаа", "Шинэ нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+    if (newPassword.length < 12) {
+      showAlert("Алдаа", "Шинэ нууц үг дор хаяж 12 тэмдэгттэй байх ёстой");
       return;
     }
 
@@ -403,7 +389,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 3. ХАДГАЛАХ БАЙРШИЛ
 
 • MongoDB Atlas (AWS, Ази-Номхон далай)
-• Утас дээр encrypted (AsyncStorage)
+• Утас дээр encrypted (SecureStore, legacy AsyncStorage migration)
 • Backup: 30 хоног
 
 4. ХАМГААЛАЛТ
@@ -411,7 +397,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 Техникийн:
 • HTTPS/TLS encryption
 • bcrypt password hashing
-• JWT токен (7 хоног)
+• Access token (60 минут)
+• Refresh token (30 хоног)
 • MongoDB Atlas Security
 • Firewall protection
 
@@ -442,8 +429,8 @@ Email: support@predictrix.com
         content: `PREDICTRIX
 AI-Powered Forex Trading Signals
 
-Хувилбар: 0.4.4
-Шинэчилсэн: 2026.04.02
+Хувилбар: v${appVersion}
+Шинэчилсэн: 2026.04.03
 Платформ: Android / iOS (Expo SDK 51)
 
 Зорилго:
@@ -504,135 +491,45 @@ GitHub: github.com/Asura-lab/Predictrix
       
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{(userData?.name || "U").charAt(0).toUpperCase()}</Text>
+        <View style={styles.profileCard}>
+          <View style={styles.headerContent}>
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarRing}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText} allowFontScaling maxFontSizeMultiplier={1.2}>
+                    {(userData?.name || "U").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+              </View>
             </View>
+            <Text style={styles.userName} allowFontScaling maxFontSizeMultiplier={1.3}>{userData?.name || "User"}</Text>
+            <Text style={styles.userEmail} allowFontScaling maxFontSizeMultiplier={1.4}>{userData?.email || ""}</Text>
+
+            <TouchableOpacity
+              onPress={() => setEditMode(true)}
+              style={styles.headerEditButton}
+              accessibilityRole="button"
+              accessibilityLabel={UI_COPY.profile.actions.editProfile}
+              accessibilityHint="Нэр болон и-мэйл мэдээллийг шинэчилнэ"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.headerEditButtonText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.editProfile}</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.userName}>{userData?.name || "User"}</Text>
-          <Text style={styles.userEmail}>{userData?.email || ""}</Text>
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Statistics Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>STATISTICS</Text>
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.daysUsed}</Text>
-              <Text style={styles.statLabel}>Days Used</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>{stats.signalsReceived}</Text>
-              <Text style={styles.statLabel}>Signals</Text>
-            </View>
-
-            <View style={styles.statCard}>
-              <Text style={styles.statValue}>
-                {stats.lastActive || "Today"}
-              </Text>
-              <Text style={styles.statLabel}>Last Active</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Personal Information Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>PERSONAL INFO</Text>
-            {!editMode && (
-              <TouchableOpacity
-                onPress={() => setEditMode(true)}
-                style={styles.editButton}
-              >
-                <Text style={styles.editButtonText}>Edit</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          <View style={styles.infoCard}>
-            <View style={styles.infoRow}>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>NAME</Text>
-                {editMode ? (
-                  <TextInput
-                    style={styles.input}
-                    value={name}
-                    onChangeText={setName}
-                    placeholder="Enter name"
-                    placeholderTextColor={colors.placeholderText}
-                  />
-                ) : (
-                  <Text style={styles.infoValue}>{name}</Text>
-                )}
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            <View style={styles.infoRow}>
-              <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>EMAIL</Text>
-                {editMode ? (
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="Enter email"
-                    placeholderTextColor={colors.placeholderText}
-                    keyboardType="email-address"
-                  />
-                ) : (
-                  <Text style={styles.infoValue}>{email}</Text>
-                )}
-              </View>
-            </View>
-
-            {editMode && (
-              <>
-                <View style={styles.divider} />
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.cancelButton]}
-                    onPress={() => {
-                      setEditMode(false);
-                      setName(userData?.name || "");
-                      setEmail(userData?.email || "");
-                    }}
-                  >
-                    <Text style={styles.cancelButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.saveButton]}
-                    onPress={handleSave}
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                      <Text style={styles.saveButtonText}>Save</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </View>
-        </View>
-
         {/* Settings Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SETTINGS</Text>
+          <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.sections.settings}</Text>
 
           <View style={styles.infoCard}>
             <View style={styles.infoRow}>
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>NOTIFICATIONS</Text>
+                <Text style={styles.infoLabel}>{UI_COPY.profile.labels.notifications}</Text>
                 <Text style={styles.infoDescription}>
-                  Enable push notifications
+                  {UI_COPY.profile.labels.notificationsDesc}
                 </Text>
               </View>
               <Switch
@@ -640,6 +537,8 @@ GitHub: github.com/Asura-lab/Predictrix
                 onValueChange={handleNotificationToggle}
                 trackColor={{ false: "#1E293B", true: "#00C853" }}
                 thumbColor={notifications ? "#FFFFFF" : "#6B7280"}
+                accessibilityLabel="Мэдэгдэл"
+                accessibilityHint="Push notification асаах эсвэл унтраах"
               />
             </View>
 
@@ -649,9 +548,9 @@ GitHub: github.com/Asura-lab/Predictrix
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>SIGNAL ALERTS</Text>
+                    <Text style={styles.infoLabel}>{UI_COPY.profile.labels.signalAlerts}</Text>
                     <Text style={styles.infoDescription}>
-                      High-confidence trading signals
+                      {UI_COPY.profile.labels.signalAlertsDesc}
                     </Text>
                   </View>
                   <Switch
@@ -659,6 +558,8 @@ GitHub: github.com/Asura-lab/Predictrix
                     onValueChange={handleSignalNotificationToggle}
                     trackColor={{ false: "#1E293B", true: "#FFD700" }}
                     thumbColor={signalNotifications ? "#FFFFFF" : "#6B7280"}
+                    accessibilityLabel="Сигнал мэдэгдэл"
+                    accessibilityHint="Өндөр итгэлцэлтэй сигналын мэдэгдэл асаах эсвэл унтраах"
                   />
                 </View>
 
@@ -668,11 +569,14 @@ GitHub: github.com/Asura-lab/Predictrix
                     <TouchableOpacity
                       style={styles.infoRow}
                       onPress={() => setShowSignalThresholdModal(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Сигналын босго"
+                      accessibilityHint="Сигнал ирэх хамгийн бага итгэлцлийн босгыг сонгоно"
                     >
                       <View style={styles.infoContent}>
-                        <Text style={styles.infoLabel}>SIGNAL THRESHOLD</Text>
+                        <Text style={styles.infoLabel}>{UI_COPY.profile.labels.signalThreshold}</Text>
                         <Text style={styles.infoDescription}>
-                          Min confidence: {(signalThreshold * 100).toFixed(0)}%
+                          {UI_COPY.profile.labels.signalThresholdDescPrefix}: {(signalThreshold * 100).toFixed(0)}%
                         </Text>
                       </View>
                       <ChevronRight size={16} color={colors.textSecondary} />
@@ -684,9 +588,9 @@ GitHub: github.com/Asura-lab/Predictrix
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>NEWS ALERTS</Text>
+                    <Text style={styles.infoLabel}>{UI_COPY.profile.labels.newsAlerts}</Text>
                     <Text style={styles.infoDescription}>
-                      Economic news events (10 min before)
+                      {UI_COPY.profile.labels.newsAlertsDesc}
                     </Text>
                   </View>
                   <Switch
@@ -694,6 +598,8 @@ GitHub: github.com/Asura-lab/Predictrix
                     onValueChange={handleNewsNotificationToggle}
                     trackColor={{ false: "#1E293B", true: "#FF5252" }}
                     thumbColor={newsNotifications ? "#FFFFFF" : "#6B7280"}
+                    accessibilityLabel="Мэдээний мэдэгдэл"
+                    accessibilityHint="Эдийн засгийн мэдээний анхааруулга асаах эсвэл унтраах"
                   />
                 </View>
 
@@ -703,15 +609,18 @@ GitHub: github.com/Asura-lab/Predictrix
                     <TouchableOpacity
                       style={styles.infoRow}
                       onPress={() => setShowImpactFilterModal(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Мэдээний нөлөөллийн шүүлтүүр"
+                      accessibilityHint="Ямар түвшний мэдээгээр мэдэгдэл авахыг тохируулна"
                     >
                       <View style={styles.infoContent}>
-                        <Text style={styles.infoLabel}>NEWS IMPACT FILTER</Text>
+                        <Text style={styles.infoLabel}>{UI_COPY.profile.labels.newsImpactFilter}</Text>
                         <View style={styles.impactRow}>
                           <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
                           {newsImpactFilter !== "high" && <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />}
                           {newsImpactFilter === "all" && <View style={[styles.impactDot, { backgroundColor: '#4CAF50' }]} />}
                           <Text style={styles.infoDescription}>
-                            {newsImpactFilter === "high" ? "High impact only" : newsImpactFilter === "medium" ? "High + Medium" : "All impact levels"}
+                            {newsImpactFilter === "high" ? UI_COPY.profile.labels.highImpactOnly : newsImpactFilter === "medium" ? UI_COPY.profile.labels.highAndMedium : UI_COPY.profile.labels.allLevels}
                           </Text>
                         </View>
                       </View>
@@ -724,9 +633,9 @@ GitHub: github.com/Asura-lab/Predictrix
 
                 <View style={styles.infoRow}>
                   <View style={styles.infoContent}>
-                    <Text style={styles.infoLabel}>SECURITY ALERTS</Text>
+                    <Text style={styles.infoLabel}>{UI_COPY.profile.labels.securityAlerts}</Text>
                     <Text style={styles.infoDescription}>
-                      Login from new device
+                      {UI_COPY.profile.labels.securityAlertsDesc}
                     </Text>
                   </View>
                   <Switch
@@ -734,6 +643,8 @@ GitHub: github.com/Asura-lab/Predictrix
                     onValueChange={handleSecurityNotificationToggle}
                     trackColor={{ false: "#1E293B", true: "#2196F3" }}
                     thumbColor={securityNotifications ? "#FFFFFF" : "#6B7280"}
+                    accessibilityLabel="Аюулгүй байдлын мэдэгдэл"
+                    accessibilityHint="Шинэ төхөөрөмжөөс нэвтрэх үед мэдэгдэл авах эсэх"
                   />
                 </View>
               </>
@@ -744,15 +655,18 @@ GitHub: github.com/Asura-lab/Predictrix
             <TouchableOpacity 
               style={styles.infoRow}
               onPress={() => setShowThemeModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Сэдэв"
+              accessibilityHint="Гэрэл, бараан эсвэл системийн сэдэв сонгоно"
             >
               <View style={styles.infoContent}>
-                <Text style={styles.infoLabel}>THEME</Text>
+                <Text style={styles.infoLabel}>{UI_COPY.profile.labels.theme}</Text>
                 <Text style={styles.infoDescription}>
                   {themeMode === "dark"
-                    ? "Dark"
+                    ? UI_COPY.profile.labels.dark
                     : themeMode === "light"
-                    ? "Light"
-                    : "System"}
+                    ? UI_COPY.profile.labels.light
+                    : UI_COPY.profile.labels.system}
                 </Text>
               </View>
               <ChevronRight size={16} color={colors.textSecondary} />
@@ -762,68 +676,163 @@ GitHub: github.com/Asura-lab/Predictrix
 
         {/* Security Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SECURITY</Text>
+          <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.sections.security}</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={handleChangePassword}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.profile.actions.changePassword}
           >
-            <Text style={styles.menuItemText}>Change Password</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.changePassword}</Text>
             <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* About Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>ABOUT</Text>
+          <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.sections.about}</Text>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("help")}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.profile.actions.help}
           >
-            <Text style={styles.menuItemText}>Help</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.help}</Text>
             <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("terms")}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.profile.actions.terms}
           >
-            <Text style={styles.menuItemText}>Terms of Service</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.terms}</Text>
             <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("privacy")}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.profile.actions.privacy}
           >
-            <Text style={styles.menuItemText}>Privacy Policy</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.privacy}</Text>
             <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => openDocument("about")}
+            accessibilityRole="button"
+            accessibilityLabel="Аппын тухай"
           >
-            <Text style={styles.menuItemText}>About App</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.aboutApp}</Text>
             <ChevronRight size={16} color={colors.textSecondary} />
           </TouchableOpacity>
 
           <View style={styles.menuItem}>
-            <Text style={styles.menuItemText}>Version</Text>
-            <Text style={styles.versionText}>0.4.3</Text>
+            <Text style={styles.menuItemText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.version}</Text>
+            <Text style={styles.versionText} allowFontScaling maxFontSizeMultiplier={1.3}>{`v${appVersion}`}</Text>
           </View>
         </View>
 
         {/* Logout Button */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutButtonText}>Sign Out</Text>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={handleLogout}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.profile.actions.signOut}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.logoutButtonText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.profile.actions.signOut}</Text>
           </TouchableOpacity>
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Password Change Modal */}
+      <Modal
+        visible={editMode}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => {
+          setEditMode(false);
+          setName(userData?.name || "");
+          setEmail(userData?.email || "");
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{UI_COPY.profile.editModal.title}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setEditMode(false);
+                  setName(userData?.name || "");
+                  setEmail(userData?.email || "");
+                }}
+              >
+                <Text style={styles.closeButton}>X</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalBody}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{UI_COPY.profile.editModal.nameLabel}</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={UI_COPY.profile.editModal.namePlaceholder}
+                  placeholderTextColor={colors.placeholderText}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{UI_COPY.profile.editModal.emailLabel}</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={email}
+                  onChangeText={setEmail}
+                  placeholder={UI_COPY.profile.editModal.emailPlaceholder}
+                  placeholderTextColor={colors.placeholderText}
+                  keyboardType="email-address"
+                />
+              </View>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.cancelButton]}
+                  onPress={() => {
+                    setEditMode(false);
+                    setName(userData?.name || "");
+                    setEmail(userData?.email || "");
+                  }}
+                >
+                  <Text style={styles.cancelButtonText}>{UI_COPY.profile.editModal.cancel}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.saveButton]}
+                  onPress={handleSave}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>{UI_COPY.profile.editModal.save}</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Password Change Modal */}
       <Modal
@@ -835,7 +844,7 @@ GitHub: github.com/Asura-lab/Predictrix
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Change Password</Text>
+              <Text style={styles.modalTitle}>{UI_COPY.profile.passwordModal.title}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowPasswordModal(false);
@@ -850,39 +859,39 @@ GitHub: github.com/Asura-lab/Predictrix
 
             <View style={styles.modalBody}>
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CURRENT PASSWORD</Text>
+                <Text style={styles.inputLabel}>{UI_COPY.profile.passwordModal.currentPasswordLabel}</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={oldPassword}
                   onChangeText={setOldPassword}
                   secureTextEntry
-                  placeholder="Enter current password"
+                  placeholder={UI_COPY.profile.passwordModal.currentPasswordPlaceholder}
                   placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>NEW PASSWORD</Text>
+                <Text style={styles.inputLabel}>{UI_COPY.profile.passwordModal.newPasswordLabel}</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry
-                  placeholder="Min 6 characters"
+                  placeholder={UI_COPY.profile.passwordModal.newPasswordPlaceholder}
                   placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+                <Text style={styles.inputLabel}>{UI_COPY.profile.passwordModal.confirmPasswordLabel}</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry
-                  placeholder="Confirm new password"
+                  placeholder={UI_COPY.profile.passwordModal.confirmPasswordPlaceholder}
                   placeholderTextColor={colors.placeholderText}
                   autoCapitalize="none"
                 />
@@ -896,7 +905,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 {loading ? (
                   <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <Text style={styles.modalButtonText}>Update Password</Text>
+                  <Text style={styles.modalButtonText}>{UI_COPY.profile.passwordModal.updatePassword}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -939,7 +948,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 style={styles.documentButton}
                 onPress={() => setShowDocumentModal(false)}
               >
-                <Text style={styles.documentButtonText}>Close</Text>
+                <Text style={styles.documentButtonText}>{UI_COPY.profile.actions.close}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -959,7 +968,7 @@ GitHub: github.com/Asura-lab/Predictrix
           onPress={() => setShowThemeModal(false)}
         >
           <View style={styles.themeModalContent}>
-            <Text style={styles.themeModalTitle}>Select Theme</Text>
+            <Text style={styles.themeModalTitle}>{UI_COPY.profile.themeModalTitle}</Text>
             
             <TouchableOpacity
               style={[
@@ -971,7 +980,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 setShowThemeModal(false);
               }}
             >
-              <Text style={styles.themeOptionText}>System</Text>
+              <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.system}</Text>
               {themeMode === 'auto' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
@@ -985,7 +994,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 setShowThemeModal(false);
               }}
             >
-              <Text style={styles.themeOptionText}>Light</Text>
+              <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.light}</Text>
               {themeMode === 'light' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
 
@@ -1000,7 +1009,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 setShowThemeModal(false);
               }}
             >
-              <Text style={styles.themeOptionText}>Dark</Text>
+              <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.dark}</Text>
               {themeMode === 'dark' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
           </View>
@@ -1020,7 +1029,7 @@ GitHub: github.com/Asura-lab/Predictrix
           onPress={() => setShowImpactFilterModal(false)}
         >
           <View style={styles.themeModalContent}>
-            <Text style={styles.themeModalTitle}>News Impact Filter</Text>
+            <Text style={styles.themeModalTitle}>{UI_COPY.profile.impactFilterTitle}</Text>
             
             <TouchableOpacity
               style={[
@@ -1031,7 +1040,7 @@ GitHub: github.com/Asura-lab/Predictrix
             >
               <View style={styles.impactRow}>
                 <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
-                <Text style={styles.themeOptionText}>High Impact Only</Text>
+                <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.highImpactOnly}</Text>
               </View>
               {newsImpactFilter === 'high' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
@@ -1046,7 +1055,7 @@ GitHub: github.com/Asura-lab/Predictrix
               <View style={styles.impactRow}>
                 <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
                 <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />
-                <Text style={styles.themeOptionText}>High + Medium</Text>
+                <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.highAndMedium}</Text>
               </View>
               {newsImpactFilter === 'medium' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
@@ -1063,7 +1072,7 @@ GitHub: github.com/Asura-lab/Predictrix
                 <View style={[styles.impactDot, { backgroundColor: '#F44336' }]} />
                 <View style={[styles.impactDot, { backgroundColor: '#FFC107' }]} />
                 <View style={[styles.impactDot, { backgroundColor: '#4CAF50' }]} />
-                <Text style={styles.themeOptionText}>All Levels</Text>
+                <Text style={styles.themeOptionText}>{UI_COPY.profile.labels.allLevels}</Text>
               </View>
               {newsImpactFilter === 'all' && <Check size={16} color={colors.success} />}
             </TouchableOpacity>
@@ -1084,7 +1093,7 @@ GitHub: github.com/Asura-lab/Predictrix
           onPress={() => setShowSignalThresholdModal(false)}
         >
           <View style={styles.themeModalContent}>
-            <Text style={styles.themeModalTitle}>Signal Confidence Threshold</Text>
+            <Text style={styles.themeModalTitle}>{UI_COPY.profile.labels.signalThresholdTitle}</Text>
             
             {[0.90, 0.92, 0.94, 0.96, 0.98, 1.0].map((val) => (
               <TouchableOpacity
@@ -1096,7 +1105,10 @@ GitHub: github.com/Asura-lab/Predictrix
                 ]}
                 onPress={() => handleSignalThresholdChange(val)}
               >
-                <Text style={styles.themeOptionText}>{(val * 100).toFixed(0)}%{val === 0.90 ? ' (Default)' : val === 1.0 ? ' (Өндөр)' : ''}</Text>
+                <Text style={styles.themeOptionText}>
+                  {(val * 100).toFixed(0)}%
+                  {val === 0.90 ? UI_COPY.profile.labels.signalThresholdDefaultSuffix : val === 1.0 ? UI_COPY.profile.labels.signalThresholdHighSuffix : ''}
+                </Text>
                 {signalThreshold === val && <Check size={16} color={colors.success} />}
               </TouchableOpacity>
             ))}
@@ -1114,24 +1126,39 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.background,
     },
     header: {
-      paddingTop: 60,
-      paddingBottom: 30,
-      paddingHorizontal: 20,
-      alignItems: "center",
+      paddingTop: 52,
+      paddingBottom: 18,
+      paddingHorizontal: 16,
+      backgroundColor: colors.background,
+    },
+    profileCard: {
       backgroundColor: colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 18,
+      paddingVertical: 20,
+      paddingHorizontal: 16,
+      alignItems: "center",
     },
     headerContent: {
       alignItems: "center",
     },
     avatarContainer: {
-      marginBottom: 16,
+      marginBottom: 14,
+    },
+    avatarRing: {
+      width: 94,
+      height: 94,
+      borderRadius: 47,
+      borderWidth: 2,
+      borderColor: colors.success + "55",
+      justifyContent: "center",
+      alignItems: "center",
     },
     avatar: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
+      width: 84,
+      height: 84,
+      borderRadius: 42,
       backgroundColor: colors.success,
       justifyContent: "center",
       alignItems: "center",
@@ -1142,73 +1169,47 @@ const createStyles = (colors: any) =>
       color: "#FFFFFF",
     },
     userName: {
-      fontSize: 20,
+      fontSize: 28,
       fontWeight: "700",
       color: colors.textPrimary,
       marginBottom: 4,
     },
     userEmail: {
-      fontSize: 13,
+      fontSize: 14,
       color: colors.textSecondary,
+      marginBottom: 12,
+    },
+    headerEditButton: {
+      backgroundColor: colors.success + "20",
+      borderWidth: 1,
+      borderColor: colors.success + "40",
+      borderRadius: 999,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    headerEditButtonText: {
+      color: colors.success,
+      fontSize: 13,
+      fontWeight: "700",
     },
     content: {
       flex: 1,
+      paddingBottom: 20,
     },
     section: {
-      marginTop: 24,
+      marginTop: 18,
       paddingHorizontal: 16,
     },
-    statsContainer: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      gap: 12,
-    },
-    statCard: {
-      flex: 1,
-      backgroundColor: colors.card,
-      borderRadius: 8,
-      padding: 16,
-      alignItems: "center",
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    statValue: {
-      fontSize: 18,
-      fontWeight: "700",
-      color: colors.textPrimary,
-      marginBottom: 4,
-    },
-    statLabel: {
-      fontSize: 10,
-      color: colors.textSecondary,
-      textAlign: "center",
-      letterSpacing: 1,
-    },
-    sectionHeader: {
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 12,
-    },
     sectionTitle: {
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: 11,
+      fontWeight: "700",
       color: colors.textSecondary,
       marginBottom: 12,
       letterSpacing: 1,
-    },
-    editButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    editButtonText: {
-      color: colors.success,
-      fontSize: 13,
-      fontWeight: "600",
     },
     infoCard: {
       backgroundColor: colors.card,
-      borderRadius: 8,
+      borderRadius: 14,
       padding: 16,
       borderWidth: 1,
       borderColor: colors.border,
@@ -1222,28 +1223,17 @@ const createStyles = (colors: any) =>
       flex: 1,
     },
     infoLabel: {
-      fontSize: 10,
+      fontSize: 11,
       color: colors.textSecondary,
+      fontWeight: "600",
       marginBottom: 4,
       letterSpacing: 1,
     },
-    infoValue: {
-      fontSize: 15,
-      color: colors.textPrimary,
-      fontWeight: "500",
-    },
     infoDescription: {
-      fontSize: 12,
+      fontSize: 13,
       color: colors.textSecondary,
-      marginTop: 2,
-    },
-    input: {
-      fontSize: 15,
-      color: colors.textPrimary,
-      fontWeight: "500",
-      borderBottomWidth: 1,
-      borderBottomColor: colors.success,
-      paddingVertical: 4,
+      fontWeight: "400",
+      lineHeight: 19,
     },
     divider: {
       height: 1,
@@ -1259,7 +1249,7 @@ const createStyles = (colors: any) =>
     actionButton: {
       flex: 1,
       paddingVertical: 12,
-      borderRadius: 8,
+      borderRadius: 10,
       alignItems: "center",
     },
     cancelButton: {
@@ -1284,7 +1274,7 @@ const createStyles = (colors: any) =>
       justifyContent: "space-between",
       backgroundColor: colors.card,
       padding: 16,
-      borderRadius: 8,
+      borderRadius: 14,
       marginBottom: 8,
       borderWidth: 1,
       borderColor: colors.border,
@@ -1301,6 +1291,7 @@ const createStyles = (colors: any) =>
     versionText: {
       fontSize: 13,
       color: colors.textSecondary,
+      fontWeight: "500",
     },
     closeButton: {
       fontSize: 20,
@@ -1412,6 +1403,7 @@ const createStyles = (colors: any) =>
       fontSize: 14,
       lineHeight: 22,
       color: colors.textPrimary,
+      textAlign: "justify",
     },
     documentModalFooter: {
       padding: 20,

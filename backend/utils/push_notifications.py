@@ -26,7 +26,14 @@ class PushNotificationService:
 
     def __init__(self):
         try:
-            self.client = MongoClient(MONGO_URI)
+            self.client = MongoClient(
+                MONGO_URI,
+                serverSelectionTimeoutMS=5000,
+                connectTimeoutMS=10000,
+                socketTimeoutMS=20000,
+                maxPoolSize=50,
+                retryWrites=True,
+            )
             self.db = self.client['users_db']
             self.push_tokens = self.db['push_tokens']
             self.notified_events = self.db['notified_events']  # Track sent news notifications

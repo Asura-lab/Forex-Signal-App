@@ -33,6 +33,28 @@ def _try_import_catboost():
         return None
 
 
+def _ensure_probability_matrix(proba: np.ndarray) -> np.ndarray:
+    proba = np.asarray(proba)
+    if proba.ndim == 1:
+        return np.column_stack([1.0 - proba, proba])
+    return proba
+
+
+def predict_ensemble_proba(models: Dict[str, object], X: np.ndarray) -> np.ndarray:
+    proba_list = []
+    for model in models.values():
+        proba_list.append(_ensure_probability_matrix(model.predict_proba(X)))
+
+    if not proba_list:
+        raise RuntimeError("No models available for probability prediction")
+
+    class_counts = {proba.shape[1] for proba in proba_list}
+    if len(class_counts) != 1:
+        raise RuntimeError(f"Inconsistent probability shapes from ensemble: {sorted(class_counts)}")
+
+    return np.mean(np.stack(proba_list, axis=0), axis=0)
+
+
 def fit_models(
     X: np.ndarray,
     y: np.ndarray,
@@ -97,8 +119,9 @@ def fit_models(
             reg_lambda=1.0,  # L2 regularization
             min_child_weight=5,  # Prevent overfitting
             gamma=0.1,  # Min loss reduction for split
+            objective="multi:softprob",
+            num_class=3,
             eval_metric="mlogloss",  # Multi-class metric
-            scale_pos_weight=pos_weight,
             random_state=random_state,
             tree_method='hist',  # Fast histogram-based (CPU)
             verbosity=0,
@@ -156,8 +179,7 @@ def fit_models(
 
 
 def predict_proba(models: Dict[str, object], X: np.ndarray) -> np.ndarray:
-    probs = []
-    for model in models.values():
-        p = model.predict_proba(X)[:, 1]
-        probs.append(p)
-    return np.mean(np.vstack(probs), axis=0)
+    ensemble_proba = predict_ensemble_proba(models, X)
+    if ensemble_proba.shape[1] == 2:
+        return ensemble_proba[:, 1]
+    return ensemble_proba.max(axis=1)

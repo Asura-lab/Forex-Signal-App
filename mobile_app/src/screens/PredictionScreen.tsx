@@ -14,6 +14,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
+import { UI_COPY } from "../config/copy";
 import { useQuery } from "@tanstack/react-query";
 import { getSignal, getRecentSignals } from "../services/api";
 import { updateNotificationPreferences } from "../services/notificationService";
@@ -113,6 +114,14 @@ const PredictionScreen = () => {
     ? new Date().toLocaleTimeString("en-US", { hour12: false })
     : "";
 
+  const provenance = live?.model_provenance || {};
+  const provenanceModelVersion = provenance.model_version || live?.model_version || "—";
+  const provenanceRunId = provenance.run_id || "—";
+  const provenanceTrainedAt = provenance.trained_at_utc || "";
+  const signalMetaLabel = live?.human_oversight_required
+    ? UI_COPY.signal.humanOversightRequired
+    : UI_COPY.signal.humanOversightOptional;
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -164,7 +173,26 @@ const PredictionScreen = () => {
             <Text style={styles.loadingText}>AI загвар шинжилж байна...</Text>
           </View>
         ) : live ? (
-          live.signal === "HOLD" ? (
+          <>
+            <View style={styles.provenanceCard}>
+              <Text style={styles.provenanceTitle}>MODEL PROVENANCE</Text>
+              <View style={styles.provenanceRow}>
+                <Text style={styles.provenanceLabel}>Model</Text>
+                <Text style={styles.provenanceValue}>{provenanceModelVersion}</Text>
+              </View>
+              <View style={styles.provenanceRow}>
+                <Text style={styles.provenanceLabel}>Run ID</Text>
+                <Text style={styles.provenanceValue} numberOfLines={1}>{provenanceRunId}</Text>
+              </View>
+              {provenanceTrainedAt ? (
+                <View style={styles.provenanceRow}>
+                  <Text style={styles.provenanceLabel}>Trained</Text>
+                  <Text style={styles.provenanceValue}>{formatTime(provenanceTrainedAt)}</Text>
+                </View>
+              ) : null}
+            </View>
+
+          {live.signal === "HOLD" ? (
             // HOLD — show directional lean if available
             <View style={styles.card}>
               <View style={styles.holdIconRow}>
@@ -268,7 +296,27 @@ const PredictionScreen = () => {
                 </Text>
               </View>
             </View>
-          )
+          )}
+            
+            <View style={styles.raiCard}>
+              <Text style={styles.raiHeader}>RESPONSIBLE AI</Text>
+              <View style={styles.raiRow}>
+                <Text style={styles.raiLabel}>{UI_COPY.signal.uncertaintyLabel}</Text>
+                <Text style={styles.raiValue}>{String(live?.uncertainty_level || "UNKNOWN").toUpperCase()}</Text>
+              </View>
+              <View style={styles.raiDivider} />
+              <View style={styles.raiRow}>
+                <Text style={styles.raiLabel}>{UI_COPY.signal.actionabilityLabel}</Text>
+                <Text style={styles.raiValue}>{String(live?.actionability || "review_then_execute").replace(/_/g, " ")}</Text>
+              </View>
+              <View style={styles.raiDivider} />
+              <View style={styles.raiRow}>
+                <Text style={styles.raiLabel}>{UI_COPY.signal.humanOversightLabel}</Text>
+                <Text style={styles.raiValue}>{signalMetaLabel}</Text>
+              </View>
+              {!!live?.oversight_note && <Text style={styles.raiNote}>{live.oversight_note}</Text>}
+            </View>
+          </>
         ) : (
           <View style={styles.emptyBox}>
             <Text style={styles.emptyText}>Таамаглал авах боломжгүй байна</Text>
@@ -365,9 +413,12 @@ const PredictionScreen = () => {
           </View>
         )}
 
-        <Text style={styles.disclaimer}>
-          [!] Зөвхөн судалгааны зорилготой. Санхүүгийн зөвлөгөө биш.
-        </Text>
+        <View style={styles.disclaimerBox}>
+          <Text style={styles.disclaimerBadge}>АНХААРУУЛГА</Text>
+          <Text style={styles.disclaimer}>
+            Зөвхөн судалгааны зорилготой. Санхүүгийн зөвлөгөө биш!
+          </Text>
+        </View>
       </ScrollView>
 
       {/* Threshold Modal */}
@@ -493,6 +544,18 @@ const createStyles = (colors: any) =>
     loadingBox: { alignItems: "center", paddingVertical: 40 },
     loadingText: { color: colors.textSecondary, fontSize: 13, marginTop: 12 },
     card: { backgroundColor: colors.card, borderRadius: 16, padding: 20, marginBottom: 16 },
+    provenanceCard: { backgroundColor: colors.card, borderRadius: 16, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
+    provenanceTitle: { fontSize: 11, fontWeight: "800", letterSpacing: 1, color: colors.textSecondary, marginBottom: 10 },
+    provenanceRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 8 },
+    provenanceLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
+    provenanceValue: { fontSize: 12, color: colors.textPrimary, fontWeight: "700", flexShrink: 1, textAlign: "right" },
+    raiCard: { backgroundColor: colors.warning + "14", borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.warning + "40" },
+    raiHeader: { fontSize: 11, fontWeight: "800", letterSpacing: 1, color: colors.warning, marginBottom: 10 },
+    raiRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, marginBottom: 8 },
+    raiLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: "600" },
+    raiValue: { fontSize: 12, color: colors.textPrimary, fontWeight: "700", flexShrink: 1, textAlign: "right" },
+    raiDivider: { height: 1, backgroundColor: colors.warning + "30", marginBottom: 8 },
+    raiNote: { fontSize: 12, color: colors.textPrimary, lineHeight: 18, textAlign: "justify", fontWeight: "600" },
     signalTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
     signalBadge: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 25 },
     signalBadgeText: { color: "#fff", fontWeight: "800", fontSize: 16 },
@@ -512,7 +575,7 @@ const createStyles = (colors: any) =>
     holdIconRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
     holdDot: { width: 10, height: 10, borderRadius: 5, marginRight: 10 },
     holdTitle: { fontSize: 15, fontWeight: "700" },
-    holdSubText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginTop: 8 },
+    holdSubText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, marginTop: 8, textAlign: "justify" },
     trendHintRow: { marginTop: 4 },
     trendHintBadge: {
       flexDirection: "row", alignItems: "center", justifyContent: "space-between",
@@ -521,7 +584,7 @@ const createStyles = (colors: any) =>
     trendHintDir: { fontSize: 14, fontWeight: "700" },
     trendHintConf: { fontSize: 22, fontWeight: "800" },
     trendBox: { backgroundColor: colors.background, borderRadius: 12, padding: 14, borderLeftWidth: 3, borderLeftColor: colors.primary, marginTop: 4 },
-    trendText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20 },
+    trendText: { fontSize: 13, color: colors.textSecondary, lineHeight: 20, textAlign: "justify" },
     savedAt: { fontSize: 11, color: colors.textSecondary, marginTop: 2 },
     emptyBox: { alignItems: "center", paddingVertical: 24, backgroundColor: colors.card, borderRadius: 16, marginBottom: 16, paddingHorizontal: 16 },
     emptyText: { color: colors.textSecondary, fontSize: 13 },
@@ -532,10 +595,33 @@ const createStyles = (colors: any) =>
     signalBadgeSmallText: { color: "#fff", fontWeight: "700", fontSize: 12 },
     emptyBestConf: { fontSize: 18, fontWeight: "800" },
     emptyBestTime: { fontSize: 11, color: colors.textSecondary },
-    emptyThresholdHint: { fontSize: 11, color: colors.textSecondary, textAlign: "center" },
+    emptyThresholdHint: { fontSize: 11, color: colors.textSecondary, textAlign: "justify" },
     retryBtn: { flexDirection: "row", alignItems: "center", backgroundColor: colors.primary, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20, marginTop: 12 },
     retryText: { color: "#fff", fontWeight: "600", fontSize: 13 },
-    disclaimer: { fontSize: 11, color: colors.textSecondary, textAlign: "center", lineHeight: 16, marginTop: 8 },
+    disclaimerBox: {
+      marginTop: 10,
+      backgroundColor: colors.warning + "14",
+      borderWidth: 1,
+      borderColor: colors.warning + "45",
+      borderRadius: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    disclaimerBadge: {
+      alignSelf: "flex-start",
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.warning,
+      letterSpacing: 1,
+      marginBottom: 6,
+    },
+    disclaimer: {
+      fontSize: 12,
+      color: colors.textPrimary,
+      textAlign: "justify",
+      lineHeight: 18,
+      fontWeight: "600",
+    },
   });
 
 export default PredictionScreen;

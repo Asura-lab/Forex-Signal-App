@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
+import { UI_COPY } from "../config/copy";
 import { getInAppNotifications, markNotificationsRead, InAppNotification } from "../services/api";
 import { NavigationProp, useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -65,12 +66,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
   const getTimeAgo = useCallback((isoString: string) => {
     const diff = Date.now() - new Date(isoString).getTime();
     const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "Одоо";
-    if (mins < 60) return `${mins} мин`;
+    if (mins < 1) return UI_COPY.notifications.now;
+    if (mins < 60) return `${mins} ${UI_COPY.notifications.minuteSuffix}`;
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours} цаг`;
+    if (hours < 24) return `${hours} ${UI_COPY.notifications.hourSuffix}`;
     const days = Math.floor(hours / 24);
-    return `${days} өдрийн өмнө`;
+    return `${days} ${UI_COPY.notifications.dayAgoSuffix}`;
   }, []);
 
   const handleNotifPress = async (notif: InAppNotification) => {
@@ -82,8 +83,8 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
     }
     // Навигаци
     if (notif.type === "signal") {
-      // Predict хуудас руу шилжих (PredictionTab)
-      navigation.navigate("Main", { screen: "PredictionTab" } as never);
+      // Сигналын canonical хуудас руу шилжих (SignalTab)
+      navigation.navigate("Main", { screen: "SignalTab" } as never);
     } else if (notif.type === "news") {
       navigation.navigate("Main", { screen: "NewsTab" } as never);
     }
@@ -139,14 +140,17 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel={UI_COPY.signup.back}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>Мэдэгдэл</Text>
+          <Text style={styles.headerTitle}>{UI_COPY.notifications.headerTitle}</Text>
           {unreadCount > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{unreadCount} шинэ</Text>
+              <Text style={styles.unreadBadgeText}>{unreadCount} {UI_COPY.notifications.unreadSuffix}</Text>
             </View>
           )}
         </View>
@@ -156,9 +160,11 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
               onPress={handleMarkAllRead}
               disabled={marking || unreadCount === 0}
               style={[styles.markAllBtn, (marking || unreadCount === 0) && styles.markAllBtnDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel={UI_COPY.notifications.markAllRead}
             >
               <Text style={[styles.markAllText, (marking || unreadCount === 0) && styles.markAllTextDisabled]}>
-                {marking ? "Хадгалж байна..." : "Бүгд уншсан"}
+                {marking ? UI_COPY.notifications.saving : UI_COPY.notifications.markAllRead}
               </Text>
             </TouchableOpacity>
           )}
@@ -172,9 +178,9 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = ({ navigation })
       ) : notifList.length === 0 ? (
         <View style={styles.centerContainer}>
           <BellOff size={48} color={colors.textSecondary} />
-          <Text style={styles.emptyTitle}>Мэдэгдэл байхгүй</Text>
+          <Text style={styles.emptyTitle}>{UI_COPY.notifications.emptyTitle}</Text>
           <Text style={styles.emptySubtitle}>
-            Шинэ сигнал болон мэдээний мэдэгдлүүд энд харагдана
+            {UI_COPY.notifications.emptySubtitle}
           </Text>
         </View>
       ) : (

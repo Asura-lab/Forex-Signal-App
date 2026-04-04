@@ -15,6 +15,7 @@ import {
 import { useTheme } from "../context/ThemeContext";
 import { useAlert } from "../context/AlertContext";
 import { getColors } from "../config/theme";
+import { APP_LOCALE, POLICY_PRIVACY_VERSION, POLICY_TERMS_VERSION, UI_COPY } from "../config/copy";
 import { registerUser } from "../services/api";
 import { NavigationProp } from "@react-navigation/native";
 import { ChevronLeft, Sun, Moon, Eye, EyeOff, Check } from 'lucide-react-native';
@@ -57,8 +58,8 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
       return;
     }
 
-    if (password.length < 6) {
-      showAlert("Error", "Password must be at least 6 characters");
+    if (password.length < 12) {
+      showAlert("Error", "Password must be at least 12 characters");
       return;
     }
 
@@ -70,7 +71,13 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
     setLoading(true);
 
     try {
-      const result = await registerUser(name, email, password);
+      const result = await registerUser(name, email, password, {
+        accepted: true,
+        terms_version: POLICY_TERMS_VERSION,
+        privacy_version: POLICY_PRIVACY_VERSION,
+        locale: APP_LOCALE,
+        accepted_at: new Date().toISOString(),
+      });
 
       if (result.success) {
         navigation.navigate("EmailVerification", {
@@ -129,7 +136,7 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
             <View style={styles.topRow}>
               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
                 <ChevronLeft size={20} color={colors.textSecondary} />
-                <Text style={styles.backText}>Back</Text>
+                <Text style={styles.backText}>{UI_COPY.signup.back}</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
                 {isDark ? (
@@ -140,19 +147,19 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
               </TouchableOpacity>
             </View>
             <Image source={require('../../assets/icon.png')} style={styles.appIcon} />
-            <Text style={styles.title}>БҮРТГҮҮЛЭХ</Text>
-            <Text style={styles.subtitle}>Predictrix-д нэгдэх</Text>
+            <Text style={styles.title}>{UI_COPY.signup.title}</Text>
+            <Text style={styles.subtitle}>{UI_COPY.signup.subtitle}</Text>
           </View>
 
           {/* Form */}
           <View style={styles.formContainer}>
             {/* Name */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>NAME</Text>
+              <Text style={styles.inputLabel}>{UI_COPY.signup.nameLabel}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Your name"
+                  placeholder={UI_COPY.signup.namePlaceholder}
                   placeholderTextColor={colors.textSecondary}
                   value={name}
                   onChangeText={setName}
@@ -163,11 +170,11 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
             {/* Email */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>EMAIL</Text>
+              <Text style={styles.inputLabel}>{UI_COPY.signup.emailLabel}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Email"
+                  placeholder={UI_COPY.signup.emailPlaceholder}
                   placeholderTextColor={colors.textSecondary}
                   value={email}
                   onChangeText={setEmail}
@@ -180,11 +187,11 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
             {/* Password */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>PASSWORD</Text>
+              <Text style={styles.inputLabel}>{UI_COPY.signup.passwordLabel}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Min 6 characters"
+                  placeholder={UI_COPY.signup.passwordPlaceholder}
                   placeholderTextColor={colors.textSecondary}
                   value={password}
                   onChangeText={setPassword}
@@ -199,11 +206,11 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
 
             {/* Confirm Password */}
             <View style={styles.inputWrapper}>
-              <Text style={styles.inputLabel}>CONFIRM PASSWORD</Text>
+              <Text style={styles.inputLabel}>{UI_COPY.signup.confirmPasswordLabel}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="Confirm password"
+                  placeholder={UI_COPY.signup.confirmPasswordPlaceholder}
                   placeholderTextColor={colors.textSecondary}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
@@ -226,10 +233,10 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
                 {acceptedTerms && <Check size={14} color="#FFFFFF" />}
               </View>
               <Text style={styles.termsText}>
-                I agree to the{" "}
-                <Text style={styles.termsLink} onPress={openTermsOfService}>Terms</Text>
-                {" "}and{" "}
-                <Text style={styles.termsLink} onPress={openPrivacyPolicy}>Privacy Policy</Text>
+                {UI_COPY.signup.termsLead}
+                <Text style={styles.termsLink} onPress={openTermsOfService}>{UI_COPY.signup.termsLink}</Text>
+                {" "}ба{" "}
+                <Text style={styles.termsLink} onPress={openPrivacyPolicy}>{UI_COPY.signup.privacyLink}</Text>
               </Text>
             </TouchableOpacity>
 
@@ -242,15 +249,15 @@ const SignUpScreen: React.FC<SignUpScreenProps> = ({ navigation }) => {
               {loading ? (
                 <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
-                <Text style={styles.signupButtonText}>Create Account</Text>
+                <Text style={styles.signupButtonText}>{UI_COPY.signup.createAccount}</Text>
               )}
             </TouchableOpacity>
 
             {/* Login Link */}
             <View style={styles.loginContainer}>
-              <Text style={styles.loginText}>Already have account? </Text>
+              <Text style={styles.loginText}>{UI_COPY.signup.alreadyHaveAccount}</Text>
               <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                <Text style={styles.loginLink}>Sign In</Text>
+                <Text style={styles.loginLink}>{UI_COPY.signup.signIn}</Text>
               </TouchableOpacity>
             </View>
           </View>

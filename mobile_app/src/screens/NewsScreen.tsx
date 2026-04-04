@@ -17,13 +17,14 @@ import { useTheme } from '../context/ThemeContext';
 import { getColors } from '../config/theme';
 import { getNews, analyzeNewsEvent } from '../services/api';
 import { X } from 'lucide-react-native';
+import { UI_COPY } from '../config/copy';
 
 const NewsScreen: React.FC = () => {
   const { isDark } = useTheme();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
   
-  const [activeTab, setActiveTab] = useState<string>('upcoming'); // 'past' | 'upcoming' | 'outlook'
+  const [activeTab, setActiveTab] = useState<string>('upcoming'); // 'history' | 'upcoming' | 'outlook'
   const [news, setNews] = useState<any[]>([]);
   const [majorImpacts, setMajorImpacts] = useState<any[]>([]);
   const [analysis, setAnalysis] = useState<any>(null);
@@ -91,7 +92,7 @@ const NewsScreen: React.FC = () => {
         if (type === 'upcoming') {
           const grouped = groupNewsByDate(result.data.data);
           setNews(grouped);
-        } else if (type === 'past') {
+        } else if (type === 'history') {
           setMajorImpacts(result.data.data);
         } else if (type === 'outlook') {
           setAnalysis(result.data.data);
@@ -135,6 +136,21 @@ const NewsScreen: React.FC = () => {
     return colors.warning;
   };
 
+  const getPastItemColor = (item: any) => {
+    const raw = String(item?.sentiment || item?.impact || item?.impact_level || '').toLowerCase();
+    if (!raw) return colors.textSecondary;
+    if (raw.includes('high') || raw.includes('bearish') || raw.includes('negative')) return '#ef5350';
+    if (raw.includes('medium') || raw.includes('neutral') || raw.includes('mixed')) return '#ff9800';
+    if (raw.includes('low') || raw.includes('bullish') || raw.includes('positive')) return '#4caf50';
+    return colors.textSecondary;
+  };
+
+  const getPastItemLabel = (item: any) => {
+    const raw = String(item?.sentiment || item?.impact || item?.impact_level || '').trim();
+    if (!raw) return UI_COPY.news.pastEventFallback.toUpperCase();
+    return raw.toUpperCase();
+  };
+
   // --- Render Functions ---
 
   const renderAnalysisModal = () => (
@@ -147,7 +163,7 @@ const NewsScreen: React.FC = () => {
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>AI Дүгнэлт</Text>
+            <Text style={styles.modalTitle}>{UI_COPY.news.modalTitle}</Text>
             <TouchableOpacity onPress={() => setSelectedEvent(null)}>
               <X size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -170,24 +186,24 @@ const NewsScreen: React.FC = () => {
   const renderTabs = () => (
     <View style={styles.tabContainer}>
       <TouchableOpacity 
-        style={[styles.tab, activeTab === 'past' && styles.activeTab]} 
-        onPress={() => setActiveTab('past')}
+        style={[styles.tab, activeTab === 'history' && styles.activeTab]} 
+        onPress={() => setActiveTab('history')}
       >
-        <Text style={[styles.tabText, activeTab === 'past' && styles.activeTabText]}>Өмнөх мэдээ</Text>
+        <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>{UI_COPY.news.tabs.history}</Text>
       </TouchableOpacity>
       
       <TouchableOpacity 
         style={[styles.tab, activeTab === 'upcoming' && styles.activeTab]} 
         onPress={() => setActiveTab('upcoming')}
       >
-        <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>Удахгүй болох</Text>
+        <Text style={[styles.tabText, activeTab === 'upcoming' && styles.activeTabText]}>{UI_COPY.news.tabs.upcoming}</Text>
       </TouchableOpacity>
       
       <TouchableOpacity 
         style={[styles.tab, activeTab === 'outlook' && styles.activeTab]} 
         onPress={() => setActiveTab('outlook')}
       >
-        <Text style={[styles.tabText, activeTab === 'outlook' && styles.activeTabText]}>Дүгнэлт</Text>
+        <Text style={[styles.tabText, activeTab === 'outlook' && styles.activeTabText]}>{UI_COPY.news.tabs.outlook}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -220,20 +236,53 @@ const NewsScreen: React.FC = () => {
     </View>
   );
 
-  // 2. Past News (FlatList of Major Impacts)
-  const renderPastNewsItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.pastNewsCard} onPress={() => handleEventPress(item)}>
-      <View style={styles.impactHeader}>
-        <Text style={styles.impactCardTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.impactDate}>{item.date.split(' ')[0]}</Text>
-      </View>
-      <Text style={styles.impactAnalysis}>{item.impact_analysis}</Text>
-    </TouchableOpacity>
-  );
+  // 2. Past News (same row style as upcoming)
+  const renderPastNewsItem = ({ item }: { item: any }) => {
+    const rawDate = String(item.date || '');
+    const normalizedDate = rawDate.replace('T', ' ');
+    const parsedDate = new Date(rawDate);
+    const timeToken = normalizedDate.split(' ')[1]?.slice(0, 5);
+
+    const currencySource = String(item.currency || item.base_currency || '').toUpperCase();
+    const currency = /^[A-Z]{2,6}$/.test(currencySource)
+      ? currencySource.slice(0, 3)
+      : 'USD';
+
+    const leftTime = timeToken || (
+      Number.isNaN(parsedDate.getTime())
+        ? '--:--'
+        : parsedDate.toLocaleTimeString('mn-MN', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          })
+    );
+
+    const impactColor = getPastItemColor(item);
+    const impactLabel = getPastItemLabel(item);
+
+    return (
+      <TouchableOpacity style={styles.row} onPress={() => handleEventPress(item)}>
+        <View style={[styles.indicator, { backgroundColor: impactColor }]} />
+
+        <View style={styles.leftColumn}>
+          <Text style={styles.currencyText} numberOfLines={1}>{currency}</Text>
+          <Text style={styles.timeText} numberOfLines={1}>{leftTime}</Text>
+        </View>
+
+        <View style={styles.centerColumn}>
+          <Text style={styles.eventText} numberOfLines={2}>{item.title}</Text>
+          <Text style={[styles.impactText, { color: impactColor }]} numberOfLines={1}>
+            {impactLabel}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // 3. Market Outlook (ScrollView)
   const renderOutlook = () => {
-    if (!analysis) return <Text style={styles.emptyText}>Мэдээлэл байхгүй байна</Text>;
+    if (!analysis) return <Text style={styles.emptyText}>{UI_COPY.news.emptyOutlook}</Text>;
     
     // Determine colors for Outlook
     const outlookLower = analysis.outlook?.toLowerCase() || '';
@@ -257,7 +306,7 @@ const NewsScreen: React.FC = () => {
         <View style={styles.outlookSection}>
           
           {/* 1. Main Outlook Card */}
-          <View style={[styles.mainOutcomeCard, { backgroundColor: outlookBg, borderColor: outlookColor }]}>
+          <View style={styles.mainOutcomeCard}>
             <Text style={[styles.outcomeTitle, { color: outlookColor }]}>
               {analysis.outlook || "ТОДОРХОЙГҮЙ"}
             </Text>
@@ -268,32 +317,32 @@ const NewsScreen: React.FC = () => {
 
           {/* 2. Market Sentiment */}
           {analysis.market_sentiment && (
-            <View style={[styles.sentimentCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.sentimentCard}>
                <View style={styles.cardHeaderRow}>
                   <View style={[styles.indicatorDot, { backgroundColor: colors.secondary }]} />
                   <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>ЭРСДЭЛИЙН ТӨЛӨВ</Text>
                </View>
-               <Text style={[styles.sentimentText, { color: colors.textSecondary }]}>
+               <Text style={styles.sentimentText}>
                  {analysis.market_sentiment}
                </Text>
             </View>
           )}
           
           {/* 3. Summary */}
-          <View style={[styles.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={styles.summaryCard}>
             <View style={styles.cardHeaderRow}>
                <Text style={[styles.cardTitle, { color: colors.primary }]}>ЗАХ ЗЭЭЛИЙН ТОЙМ</Text>
             </View>
-            <Text style={[styles.insightSummary, { color: colors.textPrimary }]}>
+            <Text style={styles.insightSummary}>
               {analysis.summary || "AI дүгнэлт хийгдэж байна..."}
             </Text>
           </View>
 
           {/* 4. Forecast */}
           {analysis.forecast && (
-            <View style={[styles.forecastCard, { backgroundColor: isDark ? '#1e293b' : '#f0f9ff', borderColor: colors.border }]}>
+            <View style={styles.forecastCard}>
               <Text style={[styles.cardTitle, { color: colors.textPrimary, marginBottom: 8 }]}>ТААМАГЛАЛ (24H)</Text>
-              <Text style={[styles.analysisText, { color: colors.textPrimary }]}>
+              <Text style={styles.analysisText}>
                 {analysis.forecast}
               </Text>
             </View>
@@ -306,7 +355,7 @@ const NewsScreen: React.FC = () => {
               {(analysis.risk_factors as any[]).map((risk: any, index: number) => (
                 <View key={index} style={styles.riskRow}>
                   <Text style={{color: '#ef5350', marginRight: 10, fontSize: 16}}>•</Text>
-                  <Text style={[styles.analysisText, { color: colors.textPrimary, flex: 1, marginBottom: 0 }]}>{risk}</Text>
+                  <Text style={[styles.analysisText, styles.analysisTextCompact, { flex: 1 }]}>{risk}</Text>
                 </View>
               ))}
             </View>
@@ -316,7 +365,7 @@ const NewsScreen: React.FC = () => {
             <View style={styles.sectionBlock}>
               <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>ОНЦЛОХ МЭДЭЭНҮҮД</Text>
               {(analysis.weekly_analysis as any[]).map((item: any, index: number) => (
-                <View key={index} style={[styles.analysisCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <View key={index} style={styles.analysisCard}>
                   <View style={styles.analysisHeader}>
                     <Text style={[styles.analysisTitle, { color: colors.textPrimary, flex: 1, marginRight: 8 }]}>
                       {item.title}
@@ -325,7 +374,7 @@ const NewsScreen: React.FC = () => {
                       {item.date.replace('T', ' ').substring(0, 16)}
                     </Text>
                   </View>
-                  <Text style={[styles.analysisText, { color: colors.textSecondary }]}>{item.impact_analysis}</Text>
+                  <Text style={styles.analysisText}>{item.impact_analysis}</Text>
                 </View>
               ))}
             </View>
@@ -340,7 +389,7 @@ const NewsScreen: React.FC = () => {
       <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
       
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>MARKET INTELLIGENCE</Text>
+        <Text style={styles.headerTitle}>{UI_COPY.news.headerTitle.toUpperCase()}</Text>
       </View>
 
       {renderTabs()}
@@ -361,25 +410,27 @@ const NewsScreen: React.FC = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
               }
               ListEmptyComponent={
-                <Text style={styles.emptyText}>No events scheduled</Text>
+                <Text style={styles.emptyText}>{UI_COPY.news.emptyUpcoming}</Text>
               }
               stickySectionHeadersEnabled={true}
             />
           )}
 
-          {activeTab === 'past' && (
-            <FlatList
-              data={majorImpacts}
-              keyExtractor={(item, index) => index.toString()}
+          {activeTab === 'history' && (
+            <SectionList
+              sections={groupNewsByDate(majorImpacts)}
+              keyExtractor={(item, index) => `${item.id || item.title || 'past'}-${index}`}
               renderItem={renderPastNewsItem}
+              renderSectionHeader={renderSectionHeader}
               contentContainerStyle={styles.listContent}
               showsVerticalScrollIndicator={false}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
               }
               ListEmptyComponent={
-                <Text style={styles.emptyText}>Өмнөх мэдээлэл олдсонгүй</Text>
+                <Text style={styles.emptyText}>{UI_COPY.news.emptyHistory}</Text>
               }
+              stickySectionHeadersEnabled={true}
             />
           )}
 
@@ -533,50 +584,9 @@ const createStyles = (colors: any) => StyleSheet.create({
     marginTop: 50,
     color: colors.textSecondary,
   },
-  // Past News Styles
-  pastNewsCard: {
-    backgroundColor: colors.card,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  impactHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  impactCardTitle: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: colors.textPrimary,
-    flex: 1,
-    marginRight: 12,
-  },
   impactDate: {
     fontSize: 12,
     color: colors.textSecondary,
-  },
-  impactDataRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    backgroundColor: colors.background,
-    padding: 8,
-    borderRadius: 8,
-  },
-  impactData: {
-    fontSize: 13,
-    color: colors.textPrimary,
-    marginRight: 16,
-    fontWeight: '600',
-  },
-  impactAnalysis: {
-    fontSize: 14,
-    color: colors.textPrimary,
-    lineHeight: 22,
   },
   // Outlook Styles
   outlookScroll: {
@@ -587,9 +597,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   },
   mainOutcomeCard: {
     padding: 20,
-    borderRadius: 16,
+    borderRadius: 12,
     marginBottom: 20,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -610,8 +622,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 20,
-    borderLeftWidth: 4,
-    borderLeftColor: '#ff9800',
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -634,6 +646,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     fontWeight: '400',
+    textAlign: 'justify',
+    color: colors.textSecondary,
   },
   sectionBlock: {
     marginBottom: 20,
@@ -651,17 +665,23 @@ const createStyles = (colors: any) => StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 20,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   insightSummary: {
-    fontSize: 15,
-    lineHeight: 24,
+    fontSize: 14,
+    lineHeight: 22,
     fontWeight: '400',
+    textAlign: 'justify',
+    color: colors.textSecondary,
   },
   forecastCard: {
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 20,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   riskRow: {
     flexDirection: 'row',
@@ -674,6 +694,8 @@ const createStyles = (colors: any) => StyleSheet.create({
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
   },
   analysisHeader: {
     flexDirection: 'row',
@@ -688,8 +710,11 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     lineHeight: 22,
     marginBottom: 4,
-    color: colors.textPrimary,
+    color: colors.textSecondary,
     textAlign: 'justify',
+  },
+  analysisTextCompact: {
+    marginBottom: 0,
   },
   // Modal Styles
   modalOverlay: {

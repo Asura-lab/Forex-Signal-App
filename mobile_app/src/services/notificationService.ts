@@ -15,6 +15,7 @@ import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { clearAuthToken, clearRefreshToken, getAuthToken } from "./authTokenStorage";
 
 const PUSH_TOKEN_KEY = "@push_token";
 const PUSH_TOKEN_LAST_SYNC_KEY = "@push_token_last_sync";
@@ -172,7 +173,7 @@ export async function registerPushTokenWithServer(
   pushToken: string
 ): Promise<boolean> {
   try {
-    const userToken = await AsyncStorage.getItem("userToken");
+    const userToken = await getAuthToken();
     if (!userToken) {
       console.log("[WARN] No auth token, skipping push token registration");
       return false;
@@ -218,7 +219,7 @@ export async function registerPushTokenWithServer(
  */
 export async function unregisterPushTokenFromServer(): Promise<boolean> {
   try {
-    const userToken = await AsyncStorage.getItem("userToken");
+    const userToken = await getAuthToken();
     if (!userToken) return false;
 
     const response = await axios.post(
@@ -272,7 +273,7 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
   };
 
   try {
-    const userToken = await AsyncStorage.getItem("userToken");
+    const userToken = await getAuthToken();
     if (!userToken) {
       return defaults;
     }
@@ -290,7 +291,8 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     }
   } catch (error: any) {
     if (error?.response?.status === 401) {
-      await AsyncStorage.removeItem("userToken");
+      await clearAuthToken();
+      await clearRefreshToken();
       console.warn("[WARN] Notification preferences: token expired, cleared stored token.");
     } else {
       console.error("[ERROR] Get notification preferences failed:", error.message);
@@ -307,7 +309,7 @@ export async function updateNotificationPreferences(
   preferences: Partial<NotificationPreferences>
 ): Promise<boolean> {
   try {
-    const userToken = await AsyncStorage.getItem("userToken");
+    const userToken = await getAuthToken();
     if (!userToken) return false;
 
     const response = await axios.put(
@@ -325,7 +327,8 @@ export async function updateNotificationPreferences(
     return response.data?.success ?? false;
   } catch (error: any) {
     if (error?.response?.status === 401) {
-      await AsyncStorage.removeItem("userToken");
+      await clearAuthToken();
+      await clearRefreshToken();
       console.warn("[WARN] Update notification preferences: token expired, cleared stored token.");
     } else {
       console.error(
@@ -393,7 +396,7 @@ export async function initializePushNotifications(): Promise<string | null> {
     const token = await getExpoPushToken();
 
     if (token) {
-      const userToken = await AsyncStorage.getItem("userToken");
+      const userToken = await getAuthToken();
       if (!userToken) {
         console.log("[INFO] Push init skipped: user not authenticated");
         return token;

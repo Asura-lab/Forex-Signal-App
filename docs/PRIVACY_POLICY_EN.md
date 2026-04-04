@@ -102,19 +102,20 @@ Welcome to Forex Signal app. We respect and protect your personal information pr
 - Profile settings
 - Creation date
 
-### 3.2 Phone Storage (AsyncStorage)
+### 3.2 Phone Storage (SecureStore + Legacy Migration)
 
 **Local Storage:**
 
-- JWT token (session)
-- Your settings
-- Cache data
+- Access token (session, SecureStore)
+- Refresh token (rotation-enabled, SecureStore)
+- Notification and preference settings
+- Non-sensitive cache data
 
 **Protection:**
 
-- Encrypted
-- Cannot be accessed outside the app
-- Deleted when app is uninstalled
+- SecureStore is used as the primary encrypted token store
+- Legacy AsyncStorage token values are migrated then deleted
+- Session tokens are revoked on logout/password reset and expire by policy
 
 ## 4. Sharing Information
 
@@ -165,9 +166,25 @@ If our company merges, is sold, or undergoes other changes, your information may
 
 **App Protection:**
 
-- Secure Storage (AsyncStorage)
-- Token expiration (7 days)
-- CORS protection
+- Secure token storage (SecureStore)
+- Access token expiration: 60 minutes
+- Refresh token expiration: 30 days
+- Token rotation + server-side revocation controls
+- CORS allowlist protection
+
+### 5.4 Consent Lifecycle and Evidence Trail
+
+We maintain auditable consent records for Terms of Service and Privacy Policy acceptance.
+
+Recorded consent evidence includes:
+
+- Terms version
+- Privacy policy version
+- Locale (`mn` or `en`)
+- Acceptance timestamp
+- IP and user-agent metadata at registration time
+
+These records support compliance verification and incident response.
 
 ### 5.2 Our Measures
 

@@ -12,6 +12,15 @@ import pandas as pd
 import warnings
 from typing import Dict, Any, Optional, Tuple
 from datetime import datetime, timedelta
+from pathlib import Path
+
+from ml.model_contract import (
+    build_model_contract,
+    feature_schema_hash,
+    load_model_manifest,
+    model_contract_required,
+    validate_model_contract,
+)
 
 warnings.filterwarnings('ignore', message='.*feature names.*')
 warnings.filterwarnings('ignore', category=UserWarning)
@@ -266,6 +275,7 @@ class GBDTSignalGenerator:
         self.calibrator = None
         self.is_loaded = False
         self.model_version = "GBDT_unknown"
+        self.model_contract = {}
 
     def load_models(self) -> bool:
         """Load the trained GBDT ensemble model"""
@@ -283,17 +293,31 @@ class GBDTSignalGenerator:
             self.feature_cols = model_data["feature_cols"]
             self.calibrator = model_data.get("calibrator")
 
-            meta = model_data.get("metadata") or {}
-            variant = meta.get("variant")
-            if variant:
-                self.model_version = str(variant)
-            else:
-                self.model_version = os.path.splitext(os.path.basename(self.model_path))[0]
+            expected_feature_hash = feature_schema_hash(self.feature_cols)
+            manifest_path = Path(self.model_path).with_name(f"{Path(self.model_path).stem}_manifest.json")
+            model_manifest = load_model_manifest(manifest_path)
+            self.model_contract = build_model_contract(
+                model_data,
+                self.model_path,
+                self.feature_cols,
+                model_manifest,
+            )
+            contract_ok, contract_errors = validate_model_contract(self.model_contract, expected_feature_hash)
+            if not contract_ok:
+                for err in contract_errors:
+                    print(f"[GBDT][CONTRACT] {err}")
+                if model_contract_required():
+                    print("[GBDT] Contract validation failed in strict mode. Aborting model load.")
+                    self.is_loaded = False
+                    return False
+
+            self.model_version = self.model_contract.get("model_version") or os.path.splitext(os.path.basename(self.model_path))[0]
 
             self.is_loaded = True
             print(f"[GBDT] ✓ Model loaded successfully")
             print(f"[GBDT]   Active file: {self.model_path}")
             print(f"[GBDT]   Version: {self.model_version}")
+            print(f"[GBDT]   Run ID: {self.model_contract.get('run_id') or 'N/A'}")
             print(f"[GBDT]   Models: {list(self.models.keys())}")
             print(f"[GBDT]   Features: {len(self.feature_cols)}")
             print(f"[GBDT]   Calibrator: {'Yes' if self.calibrator else 'No'}")
@@ -305,6 +329,28 @@ class GBDTSignalGenerator:
             traceback.print_exc()
             self.is_loaded = False
             return False
+
+    def get_model_provenance(self) -> Dict[str, Any]:
+        contract = self.model_contract or {}
+        return {
+            "schema_version": contract.get("schema_version"),
+            "model_version": contract.get("model_version") or self.model_version,
+            "run_id": contract.get("run_id"),
+            "seed": contract.get("seed"),
+            "dataset_hash": contract.get("dataset_hash"),
+            "commit_id": contract.get("commit_id"),
+            "feature_schema_hash": contract.get("feature_schema_hash"),
+            "model_file_sha256": contract.get("model_file_sha256"),
+            "trained_at_utc": contract.get("trained_at_utc"),
+        }
+
+    @staticmethod
+    def _compute_uncertainty(confidence_pct: float) -> str:
+        if confidence_pct >= 90:
+            return "low"
+        if confidence_pct >= 75:
+            return "medium"
+        return "high"
 
     def _predict_ensemble(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
@@ -502,10 +548,11 @@ class GBDTSignalGenerator:
             if signal_type in ("BUY", "SELL") and last_conf >= conf_threshold and atr_pips >= self.MIN_ATR_PIPS:
                 # Valid signal
                 sl_tp = self._calculate_sl_tp(atr_value, signal_type, entry_price, symbol)
+                confidence_pct = round(last_conf * 100, 2)
 
                 return {
                     "signal": signal_type,
-                    "confidence": round(last_conf * 100, 2),
+                    "confidence": confidence_pct,
                     "entry_price": round(entry_price, 5),
                     "stop_loss": sl_tp["stop_loss"],
                     "take_profit": sl_tp["take_profit"],
@@ -523,8 +570,13 @@ class GBDTSignalGenerator:
                     "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
                     "horizon_hours": 4,
                     "model_version": self.model_version,
+                    "model_provenance": self.get_model_provenance(),
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),
+                    "uncertainty_level": self._compute_uncertainty(confidence_pct),
+                    "actionability": "execute_with_strict_risk_controls",
+                    "human_oversight_required": True,
+                    "oversight_note": "Double-check with independent sources and pre-defined max loss before execution.",
                 }
             else:
                 # HOLD — model neutral OR confidence too low OR ATR too low
@@ -542,10 +594,11 @@ class GBDTSignalGenerator:
 
                 # For frontend: expose directional lean even on HOLD
                 # so it can show "BUY 45%" trend hint
+                confidence_pct = round(directional_conf * 100, 2)
                 return {
                     "signal": "HOLD",
                     # Expose directional confidence for trend hint display
-                    "confidence": round(directional_conf * 100, 2),
+                    "confidence": confidence_pct,
                     "directional_signal": directional_type,
                     "hold_confidence": round(hold_conf * 100, 2),
                     "entry_price": round(entry_price, 5),
@@ -562,8 +615,13 @@ class GBDTSignalGenerator:
                     "target_time": (datetime.now() + timedelta(hours=4)).isoformat(),
                     "horizon_hours": 4,
                     "model_version": self.model_version,
+                    "model_provenance": self.get_model_provenance(),
                     "min_confidence_used": round(conf_threshold * 100, 2),
                     "features_used": len(self.feature_cols),
+                    "uncertainty_level": self._compute_uncertainty(confidence_pct),
+                    "actionability": "wait_for_confirmation",
+                    "human_oversight_required": True,
+                    "oversight_note": "No clear edge detected. Wait for confirmation and avoid forced trades.",
                 }
 
         except Exception as e:

@@ -3,7 +3,7 @@
     "name": "Predictrix",
     "slug": "predictrix",
     "scheme": "predictrix",
-    "version": "0.4.4",
+    "version": "0.5.0",
     "sdkVersion": "51.0.0",
     "icon": "./assets/icon.png",
     "orientation": "portrait",
@@ -25,7 +25,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.asuralab.predictrix"
+      "bundleIdentifier": "com.asuralab.predictrix",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.asuralab.predictrix",

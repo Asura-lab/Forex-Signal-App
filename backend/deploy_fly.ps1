@@ -1,7 +1,8 @@
 param(
     [string]$AppName = "predictrix-api",
     [string]$Region = "nrt",
-    [switch]$KeepRunning
+    [switch]$KeepRunning,
+    [switch]$StopAfterDeploy
 )
 
 $ErrorActionPreference = "Stop"
@@ -127,40 +128,52 @@ $content = $content -replace 'app = ".*?"', ('app = "' + $AppName + '"')
 $content = $content -replace 'primary_region = ".*?"', ('primary_region = "' + $Region + '"')
 Set-Content .\fly.toml $content
 
-Info "Importing secrets from config/.env"
-$secretLines = Get-Content .\config\.env |
-    ForEach-Object { ($_ -split '#')[0].Trim() } |
-    Where-Object { $_ -match '^[A-Za-z_][A-Za-z0-9_]*=' }
-
-if (-not $secretLines -or $secretLines.Count -eq 0) {
-    Fail "No valid secrets found in config/.env"
+Info "Validating Fly secrets (local import policy: disabled)"
+$requiredSecrets = @("MONGO_URI", "SECRET_KEY", "MAIL_USERNAME", "MAIL_PASSWORD")
+$secretsRes = Invoke-Fly -Args @("secrets", "list", "-a", $AppName, "--json")
+if ($secretsRes.ExitCode -ne 0) {
+    Fail "Unable to read Fly secrets. Run: fly secrets list -a $AppName"
 }
 
-$tempSecrets = [System.IO.Path]::GetTempFileName()
-try {
-    Set-Content -Path $tempSecrets -Value $secretLines
-    $secretRes = Invoke-Fly -Args @("secrets", "import", "-a", $AppName) -InputFile $tempSecrets
-    if ($secretRes.ExitCode -ne 0) {
-        Fail "Failed to import secrets."
+$secretNames = @()
+if (-not [string]::IsNullOrWhiteSpace($secretsRes.StdOut)) {
+    try {
+        $secretItems = $secretsRes.StdOut | ConvertFrom-Json
+        foreach ($item in $secretItems) {
+            if ($item.name) {
+                $secretNames += [string]$item.name
+            }
+            elseif ($item.Name) {
+                $secretNames += [string]$item.Name
+            }
+        }
+    }
+    catch {
+        Fail "Failed to parse Fly secrets list JSON."
     }
 }
-finally {
-    Remove-Item $tempSecrets -ErrorAction SilentlyContinue
+
+$missingSecrets = @($requiredSecrets | Where-Object { $_ -notin $secretNames })
+if ($missingSecrets.Count -gt 0) {
+    $missingText = ($missingSecrets -join ", ")
+    Fail "Missing required Fly secrets: $missingText. Set them with: fly secrets set KEY=VALUE -a $AppName"
 }
 
-Info "Scaling profile: one machine, shared-cpu-1x, 1024MB"
+Info "Local config/.env secret import is disabled. Use Fly secret manager only."
+
+Info "Scaling profile: app=1, worker=1, shared-cpu-1x, 1024MB"
 
 Info "Deploying"
 Run-Fly -Args @("deploy", "--remote-only", "-a", $AppName)
 
 # Ensure cost profile after deployment (works for both first and subsequent deploys)
-Run-Fly -Args @("scale", "count", "1", "-a", $AppName)
+Run-Fly -Args @("scale", "count", "app=1", "worker=1", "-a", $AppName)
 Run-Fly -Args @("scale", "vm", "shared-cpu-1x", "--memory", "1024", "-a", $AppName)
 
 Info "Deployment complete."
 Run-Fly -Args @("status", "-a", $AppName)
 
-if (-not $KeepRunning) {
+if ($StopAfterDeploy -and -not $KeepRunning) {
     Info "Cost-safe mode: stopping machines now (app will auto-start on next request)"
     $machinesRes = Run-Fly -Args @("machine", "list", "--json", "-a", $AppName)
     $machines = @()
@@ -175,4 +188,7 @@ if (-not $KeepRunning) {
     }
 
     Info "All machines stopped. To run continuously, execute with -KeepRunning."
+}
+else {
+    Info "Always-on mode: leaving machines running. Use -StopAfterDeploy to force stop after deployment."
 }

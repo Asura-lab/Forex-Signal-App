@@ -7,6 +7,7 @@ import time
 import requests
 import urllib.parse
 import re
+import os
 
 # google-genai import (failsafe)
 try:
@@ -22,7 +23,13 @@ except Exception as e:
 
 from datetime import datetime, timedelta, timezone
 from pymongo import MongoClient
-from config.settings import MONGO_URI, GEMINI_API_KEYS
+from pymongo.errors import AutoReconnect, ConnectionFailure, NetworkTimeout, ServerSelectionTimeoutError
+from config.settings import (
+    ALLOW_EXTERNAL_LLM_FALLBACK,
+    GEMINI_API_KEYS,
+    GEMINI_SAFETY_MODE,
+    MONGO_URI,
+)
 from utils.tradingview_handler import tradingview_handler
 from utils.alphavantage_handler import alphavantage_handler
 
@@ -35,42 +42,59 @@ class MarketAnalyst:
     # Model constants
     FLASH_MODEL = 'gemini-2.5-flash'       # Хослол болон зах зээлийн тойм
     LITE_MODEL  = 'gemini-2.5-flash-lite'  # Бусад (мэдээний шинжилгээ гэх мэт)
+    PAIR_OUTLOOK_VALUES = ('BULLISH', 'BEARISH', 'NEUTRAL')
+    MARKET_OUTLOOK_VALUES = ('BULLISH USD', 'BEARISH USD', 'MIXED', 'RISK-ON', 'RISK-OFF')
 
     def __init__(self):
         # Configure Gemini with Key Rotation (21 keys)
         self.api_keys = GEMINI_API_KEYS
         self.current_key_index = 0
         self.gemini = None
+        self.safety_mode = GEMINI_SAFETY_MODE if GEMINI_SAFETY_MODE in ('strict', 'balanced', 'off') else 'balanced'
+        self.allow_external_fallback = bool(ALLOW_EXTERNAL_LLM_FALLBACK)
 
         if self.api_keys and GENAI_AVAILABLE:
             self._configure_gemini()
             print(f"[INFO] {len(self.api_keys)} Gemini API key бэлэн байна.", flush=True)
         else:
             if not GENAI_AVAILABLE:
-                print("[WARN] google-genai суулгаагүй. Pollinations fallback ашиглана.", flush=True)
+                print("[WARN] google-genai суулгаагүй.", flush=True)
             else:
-                print("[WARN] GEMINI_API_KEYS олдсонгүй. Pollinations fallback ашиглана.", flush=True)
+                print("[WARN] GEMINI_API_KEYS олдсонгүй.", flush=True)
 
-        # MongoDB Connection
+        if self.allow_external_fallback:
+            print("[INFO] External LLM fallback enabled", flush=True)
+        else:
+            print("[INFO] External LLM fallback disabled", flush=True)
+
+        # MongoDB connection (lazy mode to avoid blocking app startup on network/DNS issues)
+        self.client = None
+        self.db = None
+        self.news_collection = None
+        self.insights_collection = None
+        self._mongo_available = False
+
         try:
             self.client = MongoClient(
                 MONGO_URI,
-                serverSelectionTimeoutMS=5000,   # 5 секунд хүлээнэ
-                connectTimeoutMS=5000,
-                socketTimeoutMS=10000,
+                serverSelectionTimeoutMS=1500,
+                connectTimeoutMS=1500,
+                socketTimeoutMS=5000,
+                maxPoolSize=20,
+                minPoolSize=0,
+                retryWrites=True,
+                retryReads=True,
+                appname="predictrix-market-analyst",
+                connect=False,
             )
-            # Холболтыг verify хийнэ (timeout дотор)
-            self.client.admin.command('ping')
             self.db = self.client.get_database()
             self.news_collection = self.db.news_analysis
             self.insights_collection = self.db.ai_insights
-            print("[OK] MarketAnalyst connected to MongoDB")
+            self._mongo_available = True
+            print("[INFO] MarketAnalyst Mongo client initialized (lazy mode)", flush=True)
         except Exception as e:
-            print(f"[WARN] MongoDB холбогдсонгүй, offline горимд ажиллана: {e}", flush=True)
-            self.client = None
-            self.db = None
-            self.news_collection = None
-            self.insights_collection = None
+            print(f"[WARN] MongoDB client init failed, offline горимд ажиллана: {e}", flush=True)
+            self._disable_mongo()
 
         # Cache settings (per-pair)
         self._insight_cache = {}  # { pair: { "data": ..., "time": ... } }
@@ -88,6 +112,98 @@ class MarketAnalyst:
         self.FLASH_EXHAUSTION_WINDOW = 5 * 60   # 5 минут
         self.FLASH_EXHAUSTION_COUNT  = 2        # 5мин дотор хэдэн удаа fail бол exhausted
         self.FLASH_PROBE_INTERVAL    = 2 * 3600 # 2 цаг тутамд probe
+
+        # ─── Pollinations fallback circuit breaker ───
+        try:
+            self.FALLBACK_FAIL_THRESHOLD = max(1, int(os.environ.get('POLLINATIONS_FAIL_THRESHOLD', '3')))
+        except Exception:
+            self.FALLBACK_FAIL_THRESHOLD = 3
+
+        try:
+            self.FALLBACK_COOLDOWN_SECONDS = max(30, int(os.environ.get('POLLINATIONS_COOLDOWN_SECONDS', '120')))
+        except Exception:
+            self.FALLBACK_COOLDOWN_SECONDS = 120
+
+        self._fallback_fail_count = 0
+        self._fallback_circuit_open_until = 0.0
+
+        try:
+            self.MAX_PROMPT_CHARS = max(2000, int(os.environ.get('AI_PROMPT_MAX_CHARS', '12000')))
+        except Exception:
+            self.MAX_PROMPT_CHARS = 12000
+
+        self.MAX_TEXT_FIELD_CHARS = 2000
+        self._disallowed_output_patterns = [
+            re.compile(r"\b(100\s*%|guaranteed\s+profit|risk\s*free)\b", re.IGNORECASE),
+            re.compile(r"(баталгаатай\s+ашиг|эрсдэлгүй\s+ашиг|өр\s+тавьж\s+арилжаал)", re.IGNORECASE),
+            re.compile(r"\b(all\s+in|bet\s+everything)\b", re.IGNORECASE),
+        ]
+
+    def _disable_mongo(self):
+        """Disable Mongo usage for the current process after connectivity failure."""
+        self._mongo_available = False
+        self.db = None
+        self.news_collection = None
+        self.insights_collection = None
+        try:
+            if self.client is not None:
+                self.client.close()
+        except Exception:
+            pass
+        self.client = None
+
+    def _handle_mongo_connectivity_failure(self, err):
+        print(f"[WARN] MongoDB unavailable. Switching MarketAnalyst to offline mode: {err}", flush=True)
+        self._disable_mongo()
+
+    def _normalize_pair_outlook(self, outlook, technical_signal=None):
+        raw = str(outlook or '').strip()
+        upper = raw.upper()
+        if upper in self.PAIR_OUTLOOK_VALUES:
+            return upper
+
+        lowered = raw.lower()
+        bearish_keywords = ['bear', 'sell', 'буур', 'унах', 'зарах', 'сулрах', 'сулар', 'down']
+        bullish_keywords = ['bull', 'buy', 'өс', 'авах', 'чангар', 'up']
+        neutral_keywords = ['neutral', 'sideways', 'flat', 'range', 'тогтвортой', 'саармаг', 'хүлээлт', 'mixed']
+
+        if any(keyword in lowered for keyword in bearish_keywords):
+            return 'BEARISH'
+        if any(keyword in lowered for keyword in bullish_keywords):
+            return 'BULLISH'
+        if any(keyword in lowered for keyword in neutral_keywords):
+            return 'NEUTRAL'
+
+        signal = str(technical_signal or '').upper()
+        if signal == 'BUY':
+            return 'BULLISH'
+        if signal == 'SELL':
+            return 'BEARISH'
+        return 'NEUTRAL'
+
+    def _normalize_market_outlook(self, outlook):
+        raw = str(outlook or '').strip()
+        upper = raw.upper()
+        if upper in self.MARKET_OUTLOOK_VALUES:
+            return upper
+
+        lowered = raw.lower()
+        if any(keyword in lowered for keyword in ['risk-off', 'risk off', 'эрсдэлээс зайлсхий', 'аюулгүй', 'safe haven']):
+            return 'RISK-OFF'
+        if any(keyword in lowered for keyword in ['risk-on', 'risk on', 'эрсдэлд дуртай', 'эрсдэлтэй хөрөнгө']):
+            return 'RISK-ON'
+        if any(keyword in lowered for keyword in ['bullish usd', 'usd bullish', 'strong usd', 'доллар чангарах', 'ам.доллар чангарах']):
+            return 'BULLISH USD'
+        if any(keyword in lowered for keyword in ['bearish usd', 'usd bearish', 'weak usd', 'доллар сулрах', 'ам.доллар сулрах']):
+            return 'BEARISH USD'
+        if any(keyword in lowered for keyword in ['mixed', 'холимог', 'саармаг', 'neutral', 'тодорхойгүй']):
+            return 'MIXED'
+        return 'MIXED'
+
+    def _normalize_outlook_by_pair(self, pair, outlook, technical_signal=None):
+        if pair == 'MARKET':
+            return self._normalize_market_outlook(outlook)
+        return self._normalize_pair_outlook(outlook, technical_signal=technical_signal)
 
     def _configure_gemini(self):
         """Initialize Gemini client with current API key"""
@@ -133,8 +249,122 @@ class MarketAnalyst:
             self._configure_gemini()
             return False
 
+    def _is_fallback_circuit_open(self):
+        now = time.time()
+        open_until = float(self._fallback_circuit_open_until or 0.0)
+        if open_until <= now:
+            if self._fallback_circuit_open_until:
+                self._fallback_circuit_open_until = 0.0
+            return False, 0
+        return True, max(1, int(open_until - now))
+
+    def _record_fallback_success(self):
+        self._fallback_fail_count = 0
+        self._fallback_circuit_open_until = 0.0
+
+    def _record_fallback_failure(self, reason=''):
+        now = time.time()
+        circuit_open, retry_after = self._is_fallback_circuit_open()
+        if circuit_open:
+            return retry_after
+
+        self._fallback_fail_count += 1
+        print(
+            f"[WARN] Pollinations fallback failure {self._fallback_fail_count}/{self.FALLBACK_FAIL_THRESHOLD}: {reason}",
+            flush=True,
+        )
+
+        if self._fallback_fail_count >= self.FALLBACK_FAIL_THRESHOLD:
+            self._fallback_fail_count = 0
+            self._fallback_circuit_open_until = now + self.FALLBACK_COOLDOWN_SECONDS
+            print(
+                f"[WARN] Pollinations circuit opened for {self.FALLBACK_COOLDOWN_SECONDS}s",
+                flush=True,
+            )
+            return self.FALLBACK_COOLDOWN_SECONDS
+
+        return 0
+
+    def _sanitize_prompt(self, prompt):
+        text = str(prompt or '')
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', ' ', text)
+        text = re.sub(r"ignore\s+previous\s+instructions", "[filtered]", text, flags=re.IGNORECASE)
+        text = re.sub(r"disregard\s+previous\s+instructions", "[filtered]", text, flags=re.IGNORECASE)
+        text = re.sub(r"developer\s+mode", "[filtered]", text, flags=re.IGNORECASE)
+
+        if len(text) > self.MAX_PROMPT_CHARS:
+            text = text[: self.MAX_PROMPT_CHARS]
+
+        return text.strip()
+
+    def _contains_disallowed_output(self, text):
+        normalized = str(text or '').strip()
+        if not normalized:
+            return False
+
+        for pattern in self._disallowed_output_patterns:
+            if pattern.search(normalized):
+                return True
+        return False
+
+    def _sanitize_analysis_payload(self, payload):
+        if not isinstance(payload, dict):
+            return payload
+
+        sanitized = {}
+        for key, value in payload.items():
+            if isinstance(value, str):
+                trimmed = value.strip()
+                if self._contains_disallowed_output(trimmed):
+                    trimmed = "Энэ хэсгийг AI safety policy дагуу хязгаарлав."
+                if len(trimmed) > self.MAX_TEXT_FIELD_CHARS:
+                    trimmed = trimmed[: self.MAX_TEXT_FIELD_CHARS].rstrip() + "..."
+                sanitized[key] = trimmed
+            elif isinstance(value, list):
+                cleaned = []
+                for item in value[:10]:
+                    if isinstance(item, str):
+                        item_text = item.strip()
+                        if self._contains_disallowed_output(item_text):
+                            continue
+                        if len(item_text) > self.MAX_TEXT_FIELD_CHARS:
+                            item_text = item_text[: self.MAX_TEXT_FIELD_CHARS].rstrip() + "..."
+                        cleaned.append(item_text)
+                    else:
+                        cleaned.append(item)
+                sanitized[key] = cleaned
+            else:
+                sanitized[key] = value
+
+        return sanitized
+
+    def _guard_ai_text_output(self, text, force_json=False):
+        cleaned = str(text or '').strip()
+        if not cleaned:
+            return None
+
+        if not force_json and self._contains_disallowed_output(cleaned):
+            return None
+
+        return cleaned
+
+    def _gemini_safety_settings(self):
+        if self.safety_mode == 'off':
+            threshold = "BLOCK_NONE"
+        elif self.safety_mode == 'strict':
+            threshold = "BLOCK_MEDIUM_AND_ABOVE"
+        else:
+            threshold = "BLOCK_ONLY_HIGH"
+
+        return [
+            genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold=threshold),
+            genai_types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold=threshold),
+            genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold=threshold),
+            genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold=threshold),
+        ]
+
     def _call_ai(self, prompt, force_json=False, model=None, retries=3):
-        """Unified AI caller: Gemini (key circular rotation) → Pollinations.
+        """Unified AI caller: Gemini (key circular rotation) -> optional Pollinations fallback.
 
         Flash логик:
           • Key#1→Key#21→Key#1 тойрог хэлбэрээр ажиллана
@@ -143,6 +373,7 @@ class MarketAnalyst:
           • 2 цаг тутамд key#1-ээр probe → сэргэсэн бол Flash тойрогт буцна
         """
         use_model = model or self.LITE_MODEL
+        sanitized_prompt = self._sanitize_prompt(prompt)
 
         # ─── Flash exhausted үед: 2ц probe эсвэл Lite руу шилжих ───
         if use_model == self.FLASH_MODEL and self._flash_exhausted:
@@ -179,17 +410,12 @@ class MarketAnalyst:
                 try:
                     final_prompt = (
                         "IMPORTANT: This analysis is for EDUCATIONAL PURPOSES ONLY. "
-                        "Do not provide financial advice.\n\n" + prompt
+                        "Do not provide financial advice.\n\n" + sanitized_prompt
                     )
                     if force_json:
                         final_prompt += "\n\nReturn JSON only."
 
-                    safety_settings = [
-                        genai_types.SafetySetting(category="HARM_CATEGORY_HARASSMENT",        threshold="BLOCK_NONE"),
-                        genai_types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH",       threshold="BLOCK_NONE"),
-                        genai_types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_NONE"),
-                        genai_types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_NONE"),
-                    ]
+                    safety_settings = self._gemini_safety_settings()
                     config_kwargs = {"safety_settings": safety_settings}
                     if force_json:
                         config_kwargs["response_mime_type"] = "application/json"
@@ -207,6 +433,10 @@ class MarketAnalyst:
 
                     if not text:
                         raise Exception("Gemini returned empty text string")
+
+                    text = self._guard_ai_text_output(text, force_json=force_json)
+                    if not text:
+                        raise Exception("Gemini output blocked by safety guardrail")
 
                     print(f"[DEBUG] Gemini [{use_model}] Key#{self.current_key_index+1} OK: {text[:80]}...", flush=True)
                     return text
@@ -258,8 +488,20 @@ class MarketAnalyst:
                 print(f"[WARN] [{use_model}] Бүх {total_keys} key хязгаар тулсан → Pollinations fallback.", flush=True)
 
         # 2. Fallback to Pollinations
+        if not self.allow_external_fallback:
+            print("[WARN] External fallback disabled by policy.", flush=True)
+            return None
+
+        circuit_open, retry_after = self._is_fallback_circuit_open()
+        if circuit_open:
+            print(
+                f"[WARN] Pollinations circuit open ({retry_after}s left) -> fallback skipped.",
+                flush=True,
+            )
+            return None
+
         url = "https://text.pollinations.ai/"
-        final_prompt = prompt
+        final_prompt = sanitized_prompt
         if force_json:
             final_prompt += "\n\nCRITICAL: RESPONSE MUST BE VALID JSON ONLY. NO OTHER TEXT."
 
@@ -268,13 +510,25 @@ class MarketAnalyst:
                 response = requests.post(url, data=final_prompt.encode('utf-8'), timeout=60)
                 if response.status_code == 200:
                     text = response.text.strip()
+                    if not text:
+                        self._record_fallback_failure('empty response body')
+                        time.sleep(1)
+                        continue
                     for marker in ["**Support Pollinations.AI:**", "**Ad**", "---"]:
                         if marker in text:
                             text = text.split(marker)[0]
+                    text = self._guard_ai_text_output(text, force_json=force_json)
+                    if not text:
+                        self._record_fallback_failure('fallback output blocked by safety guardrail')
+                        continue
+                    self._record_fallback_success()
                     return text.strip()
+
+                self._record_fallback_failure(f'HTTP {response.status_code}')
                 time.sleep(1)
             except Exception as e:
                 print(f"Pollinations API Error (Attempt {attempt+1}/{retries}): {e}")
+                self._record_fallback_failure(str(e))
                 time.sleep(1)
         return None
 
@@ -440,14 +694,16 @@ TONE: Institutional, analytical, objective. No financial advice.
 
     def analyze_news_impact(self, news_item):
         """Analyze a single news item using Pollinations"""
-        if getattr(self, 'db', None) is None: return "Database unavailable."
+        if not self._mongo_available or self.news_collection is None:
+            return "Database unavailable."
 
         news_id = f"{news_item.get('date')}_{news_item.get('name')}_{news_item.get('currency')}"
-        
-        existing = self.news_collection.find_one({"_id": news_id})
-        if existing: return existing.get('impact_analysis')
 
         try:
+            existing = self.news_collection.find_one({"_id": news_id})
+            if existing:
+                return existing.get('impact_analysis')
+
             prompt = f"""
 ROLE: Institutional Quantitative Macro Strategist.
 TASK: Write EXACTLY ONE highly professional, analytical sentence in MONGOLIAN explaining the fundamental impact of this event.
@@ -473,6 +729,9 @@ CRITICAL: Output ONLY the single Mongolian sentence. No markdown, no bullet poin
             })
             
             return analysis_text
+        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure) as conn_err:
+            self._handle_mongo_connectivity_failure(conn_err)
+            return "Database unavailable."
         except Exception as e:
             print(f"Error analyzing news impact: {e}")
             return "Analysis failed."
@@ -549,7 +808,7 @@ Focus on central bank monetary policy divergence, yield curve dynamics, macroeco
 REQUIRED JSON STRUCTURE:
 {{
   "pair": "MARKET",
-  "outlook": "BULLISH USD / BEARISH USD / MIXED / RISK-ON / RISK-OFF (Choose one that best fits the macro environment)",
+    "outlook": "MUST be exactly one of: BULLISH USD, BEARISH USD, MIXED, RISK-ON, RISK-OFF",
   "summary": "Write a dense, professional 4-5 sentence macroeconomic summary in Mongolian. Synthesize how recent data impacts central bank rate expectations (Fed, ECB, BOE, BOJ) and global liquidity. Explain the fundamental drivers behind current currency valuations.",
   "key_drivers": [
     "List 3-4 highly specific fundamental drivers in Mongolian (e.g., 'АНУ-ын инфляцын өсөлтөөс шалтгаалсан Холбооны Нөөцийн Сангийн бодлогын хүүгийн хүлээлт', 'Евро бүсийн аж үйлдвэрийн салбарын уналт')."
@@ -569,6 +828,7 @@ CRITICAL CONSTRAINTS:
 1. Return ONLY valid JSON. No markdown blocks (```json), no introductory text.
 2. All text values MUST be in highly professional, grammatically correct Mongolian (Cyrillic).
 3. Use institutional financial terminology (e.g., мөнгөний бодлого, өгөөжийн муруй, инфляцын дарамт, хөрвөх чадвар).
+4. "outlook" value MUST be EXACT token only (uppercase), without extra words.
 """
             else:
                 # Хосолсон валютын шинжилгээ — ЧИГЛЭЛ ЗААХГҮЙ
@@ -590,7 +850,7 @@ Generate a highly analytical JSON response in PROFESSIONAL MONGOLIAN (Cyrillic).
 REQUIRED JSON STRUCTURE:
 {{
   "pair": "{pair}",
-  "outlook": "BULLISH / BEARISH / NEUTRAL (Based on combined macro & technical view)",
+    "outlook": "MUST be exactly one of: BULLISH, BEARISH, NEUTRAL",
   "summary": "Write a dense 3-4 sentence institutional summary in Mongolian. Synthesize the algorithmic technical bias ({signal_type}) with the fundamental macroeconomic context. Explain the interaction between {base} monetary policy/data and {quote} monetary policy/data.",
   "key_drivers": [
     "List 3-4 highly specific fundamental drivers for {base} and {quote} in Mongolian (e.g., '{base} төв банкны бодлогын хүүгийн зөрүү', '{quote} инфляцын дарамт')."
@@ -610,6 +870,7 @@ CRITICAL CONSTRAINTS:
 1. Return ONLY valid JSON. No markdown blocks (```json), no introductory text.
 2. All text values MUST be in highly professional, grammatically correct Mongolian (Cyrillic).
 3. Use institutional financial terminology.
+4. "outlook" MUST be EXACT token (BULLISH or BEARISH or NEUTRAL) in uppercase only. No Mongolian words in outlook.
 """
             
             # Retry logic for JSON parsing
@@ -668,6 +929,8 @@ CRITICAL CONSTRAINTS:
             for k, v in insight.items():
                 normalized_insight[k.lower()] = v
 
+            normalized_insight = self._sanitize_analysis_payload(normalized_insight)
+
             # Defaults
             if 'forecast' not in normalized_insight:
                 normalized_insight['forecast'] = "Таамаглал одоогоор тодорхойгүй байна."
@@ -675,9 +938,13 @@ CRITICAL CONSTRAINTS:
                 normalized_insight['summary'] = "Зах зээлийн мэдээлэлд үндэслэн автомат дүгнэлт гаргахад алдаа гарлаа."
             if 'key_drivers' not in normalized_insight:
                 normalized_insight['key_drivers'] = []
-            # outlook — зөвхөн MARKET-т байна, хосолсонд шаардахгүй
-            if pair == "MARKET" and 'outlook' not in normalized_insight:
-                normalized_insight['outlook'] = normalized_insight.get('market_sentiment', 'Тодорхойгүй')
+
+            normalized_insight['pair'] = pair
+            normalized_insight['outlook'] = self._normalize_outlook_by_pair(
+                pair,
+                normalized_insight.get('outlook', normalized_insight.get('market_sentiment')),
+                technical_signal=signal_type
+            )
 
             insight = normalized_insight
 
@@ -700,7 +967,7 @@ CRITICAL CONSTRAINTS:
                 print("[WARN] EUR/USD Analysis Failed - Returning Error State (No Mocking)")
                 return {
                     "pair": pair,
-                    "outlook": "Analysis Unavailable",
+                    "outlook": "NEUTRAL",
                     "summary": "AI System is currently offline. Unable to generate real-time analysis.",
                     "recent_events": [],
                     "event_impacts": "N/A",
@@ -716,7 +983,7 @@ CRITICAL CONSTRAINTS:
         """Fallback for general market analysis"""
         return {
             "pair": "MARKET",
-            "outlook": "Тодорхойгүй (Neutral)",
+            "outlook": "MIXED",
             "summary": "AI систем ачаалалтай байгаа тул автомат дүгнэлт хийхэд саатал гарлаа. Гэхдээ зах зээл ерөнхийдөө тогтвортой, хүлээлтийн байдалтай байна.",
             "recent_events": ["AI холболт саатлаа", "Техник үзүүлэлт хэвийн"],
             "event_impacts": "Тодорхойлох боломжгүй",
@@ -729,9 +996,11 @@ CRITICAL CONSTRAINTS:
     def _save_to_db(self, insight, pair):
         """Safely save insight to DB"""
         try:
-            if getattr(self, 'db', None) is not None:
+            if self._mongo_available and self.insights_collection is not None:
                 self.insights_collection.insert_one(insight.copy())
                 print(f"[OK] Saved AI insight for {pair} to DB")
+        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure) as conn_err:
+            self._handle_mongo_connectivity_failure(conn_err)
         except Exception as e:
             print(f"[ERROR] Error saving insight to DB: {e}")
 
@@ -743,7 +1012,7 @@ CRITICAL CONSTRAINTS:
         
         insight = {
             "pair": pair,
-            "outlook": "Тодорхойгүй",
+            "outlook": "NEUTRAL",
             "summary": "AI холболт түр саатсан тул автомат дүгнэлт гаргах боломжгүй байна. Техник үзүүлэлтүүдийг харна уу.",
             "recent_events": ["Мэдээлэл байхгүй"],
             "event_impacts": "Мэдээлэл байхгүй",
@@ -754,12 +1023,12 @@ CRITICAL CONSTRAINTS:
         }
         
         if signal_type == "BUY":
-            insight["outlook"] = "Өсөх хандлагатай (Bullish)"
+            insight["outlook"] = "BULLISH"
             insight["summary"] = f"Техник үзүүлэлтүүд {confidence:.1f}%-ийн магадлалтайгаар өсөлтийг зааж байна."
             insight["forecast"] = "Ханш өсөх хандлагатай байна."
             insight["market_sentiment"] = "Risk-On"
         elif signal_type == "SELL":
-            insight["outlook"] = "Унах хандлагатай (Bearish)"
+            insight["outlook"] = "BEARISH"
             insight["summary"] = f"Зах зээл уналтын дохио өгч байна ({confidence:.1f}%)."
             insight["forecast"] = "Ханш буурах хандлагатай байна."
             insight["market_sentiment"] = "Risk-Off"

@@ -21,6 +21,8 @@ const AppAlert: React.FC = () => {
   const colors = getColors(isDark);
   const { alertState, hideAlert } = useAlert();
   const { visible, title, message, buttons } = alertState;
+  const shouldJustifyMessage =
+    message.length > 120 || message.includes("\n");
 
   const handlePress = (btn: AlertButton) => {
     hideAlert();
@@ -54,7 +56,16 @@ const AppAlert: React.FC = () => {
           <Text style={styles.title}>{title}</Text>
 
           {/* Message */}
-          {!!message && <Text style={styles.message}>{message}</Text>}
+          {!!message && (
+            <Text
+              style={[
+                styles.message,
+                shouldJustifyMessage && styles.messageLong,
+              ]}
+            >
+              {message}
+            </Text>
+          )}
 
           {/* Divider */}
           <View style={styles.divider} />
@@ -135,6 +146,9 @@ const createStyles = (colors: any, isDark: boolean) =>
       paddingHorizontal: 20,
       paddingBottom: 18,
       lineHeight: 20,
+    },
+    messageLong: {
+      textAlign: "justify",
     },
     divider: {
       height: 1,

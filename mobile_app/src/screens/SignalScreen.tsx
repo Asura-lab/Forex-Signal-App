@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { useTheme } from "../context/ThemeContext";
 import { getColors } from "../config/theme";
+import { UI_COPY } from "../config/copy";
 import { useQuery } from "@tanstack/react-query";
 import { getMarketAnalysis } from "../services/api";
 import { NavigationProp, RouteProp } from "@react-navigation/native";
@@ -38,6 +39,64 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
   const [expandedSummary, setExpandedSummary] = useState(false);
   const [expandedForecast, setExpandedForecast] = useState(false);
 
+  const getNormalizedOutlook = (value: unknown) => {
+    const normalized = String(value || "").toLowerCase();
+
+    const bearishKeywords = ["bear", "sell", "буур", "унах", "зарах", "сулрах", "down"];
+    const bullishKeywords = ["bull", "buy", "өс", "авах", "чангар", "up"];
+    const stableKeywords = ["neutral", "stable", "hold", "sideways", "flat", "тогтвортой", "саармаг", "хажуу"];
+
+    if (bearishKeywords.some((keyword) => normalized.includes(keyword))) {
+      return { label: "BEARISH", color: "#EF4444" };
+    }
+
+    if (bullishKeywords.some((keyword) => normalized.includes(keyword))) {
+      return { label: "BULLISH", color: "#22C55E" };
+    }
+
+    if (stableKeywords.some((keyword) => normalized.includes(keyword))) {
+      return { label: "NEUTRAL", color: "#F59E0B" };
+    }
+
+    return { label: "NEUTRAL", color: "#F59E0B" };
+  };
+
+  const getAnalysisSourceBadge = (source: unknown, stale: boolean) => {
+    const normalized = String(source || "").toLowerCase();
+
+    if (stale || normalized === "cache-stale") {
+      return { label: UI_COPY.signal.badges.staleCache, color: colors.warning };
+    }
+
+    if (normalized === "cache-fallback") {
+      return { label: UI_COPY.signal.badges.fallbackCache, color: colors.warning };
+    }
+
+    if (normalized === "cache-fresh") {
+      return { label: UI_COPY.signal.badges.cached, color: colors.primary };
+    }
+
+    if (normalized === "market-direct") {
+      return { label: UI_COPY.signal.badges.marketMode, color: colors.primary };
+    }
+
+    return { label: UI_COPY.signal.badges.realtime, color: colors.success };
+  };
+
+  const formatMetaTime = (iso: unknown) => {
+    if (!iso) return "";
+    try {
+      return new Date(String(iso)).toLocaleString("mn-MN", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+
   // Truncate text helper
   const truncateText = (text: string, limit: number = 200) =>
     text && text.length > limit ? text.substring(0, limit) + "..." : text;
@@ -47,6 +106,7 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
     data: aiAnalysis,
     isLoading: loadingAnalysis,
     isError: analysisError,
+    error: analysisQueryError,
     isFetching: analysisFetching,
     failureCount,
     refetch,
@@ -55,7 +115,23 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
     queryFn: async () => {
       if (!pair?.name) return null;
       const result = await getMarketAnalysis(pair.name);
-      if (!result.success) throw new Error('fetch_failed');
+      if (!result.success) {
+        const errorCode = result.statusCode;
+        const typedError = new Error(
+          errorCode === 400
+            ? 'unsupported_pair'
+            : errorCode === 429
+              ? 'rate_limited'
+              : 'fetch_failed'
+        ) as Error & { retryAfter?: number };
+
+        if (typeof result.retryAfter === 'number') {
+          typedError.retryAfter = result.retryAfter;
+        }
+
+        throw typedError;
+      }
+
       const data = result.data;
       // Шинжилгээ бүрэн биш бол cache хийлгүй retry хийнэ
       const isEmpty =
@@ -68,9 +144,29 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
     staleTime: 15 * 60 * 1000,
     gcTime: 30 * 60 * 1000,
     enabled: !!pair?.name,
-    retry: 5,
-    retryDelay: (attempt) => Math.min(8000 * (attempt + 1), 30000), // 8s, 16s, 24s, 30s, 30s
+    retry: (attempt, error: any) => {
+      if (error?.message === 'unsupported_pair') return false;
+      if (error?.message === 'rate_limited') return attempt < 3;
+      return attempt < 5;
+    },
+    retryDelay: (attempt, error: any) => {
+      const retryAfterSeconds = Number(error?.retryAfter || 0);
+      if (retryAfterSeconds > 0) {
+        return Math.min(retryAfterSeconds * 1000, 30000);
+      }
+      return Math.min(8000 * (attempt + 1), 30000);
+    }, // 8s, 16s, 24s, 30s, 30s
   });
+
+  const queryErrorMessage = (analysisQueryError as Error | null)?.message || "";
+  const isUnsupportedPairError = queryErrorMessage === "unsupported_pair";
+  const isRateLimitedError = queryErrorMessage === "rate_limited";
+
+  const emptyStateText = isUnsupportedPairError
+    ? UI_COPY.signal.unsupportedPair
+    : isRateLimitedError
+      ? UI_COPY.signal.rateLimited
+      : UI_COPY.signal.emptyDefault;
 
 
 
@@ -80,12 +176,18 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel={UI_COPY.signal.back}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <ChevronLeft size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <Text style={styles.pairName}>{pair?.name || "EUR/USD"}</Text>
-          <Text style={styles.pairSub}>AI Шинжилгээ</Text>
+          <Text style={styles.pairName} allowFontScaling maxFontSizeMultiplier={1.3}>{pair?.name || "EUR/USD"}</Text>
+          <Text style={styles.pairSub} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.signal.subtitle}</Text>
         </View>
         <View style={{ width: 48 }} />
       </View>
@@ -95,39 +197,76 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
         {(loadingAnalysis || (analysisError && analysisFetching)) ? (
           <View style={[styles.signalCard, { alignItems: "center", paddingVertical: 48 }]}>
             <ActivityIndicator color={colors.primary} size="large" />
-            <Text style={styles.loadingText}>
+            <Text style={styles.loadingText} allowFontScaling maxFontSizeMultiplier={1.4}>
               {failureCount > 0
-                ? `AI шинжилж байна... (${failureCount + 1}-р оролдлого)`
-                : 'AI шинжилж байна...'}
+                ? `${UI_COPY.signal.loading} (${failureCount + 1}-р оролдлого)`
+                : UI_COPY.signal.loading}
             </Text>
           </View>
         ) : aiAnalysis ? (
           (() => {
             const rawOutlook = aiAnalysis.outlook || aiAnalysis.market_sentiment || "Neutral";
-            const normalizedOutlook = String(rawOutlook).toLowerCase();
-            const isBearish =
-              normalizedOutlook.includes("bear") ||
-              normalizedOutlook.includes("sell") ||
-              normalizedOutlook.includes("буур") ||
-              normalizedOutlook.includes("унах") ||
-              normalizedOutlook.includes("зарах");
-            const isBullish =
-              normalizedOutlook.includes("bull") ||
-              normalizedOutlook.includes("buy") ||
-              normalizedOutlook.includes("өс") ||
-              normalizedOutlook.includes("авах");
-
-            // Required mapping: bearish=red, bullish=green, neutral/stable=mustard-yellow
-            const outlookColor = isBearish
-              ? "#EF4444"
-              : isBullish
-                ? "#22C55E"
-                : "#F59E0B";
+            const normalizedOutlook = getNormalizedOutlook(rawOutlook);
+            const analysisMeta = (aiAnalysis as any).__meta || {};
+            const uncertaintyLevel = String((aiAnalysis as any).uncertainty_level || "unknown").toUpperCase();
+            const actionability = String((aiAnalysis as any).actionability || "review_then_execute_with_risk_controls");
+            const oversightRequired = Boolean((aiAnalysis as any).human_oversight_required !== false);
+            const oversightNote = String((aiAnalysis as any).oversight_note || "");
+            const sourceBadge = getAnalysisSourceBadge(
+              analysisMeta.analysisSource,
+              Boolean(analysisMeta.stale)
+            );
             return (
               <>
                 {/* Outlook banner */}
                 <View style={styles.outlookCard}>
-                  <Text style={[styles.outlookText, { color: outlookColor }]}>{rawOutlook}</Text>
+                  <Text style={[styles.outlookText, { color: normalizedOutlook.color }]}>
+                    {normalizedOutlook.label}
+                  </Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.analysisSourceBadge,
+                    {
+                      borderColor: sourceBadge.color + "55",
+                      backgroundColor: sourceBadge.color + "16",
+                    },
+                  ]}
+                >
+                  <Text style={[styles.analysisSourceBadgeText, { color: sourceBadge.color }]}>
+                    {sourceBadge.label}
+                  </Text>
+                  {analysisMeta.generatedAt ? (
+                    <Text style={styles.analysisSourceTime}>{formatMetaTime(analysisMeta.generatedAt)}</Text>
+                  ) : null}
+                </View>
+
+                <View style={styles.raiCard}>
+                  <Text style={styles.raiHeader}>RESPONSIBLE AI</Text>
+
+                  <View style={styles.raiRow}>
+                    <Text style={styles.raiLabel}>{UI_COPY.signal.uncertaintyLabel}</Text>
+                    <Text style={styles.raiValue}>{uncertaintyLevel}</Text>
+                  </View>
+
+                  <View style={styles.raiDivider} />
+
+                  <View style={styles.raiRow}>
+                    <Text style={styles.raiLabel}>{UI_COPY.signal.actionabilityLabel}</Text>
+                    <Text style={styles.raiValue}>{actionability.replace(/_/g, " ")}</Text>
+                  </View>
+
+                  <View style={styles.raiDivider} />
+
+                  <View style={styles.raiRow}>
+                    <Text style={styles.raiLabel}>{UI_COPY.signal.humanOversightLabel}</Text>
+                    <Text style={styles.raiValue}>
+                      {oversightRequired ? UI_COPY.signal.humanOversightRequired : UI_COPY.signal.humanOversightOptional}
+                    </Text>
+                  </View>
+
+                  {!!oversightNote && <Text style={styles.raiNote}>{oversightNote}</Text>}
                 </View>
 
                 {/* Summary */}
@@ -135,18 +274,20 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                   <View style={styles.sectionCard}>
                     <View style={styles.sectionTitleRow}>
                       <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
-                      <Text style={styles.sectionTitle}>ДҮГНЭЛТ</Text>
+                      <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.signal.summaryTitle}</Text>
                     </View>
-                    <Text style={styles.sectionText}>
+                    <Text style={styles.sectionText} allowFontScaling maxFontSizeMultiplier={1.4}>
                       {expandedSummary ? aiAnalysis.summary : truncateText(aiAnalysis.summary, 180)}
                     </Text>
                     {aiAnalysis.summary.length > 180 && (
                       <TouchableOpacity
                         onPress={() => setExpandedSummary(!expandedSummary)}
                         style={styles.expandBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={expandedSummary ? UI_COPY.signal.collapse : UI_COPY.signal.expand}
                       >
-                        <Text style={styles.expandBtnText}>
-                          {expandedSummary ? "Буулгах" : "Дэлгэрэнгүй харах"}
+                        <Text style={styles.expandBtnText} allowFontScaling maxFontSizeMultiplier={1.4}>
+                          {expandedSummary ? UI_COPY.signal.collapse : UI_COPY.signal.expand}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -158,18 +299,20 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                   <View style={[styles.sectionCard, { borderLeftWidth: 3, borderLeftColor: colors.warning + "80" }]}>
                     <View style={styles.sectionTitleRow}>
                       <View style={[styles.sectionDot, { backgroundColor: colors.warning }]} />
-                      <Text style={styles.sectionTitle}>ТААМАГЛАЛ</Text>
+                      <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.signal.forecastTitle}</Text>
                     </View>
-                    <Text style={styles.sectionText}>
+                    <Text style={styles.sectionText} allowFontScaling maxFontSizeMultiplier={1.4}>
                       {expandedForecast ? aiAnalysis.forecast : truncateText(aiAnalysis.forecast, 180)}
                     </Text>
                     {aiAnalysis.forecast.length > 180 && (
                       <TouchableOpacity
                         onPress={() => setExpandedForecast(!expandedForecast)}
                         style={styles.expandBtn}
+                        accessibilityRole="button"
+                        accessibilityLabel={expandedForecast ? UI_COPY.signal.collapse : UI_COPY.signal.expand}
                       >
-                        <Text style={styles.expandBtnText}>
-                          {expandedForecast ? "Буулгах" : "Дэлгэрэнгүй харах"}
+                        <Text style={styles.expandBtnText} allowFontScaling maxFontSizeMultiplier={1.4}>
+                          {expandedForecast ? UI_COPY.signal.collapse : UI_COPY.signal.expand}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -181,12 +324,12 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
                   <View style={[styles.sectionCard, { borderLeftWidth: 3, borderLeftColor: colors.error + "80" }]}>
                     <View style={styles.sectionTitleRow}>
                       <View style={[styles.sectionDot, { backgroundColor: colors.error }]} />
-                      <Text style={styles.sectionTitle}>ЭРСДЭЛТ ХҮЧИН ЗҮЙЛС</Text>
+                      <Text style={styles.sectionTitle} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.signal.riskTitle}</Text>
                     </View>
                     {(aiAnalysis.risk_factors as any[]).map((risk: any, index: number) => (
                       <View key={index} style={styles.riskRow}>
                         <View style={[styles.riskBullet, { backgroundColor: colors.error }]} />
-                        <Text style={styles.riskText}>{risk}</Text>
+                        <Text style={styles.riskText} allowFontScaling maxFontSizeMultiplier={1.4}>{risk}</Text>
                       </View>
                     ))}
                   </View>
@@ -196,22 +339,52 @@ const SignalScreen = ({ route, navigation }: SignalScreenProps) => {
           })()
         ) : (
           <View style={[styles.signalCard, { alignItems: "center", paddingVertical: 40, gap: 16 }]}>
-            <Text style={styles.sectionText}>Шинжилгээ хийгдээгүй байна</Text>
-            <TouchableOpacity
-              onPress={() => refetch()}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10,
-                borderRadius: 8, borderWidth: 1, borderColor: colors.primary + '60' }}
-            >
-              <RefreshCw size={16} color={colors.primary} />
-              <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Дахин оролдох</Text>
-            </TouchableOpacity>
+            <Text style={styles.sectionText} allowFontScaling maxFontSizeMultiplier={1.4}>{emptyStateText}</Text>
+            {isUnsupportedPairError ? (
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '60'
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={UI_COPY.signal.back}
+              >
+                <ChevronLeft size={16} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.signal.back}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={() => refetch()}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  padding: 10,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: colors.primary + '60'
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={UI_COPY.signal.retry}
+              >
+                <RefreshCw size={16} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.signal.retry}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         {/* Disclaimer */}
-        <Text style={styles.disclaimer}>
-          [!] Зөвхөн судалгааны зорилготой. Санхүүгийн зөвлөгөө биш.
-        </Text>
+        <View style={styles.disclaimerBox}>
+          <Text style={styles.disclaimerBadge} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.signal.disclaimerTitle}</Text>
+          <Text style={styles.disclaimer} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.signal.disclaimerText}</Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -630,6 +803,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 22,
     marginBottom: 8,
+    textAlign: "justify",
   },
   expandBtn: {
     marginTop: 10,
@@ -666,6 +840,72 @@ const createStyles = (colors: any) => StyleSheet.create({
     lineHeight: 32,
     textAlign: "center",
   },
+  analysisSourceBadge: {
+    marginTop: -8,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    gap: 2,
+  },
+  analysisSourceBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    letterSpacing: 0.8,
+  },
+  analysisSourceTime: {
+    fontSize: 11,
+    color: colors.textSecondary,
+  },
+  raiCard: {
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: colors.warning + "50",
+    backgroundColor: colors.warning + "14",
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  raiHeader: {
+    color: colors.warning,
+    fontSize: 11,
+    fontWeight: "800",
+    letterSpacing: 1,
+  },
+  raiRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  raiLabel: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+  },
+  raiValue: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  raiDivider: {
+    height: 1,
+    backgroundColor: colors.warning + "35",
+  },
+  raiNote: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: "justify",
+    marginTop: 4,
+  },
   riskRow: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -683,12 +923,31 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     lineHeight: 20,
+    textAlign: "justify",
+  },
+  disclaimerBox: {
+    marginTop: 8,
+    backgroundColor: colors.warning + "14",
+    borderWidth: 1,
+    borderColor: colors.warning + "45",
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  disclaimerBadge: {
+    alignSelf: "flex-start",
+    fontSize: 10,
+    fontWeight: "800",
+    color: colors.warning,
+    letterSpacing: 1,
+    marginBottom: 6,
   },
   disclaimer: {
     fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
+    color: colors.textPrimary,
+    textAlign: "justify",
     lineHeight: 18,
+    fontWeight: "600",
   },
   comingSoon: {
     fontSize: 48,
@@ -794,6 +1053,7 @@ const createStyles = (colors: any) => StyleSheet.create({
     fontSize: 14,
     color: colors.textPrimary,
     lineHeight: 22,
+    textAlign: "justify",
   },
 });
 

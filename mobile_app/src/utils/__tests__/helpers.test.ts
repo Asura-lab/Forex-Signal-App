@@ -1,4 +1,11 @@
-import { formatNumber, formatPercent, getSignalColor, SIGNAL_TYPES } from '../helpers';
+import {
+  formatNumber,
+  formatPercent,
+  getSignalColor,
+  SIGNAL_TYPES,
+  ACTIVE_CURRENCY_PAIRS,
+  CURRENCY_PAIRS,
+} from '../helpers';
 
 describe('Helper Functions', () => {
   describe('formatNumber', () => {
@@ -34,6 +41,13 @@ describe('Helper Functions', () => {
 
     it('returns default color for unknown signal', () => {
       expect(getSignalColor(99)).toBe('#9E9E9E');
+    });
+  });
+
+  describe('active currency scope', () => {
+    it('keeps market list aligned with configured currency pairs', () => {
+      expect(ACTIVE_CURRENCY_PAIRS).toHaveLength(CURRENCY_PAIRS.length);
+      expect(ACTIVE_CURRENCY_PAIRS.some((pair) => pair.id === 'EUR_USD')).toBe(true);
     });
   });
 });

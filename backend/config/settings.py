@@ -5,26 +5,104 @@ Predictrix Flask backend + GBDT signal generator
 
 import os
 from pathlib import Path
-from dotenv import load_dotenv
 
 # Project root directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-# Load environment variables from config/.env
+# Load environment variables from config/.env only when explicitly allowed.
 ENV_PATH = Path(__file__).resolve().parent / '.env'
-load_dotenv(ENV_PATH)
+
+
+def _as_bool(value: str, default: bool = False) -> bool:
+    raw = str(value if value is not None else default).strip().lower()
+    return raw in ('1', 'true', 'yes', 'on')
+
+
+def _is_production_runtime() -> bool:
+    explicit_env = str(os.getenv('APP_ENV', os.getenv('ENVIRONMENT', ''))).strip().lower()
+    if explicit_env in ('prod', 'production', 'staging'):
+        return True
+
+    if os.getenv('FLY_APP_NAME') or os.getenv('WEBSITE_SITE_NAME'):
+        return True
+
+    debug_raw = os.getenv('DEBUG')
+    if debug_raw is not None and str(debug_raw).strip().lower() in ('0', 'false', 'no', 'off'):
+        return True
+
+    return False
+
+
+PRODUCTION_RUNTIME = _is_production_runtime()
+
+ALLOW_LOCAL_DOTENV = False
+if _as_bool(os.getenv('ALLOW_LOCAL_DOTENV', 'false')):
+    print('[WARN] ALLOW_LOCAL_DOTENV is ignored. Local dotenv loading is disabled by security policy.')
+
+strict_default = 'true' if PRODUCTION_RUNTIME else 'false'
+STRICT_RUNTIME_SECRETS = _as_bool(os.getenv('STRICT_RUNTIME_SECRETS', strict_default))
+
+if PRODUCTION_RUNTIME and ALLOW_LOCAL_DOTENV:
+    if STRICT_RUNTIME_SECRETS:
+        raise ValueError("ALLOW_LOCAL_DOTENV=true is not allowed in production runtime.")
+    print("[WARN] ALLOW_LOCAL_DOTENV ignored in production runtime.")
+    ALLOW_LOCAL_DOTENV = False
+
+if ALLOW_LOCAL_DOTENV and ENV_PATH.exists():
+    # Local dotenv loading is intentionally disabled to avoid accidental secret ingestion.
+    print('[WARN] Local dotenv loading is disabled by security policy. Using runtime environment only.')
 
 # MongoDB Configuration
 MONGO_URI = os.getenv('MONGO_URI')
 if not MONGO_URI:
-    raise ValueError("MONGO_URI байхгүй байна! backend/config/.env файлыг шалгана уу.")
+    if STRICT_RUNTIME_SECRETS or PRODUCTION_RUNTIME:
+        raise ValueError("MONGO_URI байхгүй байна! Secret manager эсвэл runtime environment-оос өгнө үү.")
+    MONGO_URI = 'mongodb://localhost:27017/users_db'
+    print("[WARN] MONGO_URI not set. Using local fallback URI for development/testing.")
 
 # JWT Configuration
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
-    raise ValueError("SECRET_KEY байхгүй байна! backend/config/.env файлыг шалгана уу.")
+    if STRICT_RUNTIME_SECRETS or PRODUCTION_RUNTIME:
+        raise ValueError("SECRET_KEY байхгүй байна! Secret manager эсвэл runtime environment-оос өгнө үү.")
+    SECRET_KEY = 'dev-insecure-secret-key-change-me'
+    print("[WARN] SECRET_KEY not set. Using local fallback key for development/testing.")
 
-JWT_EXPIRATION_DAYS = 7
+JWT_ISSUER = os.getenv('JWT_ISSUER', 'predictrix-api').strip() or 'predictrix-api'
+JWT_AUDIENCE = os.getenv('JWT_AUDIENCE', 'predictrix-mobile').strip() or 'predictrix-mobile'
+
+try:
+    ACCESS_TOKEN_EXPIRATION_MINUTES = int(os.getenv('ACCESS_TOKEN_EXPIRATION_MINUTES', '60'))
+except Exception:
+    ACCESS_TOKEN_EXPIRATION_MINUTES = 60
+ACCESS_TOKEN_EXPIRATION_MINUTES = max(5, ACCESS_TOKEN_EXPIRATION_MINUTES)
+
+try:
+    REFRESH_TOKEN_EXPIRATION_DAYS = int(os.getenv('REFRESH_TOKEN_EXPIRATION_DAYS', '30'))
+except Exception:
+    REFRESH_TOKEN_EXPIRATION_DAYS = 30
+REFRESH_TOKEN_EXPIRATION_DAYS = max(1, REFRESH_TOKEN_EXPIRATION_DAYS)
+
+# Consent and policy governance
+POLICY_TERMS_VERSION = os.getenv('POLICY_TERMS_VERSION', '2026-04-04')
+POLICY_PRIVACY_VERSION = os.getenv('POLICY_PRIVACY_VERSION', '2026-04-04')
+
+# Model governance (fail-fast in production by default)
+MODEL_CONTRACT_REQUIRED = _as_bool(
+    os.getenv('MODEL_CONTRACT_REQUIRED', 'true' if PRODUCTION_RUNTIME else 'false')
+)
+
+# LLM governance
+ALLOW_EXTERNAL_LLM_FALLBACK = _as_bool(
+    os.getenv('ALLOW_EXTERNAL_LLM_FALLBACK', 'false')
+)
+GEMINI_SAFETY_MODE = os.getenv('GEMINI_SAFETY_MODE', 'strict' if PRODUCTION_RUNTIME else 'balanced').strip().lower()
+
+# Backward compatibility for older imports.
+JWT_EXPIRATION_DAYS = max(1, ACCESS_TOKEN_EXPIRATION_MINUTES // (24 * 60))
+
+# Distributed rate limit backend (Redis)
+RATE_LIMIT_REDIS_URL = os.getenv('RATE_LIMIT_REDIS_URL', '').strip()
 
 # Email Configuration (Flask-Mail)
 MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
@@ -69,7 +147,7 @@ GEMINI_API_KEYS = [key for key in GEMINI_API_KEYS if key]
 # API Configuration
 API_HOST = os.getenv('API_HOST', '0.0.0.0')
 API_PORT = int(os.getenv('API_PORT', 5000))
-DEBUG_MODE = os.getenv('DEBUG', 'True').lower() == 'true'
+DEBUG_MODE = _as_bool(os.getenv('DEBUG', 'false' if PRODUCTION_RUNTIME else 'true'))
 
 # Data directories
 DATA_DIR = BASE_DIR / 'data'
@@ -79,5 +157,7 @@ MODELS_DIR = BASE_DIR / 'models'
 
 SUPPORTED_PAIR = "EUR_USD"
 
-print(f"[OK] Configuration loaded from: {ENV_PATH}")
+print("[OK] Configuration loaded from runtime environment variables")
+print(f"[INFO] Production runtime mode: {PRODUCTION_RUNTIME}")
+print(f"[INFO] Strict runtime secrets: {STRICT_RUNTIME_SECRETS}")
 print(f"[INFO] Using Yahoo Finance (yfinance) for forex data — no API key required")

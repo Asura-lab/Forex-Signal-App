@@ -1,5 +1,5 @@
 /**
- * Валютын хослолын мэдээлэл - 20 алдартай forex хослол
+ * Валютын хослолын мэдээлэл (metadata)
  */
 export interface CurrencyPair {
   id: string;
@@ -132,6 +132,9 @@ export const CURRENCY_PAIRS: CurrencyPair[] = [
     color: "#7C4DFF",
   },
 ];
+
+// Market board shows all pairs, while prediction scope remains EUR/USD on backend.
+export const ACTIVE_CURRENCY_PAIRS: CurrencyPair[] = CURRENCY_PAIRS;
 
 export interface SignalType {
   name: string;
@@ -299,6 +302,7 @@ export const getTimeBasedGreeting = (language: "mn" | "en" = "mn"): string => {
 
 export default {
   CURRENCY_PAIRS,
+  ACTIVE_CURRENCY_PAIRS,
   SIGNAL_TYPES,
   formatNumber,
   formatPercent,

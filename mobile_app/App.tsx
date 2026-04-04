@@ -7,7 +7,6 @@ import {
 } from "react-native";
 import { NavigationContainer, NavigationContainerRef } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { getColors } from "./src/config/theme";
@@ -16,13 +15,14 @@ import SignUpScreen from "./src/screens/SignUpScreen";
 import EmailVerificationScreen from "./src/screens/EmailVerificationScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import MainTabs from "./src/navigation/MainTabs";
-import SignalScreen from "./src/screens/SignalScreen";
+import PredictionScreen from "./src/screens/PredictionScreen";
 import NotificationsScreen from "./src/screens/NotificationsScreen";
 import {
   initializePushNotifications,
   setupNotificationListeners,
   requestNotificationPermission,
 } from "./src/services/notificationService";
+import { getAuthToken } from "./src/services/authTokenStorage";
 import { AlertProvider } from "./src/context/AlertContext";
 import AppAlert from "./src/components/AppAlert";
 import SplashScreen from "./src/screens/SplashScreen";
@@ -50,7 +50,7 @@ function AppContent() {
 
     try {
       if (data?.type === "signal" || data?.screen === "Signal") {
-        nav.navigate("Main", { screen: "PredictionTab" });
+        nav.navigate("Main", { screen: "SignalTab" });
       } else if (data?.screen === "News") {
         nav.navigate("Main", { screen: "NewsTab" });
       } else if (data?.screen === "Profile") {
@@ -72,7 +72,7 @@ function AppContent() {
         if (nextState !== "active") return;
 
         try {
-          const token = await AsyncStorage.getItem("userToken");
+          const token = await getAuthToken();
           const isLoggedIn = !!token;
           setUserLoggedIn(isLoggedIn);
 
@@ -125,7 +125,7 @@ function AppContent() {
 
   const checkAuthStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await getAuthToken();
       setUserLoggedIn(!!token);
     } catch (error) {
       setUserLoggedIn(false);
@@ -210,7 +210,7 @@ function AppContent() {
           />
           <Stack.Screen
             name="Signal"
-            component={SignalScreen as any}
+            component={PredictionScreen as any}
             options={{
               headerShown: false,
             }}

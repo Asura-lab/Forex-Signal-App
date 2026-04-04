@@ -1,8 +1,17 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from "axios";
 import { Platform } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_BASE_URL } from "../config/api";
 import { getDeviceId } from "./notificationService";
+import {
+  clearAuthToken,
+  clearRefreshToken,
+  clearStoredUserData,
+  getAuthToken,
+  getRefreshToken,
+  setAuthToken,
+  setRefreshToken,
+  setStoredUserData,
+} from "./authTokenStorage";
 
 export interface UserData {
   id: string;
@@ -16,9 +25,87 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   token?: string;
+  refresh_token?: string;
   user?: UserData;
   requiresVerification?: boolean;
 }
+
+const AUTH_REFRESH_PATH = "/auth/refresh";
+const NON_REFRESHABLE_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/verify-email",
+  "/auth/resend-verification",
+  "/auth/forgot-password",
+  "/auth/verify-reset-code",
+  "/auth/reset-password",
+  AUTH_REFRESH_PATH,
+];
+
+let refreshInFlight: Promise<string | null> | null = null;
+
+const clearSessionState = async () => {
+  await clearAuthToken();
+  await clearRefreshToken();
+  await clearStoredUserData();
+};
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldAttemptTokenRefresh = (config: any) => {
+  const requestUrl = String(config?.url || "");
+  if (config?.__isRetryRequest) {
+    return false;
+  }
+
+  return !NON_REFRESHABLE_PATHS.some((path) => requestUrl.includes(path));
+};
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (refreshInFlight) {
+    return refreshInFlight;
+  }
+
+  refreshInFlight = (async () => {
+    const refreshToken = await getRefreshToken();
+    if (!refreshToken) {
+      await clearSessionState();
+      return null;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}${AUTH_REFRESH_PATH}`,
+        { refresh_token: refreshToken },
+        {
+          timeout: 10000,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const nextAccessToken = response.data?.token;
+      const nextRefreshToken = response.data?.refresh_token;
+
+      if (!nextAccessToken || !nextRefreshToken) {
+        await clearSessionState();
+        return null;
+      }
+
+      await setAuthToken(nextAccessToken);
+      await setRefreshToken(nextRefreshToken);
+      return nextAccessToken;
+    } catch {
+      await clearSessionState();
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+};
 
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
@@ -31,7 +118,7 @@ const apiClient: AxiosInstance = axios.create({
 // Request interceptor - Token автоматаар нэмэх
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
-    const token = await AsyncStorage.getItem("userToken");
+    const token = await getAuthToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -47,9 +134,21 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: any) => {
     if (error?.response?.status === 401) {
-      // Token expired or invalid — clear it so the user can re-authenticate
-      await AsyncStorage.removeItem("userToken");
-      console.warn("[WARN] apiClient: 401 received, cleared stored token.");
+      const config = error?.config || {};
+
+      if (shouldAttemptTokenRefresh(config)) {
+        config.__isRetryRequest = true;
+        const nextAccessToken = await refreshAccessToken();
+        if (nextAccessToken) {
+          config.headers = config.headers || {};
+          config.headers.Authorization = `Bearer ${nextAccessToken}`;
+          return apiClient(config);
+        }
+      }
+
+      // Access + refresh tokens are both invalid/expired.
+      await clearSessionState();
+      console.warn("[WARN] apiClient: 401 received, cleared session tokens.");
     }
 
     // Retry up to 3 times on network/timeout errors
@@ -80,12 +179,26 @@ apiClient.interceptors.response.use(
 /**
  * Бүртгүүлэх (Имэйл баталгаажуулалттай)
  */
-export const registerUser = async (name: string, email: string, password: string): Promise<ApiResponse> => {
+export interface RegisterConsentPayload {
+  accepted: boolean;
+  terms_version: string;
+  privacy_version: string;
+  locale: "mn" | "en";
+  accepted_at: string;
+}
+
+export const registerUser = async (
+  name: string,
+  email: string,
+  password: string,
+  consent: RegisterConsentPayload,
+): Promise<ApiResponse> => {
   try {
     const response = await apiClient.post("/auth/register", {
       name,
       email,
       password,
+      consent,
     });
     return { success: true, data: response.data };
   } catch (error: any) {
@@ -108,11 +221,11 @@ export const verifyEmail = async (email: string, code: string): Promise<ApiRespo
 
     // Token-ийг хадгалах
     if (response.data.token) {
-      await AsyncStorage.setItem("userToken", response.data.token);
-      await AsyncStorage.setItem(
-        "userData",
-        JSON.stringify(response.data.user)
-      );
+      await setAuthToken(response.data.token);
+      if (response.data.refresh_token) {
+        await setRefreshToken(response.data.refresh_token);
+      }
+      await setStoredUserData(JSON.stringify(response.data.user));
     }
 
     return { success: true, data: response.data };
@@ -156,11 +269,11 @@ export const loginUser = async (email: string, password: string): Promise<ApiRes
 
     // Token хадгалах
     if (response.data.token) {
-      await AsyncStorage.setItem("userToken", response.data.token);
-      await AsyncStorage.setItem(
-        "userData",
-        JSON.stringify(response.data.user)
-      );
+      await setAuthToken(response.data.token);
+      if (response.data.refresh_token) {
+        await setRefreshToken(response.data.refresh_token);
+      }
+      await setStoredUserData(JSON.stringify(response.data.user));
     }
 
     return { success: true, data: response.data };
@@ -231,8 +344,19 @@ export const resetPassword = async (email: string, code: string, newPassword: st
  */
 export const logoutUser = async () => {
   try {
-    await AsyncStorage.removeItem("userToken");
-    await AsyncStorage.removeItem("userData");
+    const refreshToken = await getRefreshToken();
+    if (refreshToken) {
+      try {
+        await apiClient.post("/auth/logout", {
+          refresh_token: refreshToken,
+          all_devices: false,
+        });
+      } catch {
+        // Ignore server logout failure; local logout must still succeed.
+      }
+    }
+
+    await clearSessionState();
     return { success: true };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -413,14 +537,76 @@ export const getRecentSignals = async (pair: string = "EUR/USD", limit: number =
 export const getMarketAnalysis = async (pair: string) => {
   try {
     const response = await apiClient.get(`/api/market-analysis?pair=${pair}`);
-    // Backend returns { status: "success", data: { ... } }
-    // We want to return the inner data object
-    return { success: true, data: response.data.data };
+    let payload = response.data || {};
+
+    if (response.status === 202 || String(payload.status || "").toLowerCase() === "pending") {
+      const jobId = String(payload.job_id || "").trim();
+      if (!jobId) {
+        return {
+          success: false,
+          error: "Analysis job id олдсонгүй",
+          statusCode: 503,
+        };
+      }
+
+      const maxPollAttempts = 8;
+      for (let attempt = 0; attempt < maxPollAttempts; attempt += 1) {
+        const pollResponse = await apiClient.get(`/api/market-analysis/status/${jobId}`);
+        const pollPayload = pollResponse.data || {};
+        const pollStatus = String(pollPayload.status || "").toLowerCase();
+        const jobStatus = String(pollPayload.job_status || pollStatus).toLowerCase();
+
+        if (pollStatus === "success" && pollPayload.data) {
+          payload = pollPayload;
+          break;
+        }
+
+        if ((pollResponse.status === 202 || pollStatus === "pending" || jobStatus === "queued" || jobStatus === "running") && attempt < maxPollAttempts - 1) {
+          const retryAfterSeconds = Number(pollPayload.poll_after_seconds || 2) || 2;
+          await wait(Math.max(1, retryAfterSeconds) * 1000);
+          continue;
+        }
+
+        return {
+          success: false,
+          error: pollPayload.message || pollPayload.error || "Market analysis бэлэн болоогүй байна",
+          statusCode: pollResponse.status,
+          retryAfter: Number(pollPayload.retry_after || pollPayload.poll_after_seconds || 0) || undefined,
+        };
+      }
+    }
+
+    if (!payload?.data) {
+      return {
+        success: false,
+        error: payload?.message || "Market analysis өгөгдөл хоосон байна",
+        statusCode: response.status,
+      };
+    }
+
+    const analysisData = payload.data || {};
+
+    const analysisMeta = {
+      analysisSource: payload.analysis_source || (payload.cached ? (payload.stale ? "cache-stale" : "cache-fresh") : "fresh-generated"),
+      cached: Boolean(payload.cached),
+      stale: Boolean(payload.stale),
+      generatedAt: payload.generated_at || null,
+    };
+
+    return {
+      success: true,
+      data: {
+        ...analysisData,
+        __meta: analysisMeta,
+      },
+    };
   } catch (error: any) {
     console.error("Market analysis авах алдаа:", error.message);
     return {
       success: false,
       error: error.response?.data?.error || error.message,
+      statusCode: error.response?.status,
+      retryAfter: Number(error.response?.data?.retry_after || 0) || undefined,
     };
   }
 };
@@ -462,11 +648,12 @@ export const changeUserPassword = async (oldPassword: string, newPassword: strin
 
 /**
  * Мэдээ авах
- * @param {string} type - 'upcoming' | 'past' | 'outlook'
+ * @param {string} type - 'upcoming' | 'history' | 'past' | 'outlook'
  */
 export const getNews = async (type: string = "upcoming") => {
   try {
-    const response = await apiClient.get(`/api/news?type=${type}`);
+    const normalizedType = type === "past" ? "history" : type;
+    const response = await apiClient.get(`/api/news?type=${normalizedType}`);
     return { success: true, data: response.data };
   } catch (error: any) {
     console.error("Мэдээ авах алдаа:", error.message);

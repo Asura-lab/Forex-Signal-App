@@ -1,7 +1,7 @@
 import React from "react";
 import { View, StyleSheet } from "react-native";
 import CurrencyCard from "./CurrencyCard";
-import { CURRENCY_PAIRS, CurrencyPair } from "../utils/helpers";
+import { ACTIVE_CURRENCY_PAIRS, CurrencyPair } from "../utils/helpers";
 
 interface CurrencyListProps {
   liveRates: Record<string, any>;
@@ -18,7 +18,7 @@ const CurrencyList: React.FC<CurrencyListProps> = ({ liveRates, onPairPress, loa
   
   return (
     <View style={styles.container}>
-      {CURRENCY_PAIRS.map((pair) => (
+      {ACTIVE_CURRENCY_PAIRS.map((pair) => (
         <CurrencyCard
           key={pair.id}
           pair={pair}

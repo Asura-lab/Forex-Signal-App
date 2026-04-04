@@ -17,6 +17,7 @@ import { loginUser } from "../services/api";
 import { initializePushNotifications } from "../services/notificationService";
 import { NavigationProp } from "@react-navigation/native";
 import { Sun, Moon, Eye, EyeOff } from 'lucide-react-native';
+import { UI_COPY } from "../config/copy";
 
 interface LoginScreenProps {
   navigation: NavigationProp<any>;
@@ -108,7 +109,14 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
       
       <View style={styles.content}>
         {/* Theme Toggle */}
-        <TouchableOpacity onPress={toggleTheme} style={styles.themeToggle}>
+        <TouchableOpacity
+          onPress={toggleTheme}
+          style={styles.themeToggle}
+          accessibilityRole="button"
+          accessibilityLabel="Сэдэв солих"
+          accessibilityHint="Гэрэл болон бараан горим хооронд шилжинэ"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           {isDark ? (
             <Sun size={22} color={colors.textSecondary} />
           ) : (
@@ -118,45 +126,54 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>PREDICTRIX</Text>
-          <Text style={styles.subtitle}>AI Trading Assistant</Text>
+          <Text style={styles.title} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.login.title}</Text>
+          <Text style={styles.subtitle} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.subtitle}</Text>
         </View>
 
         {/* Form */}
         <View style={styles.formContainer}>
           {/* Email */}
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>EMAIL</Text>
+            <Text style={styles.inputLabel} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.emailLabel}</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Enter your email"
+                placeholder={UI_COPY.login.emailPlaceholder}
                 placeholderTextColor={colors.placeholderText}
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                allowFontScaling
+                maxFontSizeMultiplier={1.4}
+                accessibilityLabel="И-мэйл хаяг"
               />
             </View>
           </View>
 
           {/* Password */}
           <View style={styles.inputWrapper}>
-            <Text style={styles.inputLabel}>PASSWORD</Text>
+            <Text style={styles.inputLabel} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.passwordLabel}</Text>
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
-                placeholder="Enter password"
+                placeholder={UI_COPY.login.passwordPlaceholder}
                 placeholderTextColor={colors.placeholderText}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
+                allowFontScaling
+                maxFontSizeMultiplier={1.4}
+                accessibilityLabel="Нууц үг"
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.toggleButton}
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? "Нууц үгийг нуух" : "Нууц үгийг харуулах"}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {showPassword ? <EyeOff size={18} color={colors.textSecondary} /> : <Eye size={18} color={colors.textSecondary} />}
               </TouchableOpacity>
@@ -167,8 +184,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <TouchableOpacity
             onPress={() => navigation.navigate("ForgotPassword")}
             style={styles.forgotButton}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.login.forgotPassword}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Text style={styles.forgotText}>Forgot password?</Text>
+            <Text style={styles.forgotText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.forgotPassword}</Text>
           </TouchableOpacity>
 
           {/* Login Button */}
@@ -176,18 +196,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             style={[styles.loginButton, loading && styles.disabledButton]}
             onPress={handleLogin}
             disabled={loading}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.login.signIn}
           >
             {loading ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
             ) : (
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Text style={styles.loginButtonText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.signIn}</Text>
             )}
           </TouchableOpacity>
 
           {/* Divider */}
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <Text style={styles.dividerText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.or}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -195,15 +217,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           <TouchableOpacity
             style={styles.signupButton}
             onPress={() => navigation.navigate("SignUp")}
+            accessibilityRole="button"
+            accessibilityLabel={UI_COPY.login.createAccount}
           >
-            <Text style={styles.signupButtonText}>Create Account</Text>
+            <Text style={styles.signupButtonText} allowFontScaling maxFontSizeMultiplier={1.4}>{UI_COPY.login.createAccount}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footerText}>
-          For research purposes only
-        </Text>
+        <Text style={styles.footerText} allowFontScaling maxFontSizeMultiplier={1.5}>{UI_COPY.login.footer}</Text>
       </View>
     </KeyboardAvoidingView>
   );

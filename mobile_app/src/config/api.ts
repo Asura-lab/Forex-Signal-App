@@ -7,9 +7,11 @@ import { Platform } from "react-native";
 
 // ─── Environment switch ───────────────────────────────────────────────────────
 // __DEV__ = true  → local backend (npm start / expo go)
-// __DEV__ = false → Fly.io production backend (release build)
+// __DEV__ = false → production URL (default: Fly, overridable for Azure release)
 
-const PRODUCTION_URL = 'https://predictrix-api.fly.dev';
+const DEFAULT_PRODUCTION_URL = 'https://predictrix-api.fly.dev';
+const ENV_PRODUCTION_URL = (globalThis as any)?.process?.env?.EXPO_PUBLIC_API_BASE_URL?.trim();
+const PRODUCTION_URL = ENV_PRODUCTION_URL || DEFAULT_PRODUCTION_URL;
 
 // Android emulator uses 10.0.2.2 to reach host machine; iOS uses localhost
 const LOCAL_URL = Platform.OS === 'android'
@@ -30,7 +32,9 @@ export const API_ENDPOINTS = {
   // Authentication
   LOGIN: `${API_BASE_URL}/auth/login`,
   REGISTER: `${API_BASE_URL}/auth/register`,
-  VERIFY: `${API_BASE_URL}/auth/verify`,
+  VERIFY_EMAIL: `${API_BASE_URL}/auth/verify-email`,
+  REFRESH: `${API_BASE_URL}/auth/refresh`,
+  LOGOUT: `${API_BASE_URL}/auth/logout`,
   ME: `${API_BASE_URL}/auth/me`,
   UPDATE: `${API_BASE_URL}/auth/update`,
   CHANGE_PASSWORD: `${API_BASE_URL}/auth/change-password`,

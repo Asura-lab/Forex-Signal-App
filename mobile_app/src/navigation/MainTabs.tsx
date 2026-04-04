@@ -8,8 +8,11 @@ import HomeScreen from "../screens/HomeScreen";
 import NewsScreen from "../screens/NewsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
 import PredictionScreen from "../screens/PredictionScreen";
+import { CURRENCY_PAIRS } from "../utils/helpers";
+import { UI_COPY } from "../config/copy";
 
 const Tab = createBottomTabNavigator();
+const DEFAULT_SIGNAL_PAIR = CURRENCY_PAIRS[0];
 
 
 
@@ -27,7 +30,7 @@ const MainTabs = () => {
         tabBarIcon: ({ focused }) => {
           const iconColor = focused ? colors.success : colors.textSecondary;
           if (route.name === 'HomeTab') return <ChartCandlestick size={22} color={iconColor} />;
-          if (route.name === 'PredictionTab') return <TrendingUpDown size={22} color={iconColor} />;
+          if (route.name === 'SignalTab') return <TrendingUpDown size={22} color={iconColor} />;
           if (route.name === 'NewsTab') return <Newspaper size={22} color={iconColor} />;
           return <User size={22} color={iconColor} />;
         },
@@ -52,28 +55,33 @@ const MainTabs = () => {
         name="HomeTab"
         component={HomeScreen}
         options={{
-          tabBarLabel: "MARKET",
+          tabBarLabel: UI_COPY.tabs.market,
+          tabBarAccessibilityLabel: UI_COPY.tabs.market,
         }}
       />
       <Tab.Screen
-        name="PredictionTab"
-        component={PredictionScreen}
+        name="SignalTab"
+        component={PredictionScreen as any}
+        initialParams={{ pair: DEFAULT_SIGNAL_PAIR }}
         options={{
-          tabBarLabel: "SIGNAL",
+          tabBarLabel: UI_COPY.tabs.signal,
+          tabBarAccessibilityLabel: UI_COPY.tabs.signal,
         }}
       />
       <Tab.Screen
         name="NewsTab"
         component={NewsScreen}
         options={{
-          tabBarLabel: "NEWS",
+          tabBarLabel: UI_COPY.tabs.news,
+          tabBarAccessibilityLabel: UI_COPY.tabs.news,
         }}
       />
       <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
-          tabBarLabel: "PROFILE",
+          tabBarLabel: UI_COPY.tabs.profile,
+          tabBarAccessibilityLabel: UI_COPY.tabs.profile,
         }}
       />
     </Tab.Navigator>

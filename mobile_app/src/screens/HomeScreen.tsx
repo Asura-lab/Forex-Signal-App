@@ -17,6 +17,8 @@ import { CurrencyPair } from "../utils/helpers";
 import { NavigationProp, useFocusEffect } from "@react-navigation/native";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bell } from 'lucide-react-native';
+import { useAlert } from "../context/AlertContext";
+import { UI_COPY } from "../config/copy";
 
 interface HomeScreenProps {
   navigation: NavigationProp<any>;
@@ -31,6 +33,7 @@ interface LiveRatesMap {
  */
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { isDark } = useTheme();
+  const { showAlert } = useAlert();
   const colors = getColors(isDark);
   const styles = createStyles(colors);
   const queryClient = useQueryClient();
@@ -88,13 +91,21 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     refetchInterval: 60000,
   });
 
-  const lastUpdateTime = new Date().toLocaleTimeString("en-US", { hour12: false });
+  const lastUpdateTime = new Date().toLocaleTimeString("mn-MN", { hour12: false });
 
   const onRefresh = async () => {
     await refetch();
   };
 
   const handlePairPress = (pair: CurrencyPair) => {
+    if (pair?.name !== "EUR/USD") {
+      showAlert(
+        "Зөвхөн EUR/USD таамаг",
+        "Бусад валютын хослол дээр одоогоор зөвхөн бодит ханш харуулна."
+      );
+      return;
+    }
+
     navigation.navigate("Signal", { pair });
   };
 
@@ -106,7 +117,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.loadingContainer}>
         <StatusBar barStyle={isDark ? "light-content" : "dark-content"} backgroundColor={colors.background} />
         <ActivityIndicator size="large" color={colors.success} />
-        <Text style={styles.loadingText}>Loading market data...</Text>
+        <Text style={styles.loadingText} allowFontScaling maxFontSizeMultiplier={1.5}>{UI_COPY.home.loading}</Text>
       </View>
     );
   }
@@ -118,20 +129,24 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>FOREX MARKET</Text>
+          <Text style={styles.headerTitle} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.home.headerTitle.toUpperCase()}</Text>
           <View style={styles.headerRight}>
             {/* Bell Icon */}
             <TouchableOpacity
               style={styles.bellButton}
               onPress={() => navigation.navigate("Notifications" as never)}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Мэдэгдэл"
+              accessibilityHint="Уншаагүй мэдэгдлүүдийг нээнэ"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
               <View style={styles.bellIcon}>
                 <Bell size={22} color={colors.textSecondary} />
               </View>
               {badgeCount > 0 && (
                 <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>
+                  <Text style={styles.bellBadgeText} allowFontScaling maxFontSizeMultiplier={1.2}>
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </Text>
                 </View>
@@ -140,12 +155,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             {/* Status */}
             <View style={styles.statusContainer}>
               <View style={[styles.statusDot, { backgroundColor: apiConnected ? colors.success : colors.error }]} />
-              <Text style={[styles.statusText, { color: apiConnected ? colors.success : colors.error }]}>{apiConnected ? "LIVE" : "OFFLINE"}</Text>
+              <Text
+                style={[styles.statusText, { color: apiConnected ? colors.success : colors.error }]}
+                allowFontScaling
+                maxFontSizeMultiplier={1.3}
+              >
+                {apiConnected ? "ИДЭВХТЭЙ" : "САЛАНГИД"}
+              </Text>
             </View>
           </View>
         </View>
         {lastUpdateTime && (
-          <Text style={styles.updateTime}>Last update: {lastUpdateTime}</Text>
+          <Text style={styles.updateTime} allowFontScaling maxFontSizeMultiplier={1.3}>
+            {UI_COPY.home.lastUpdatePrefix}: {lastUpdateTime}
+          </Text>
         )}
       </View>
 
@@ -163,10 +186,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       >
         {/* Table Header */}
         <View style={styles.tableHeader}>
-          <Text style={[styles.tableHeaderText, styles.symbolColumn]}>SYMBOL</Text>
-          <Text style={[styles.tableHeaderText, styles.priceColumn]}>PRICE</Text>
-          <Text style={[styles.tableHeaderText, styles.changeColumn]}>CHG</Text>
-          <Text style={[styles.tableHeaderText, styles.percentColumn]}>CHG%</Text>
+          <Text style={[styles.tableHeaderText, styles.symbolColumn]} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.home.table.symbol.toUpperCase()}</Text>
+          <Text style={[styles.tableHeaderText, styles.priceColumn]} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.home.table.price.toUpperCase()}</Text>
+          <Text style={[styles.tableHeaderText, styles.changeColumn]} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.home.table.change.toUpperCase()}</Text>
+          <Text style={[styles.tableHeaderText, styles.percentColumn]} allowFontScaling maxFontSizeMultiplier={1.3}>{UI_COPY.home.table.changePercent.toUpperCase()}</Text>
         </View>
 
         {/* Currency List */}

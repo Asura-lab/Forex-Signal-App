@@ -120,8 +120,8 @@ const ForgotPasswordScreen = ({ navigation }: { navigation: any }) => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      showAlert("Алдаа", "Нууц үг дор хаяж 6 тэмдэгттэй байх ёстой");
+    if (newPassword.length < 12) {
+      showAlert("Алдаа", "Нууц үг дор хаяж 12 тэмдэгттэй байх ёстой");
       return;
     }
 
